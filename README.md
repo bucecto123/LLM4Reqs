@@ -14,6 +14,6 @@ LLM4Reqs is an AI-driven system that leverages Large Language Models (LLMs) to a
    ```
 3. Start the API server:
    ```
-   uvicorn app:app --reload
+   uvicorn main:app --reload
    ```
-4. You can now test the two APIs available in `app.py`.
+4. You can now test the two APIs available in `main.py`.
