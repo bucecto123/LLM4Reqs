@@ -97,6 +97,11 @@ CORS_ALLOWED_ORIGINS=http://localhost:5173
 php artisan migrate
 ```
 
+To reset database if needed:
+```powershell
+php artisan migrate:fresh
+```
+
 5. Install and publish Sanctum (if not already present):
 
 ```powershell
