@@ -1,9 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { clearAuth } from '../utils/api';
 import { Home, TrendingUp, Plane, ShoppingBag, Plus, Search, Grid3x3, Mic, Send, Globe, Paperclip, ChevronRight, Sparkles } from 'lucide-react';
 
 export default function LLMDashboard() {
   const [message, setMessage] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const accountRef = useRef();
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (accountRef.current && !accountRef.current.contains(e.target)) {
+        setIsAccountOpen(false);
+      }
+    }
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -53,18 +66,36 @@ export default function LLMDashboard() {
         )}
 
         {/* Account */}
-        <div className="p-4 border-t border-gray-200">
-          <button className="w-full flex items-center space-x-3 hover:bg-gray-50 p-3 rounded-lg transition-colors">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#4A7BA7' }}>
-              <span className="text-white text-sm font-semibold">A</span>
-            </div>
-            {isSidebarOpen && (
-              <div className="flex-1 text-left">
-                <div className="text-sm font-medium text-gray-800">Account</div>
-                <div className="text-xs font-semibold" style={{ color: '#4A7BA7' }}>Pro</div>
+        <div className="p-4 border-t border-gray-200 relative">
+          <div ref={accountRef} className="w-full">
+            <button onClick={() => setIsAccountOpen(!isAccountOpen)} className="w-full flex items-center space-x-3 hover:bg-gray-50 p-3 rounded-lg transition-colors">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#4A7BA7' }}>
+                <span className="text-white text-sm font-semibold">A</span>
+              </div>
+              {isSidebarOpen && (
+                <div className="flex-1 text-left">
+                  <div className="text-sm font-medium text-gray-800">Account</div>
+                  <div className="text-xs font-semibold" style={{ color: '#4A7BA7' }}>Pro</div>
+                </div>
+              )}
+            </button>
+
+            {/* small dropdown with only Logout */}
+            {isAccountOpen && (
+              <div
+                className="absolute bottom-20 left-4 rounded shadow-lg z-50 w-40"
+                style={{ backgroundColor: '#112D4E', border: '1px solid rgba(255,255,255,0.06)' }}
+              >
+                <button
+                  onClick={() => { clearAuth(); }}
+                  className="w-full text-left px-4 py-2 text-sm text-white font-medium hover:opacity-90"
+                  style={{ backgroundColor: 'transparent' }}
+                >
+                  Log out
+                </button>
               </div>
             )}
-          </button>
+          </div>
         </div>
       </div>
 
@@ -147,7 +178,7 @@ export default function LLMDashboard() {
 function NavItem({ icon, label, active, isOpen }) {
   const baseClasses = "w-full flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-all duration-200";
   const activeStyle = active 
-    ? { backgroundColor: '#DBE2EF', color: '#112D4E' }
+    ? { backgroundColor: '#112D4E', color: '#DBE2EF' }
     : {};
 
   return (
