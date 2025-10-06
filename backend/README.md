@@ -59,3 +59,80 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+## LLM4Reqs additions
+
+This repository has been extended for the LLM4Reqs capstone project. Changes/additions include:
+
+- API endpoints: `/api/health`, `/api/chat`, `/api/register`, `/api/login`, `/api/logout`.
+- Token-based authentication using Laravel Sanctum (personal access tokens).
+- `ChatController` proxies chat requests to a Python LLM service configurable via `LLM_URL` in `.env`.
+
+Quick setup (project-specific):
+
+1. Ensure dependencies are installed:
+
+```powershell
+composer install
+```
+
+2. Copy `.env.example` to `.env` and generate an app key:
+
+```powershell
+copy .env.example .env
+php artisan key:generate
+```
+
+3. Update `.env` values if needed. The following values have been appended to `.env` and can be changed:
+
+```
+LLM_URL=http://127.0.0.1:8000/extract
+SANCTUM_STATEFUL_DOMAINS=localhost:5173
+CORS_ALLOWED_ORIGINS=http://localhost:5173
+```
+
+4. Run migrations (creates users and session tables if using database session driver):
+
+```powershell
+php artisan migrate
+```
+
+5. Install and publish Sanctum (if not already present):
+
+```powershell
+composer require laravel/sanctum
+php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
+php artisan migrate
+```
+
+6. Serve the backend (avoid port conflict with the Python server):
+
+```powershell
+php artisan serve --port=8001
+```
+
+Example API calls are provided in the project root README or can be executed via Postman/curl as shown below:
+
+Register:
+
+```powershell
+curl -X POST http://localhost:8001/api/register -H "Content-Type: application/json" -d '{"name":"Alice","email":"alice@example.com","password":"secret","password_confirmation":"secret"}'
+```
+
+Login:
+
+```powershell
+curl -X POST http://localhost:8001/api/login -H "Content-Type: application/json" -d '{"email":"alice@example.com","password":"secret"}'
+```
+
+Chat (use token from login):
+
+```powershell
+curl -X POST http://localhost:8001/api/chat -H "Content-Type: application/json" -H "Authorization: Bearer <TOKEN>" -d '{"text":"Hello LLM"}'
+```
+
+Health:
+
+```powershell
+curl http://localhost:8001/api/health
+```
