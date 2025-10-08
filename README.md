@@ -66,7 +66,7 @@ php artisan migrate --seed
 6. Start the Laravel dev server (optional; the frontend may call the API directly):
 
 ```powershell
-php artisan serve --host=127.0.0.1 --port=8000
+php artisan serve --host=127.0.0.1 --port=8001
 ```
 
 Notes:
@@ -89,7 +89,7 @@ npm install
 npm run dev
 ```
 
-By default Vite serves on `http://localhost:5173` (or a similar port). Configure proxy settings in `frontend/vite.config.js` or the frontend code to point API requests to the Laravel backend (for example `http://localhost:8000/api`).
+By default Vite serves on `http://localhost:5173` (or a similar port). Configure proxy settings in `frontend/vite.config.js` or the frontend code to point API requests to the Laravel backend (for example `http://localhost:8001/api`).
 
 3. Build for production:
 
