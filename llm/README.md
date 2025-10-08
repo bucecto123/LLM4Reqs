@@ -48,7 +48,7 @@ GROQ_MODEL=mixtral-8x7b-32768
 ### 4. Chạy Service
 
 ```bash
-python main.py
+uvicorn main:app --reload
 ```
 
 Service chạy tại: `http://localhost:8000`
@@ -546,29 +546,3 @@ curl -X POST http://localhost:8000/api/documents/1/process
 # 4. Check results
 curl http://localhost:8000/api/projects/1/requirements
 ```
-
----
-
-## ✅ Week 2 Checklist
-
-### Trưởng Nhóm (Bạn):
-- [ ] Get Groq API key
-- [ ] Setup FastAPI với code từ artifact
-- [ ] Test tất cả endpoints
-- [ ] Document cho team
-- [ ] Demo cho Backend team
-
-### Backend Team:
-- [ ] Tạo LLMService class
-- [ ] Test connection với FastAPI
-- [ ] Implement document processing
-- [ ] Test end-to-end flow
-
----
-
-## 🎓 Resources
-
-- Groq Console: https://console.groq.com/
-- Groq Docs: https://console.groq.com/docs
-- FastAPI Docs: https://fastapi.tiangolo.com/
-- Model comparison: https://console.groq.com/docs/models

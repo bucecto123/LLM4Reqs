@@ -32,13 +32,7 @@ if not GROQ_API_KEY:
     print("WARNING: GROQ_API_KEY is not set. Groq calls will fail until you set this in your .env file.")
 
 groq_client = Groq(api_key=GROQ_API_KEY)
-DEFAULT_MODEL = os.getenv("GROQ_MODEL", "mixtral-8x7b-32768")
-
-# Free Groq models:
-# - mixtral-8x7b-32768 (Best for complex tasks, 32k context)
-# - llama-3.1-8b-instant (Fastest, good for simple tasks)
-# - llama-3.1-70b-versatile (Most powerful, slower)
-# - gemma2-9b-it (Good balance)
+DEFAULT_MODEL = os.getenv("GROQ_MODEL", "gemma2-9b-it")
 
 # ==================== REQUEST/RESPONSE MODELS ====================
 

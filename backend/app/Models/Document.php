@@ -10,9 +10,13 @@ class Document extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['project_id', 'conversation_id', 'user_id', 'filename', 'original_filename', 'file_path', 'file_size', 'file_type', 'status', 'processed_at'];
+    protected $fillable = ['project_id', 'conversation_id', 'user_id', 'filename', 'original_filename', 'file_path', 'content', 'file_size', 'file_type', 'status', 'processed_at'];
 
     protected $dates = ['processed_at'];
+
+    protected $casts = [
+        'content' => 'string',
+    ];
 
     public function project()
     {

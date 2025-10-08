@@ -21,6 +21,7 @@ class DocumentFactory extends Factory
             'filename' => $this->faker->word() . '.pdf',
             'original_filename' => $this->faker->word() . '.pdf',
             'file_path' => '/uploads/' . $this->faker->word() . '.pdf',
+            'content' => $this->faker->paragraphs(3, true),
             'file_size' => $this->faker->numberBetween(1000, 1000000),
             'file_type' => 'pdf',
             'status' => 'uploaded',

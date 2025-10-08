@@ -139,6 +139,7 @@ CREATE TABLE documents (
     filename TEXT NOT NULL,
     original_filename TEXT,
     file_path TEXT,
+    content TEXT,
     file_size INTEGER,
     file_type TEXT,
     status TEXT DEFAULT 'uploaded',
