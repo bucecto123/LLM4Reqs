@@ -17,10 +17,7 @@ class Requirement extends Model
         return $this->belongsTo(Project::class);
     }
 
-    public function personas()
-    {
-        return $this->belongsToMany(Persona::class, 'requirement_personas');
-    }
+    // Persona mapping handled elsewhere; pivot table removed.
 
     public function conflicts()
     {

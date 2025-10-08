@@ -17,8 +17,5 @@ class Persona extends Model
         'is_default' => 'boolean',
     ];
 
-    public function requirements()
-    {
-        return $this->belongsToMany(Requirement::class, 'requirement_personas');
-    }
+    // Requirements relation removed — mapping is handled on Requirement/Conversation now.
 }
