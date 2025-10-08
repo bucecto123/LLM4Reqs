@@ -5,11 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Conversation extends Model
+class ProjectCollaborator extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['project_id', 'user_id', 'requirement_id', 'title', 'context', 'status'];
+    public $timestamps = true;
+
+    protected $fillable = ['project_id', 'user_id', 'role'];
 
     public function project()
     {
@@ -19,10 +21,5 @@ class Conversation extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
-    }
-
-    public function messages()
-    {
-        return $this->hasMany(Message::class);
     }
 }

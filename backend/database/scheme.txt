@@ -1,0 +1,164 @@
+-- Enable foreign key enforcement
+PRAGMA foreign_keys = ON;
+
+---------------------------------------------------
+-- USERS
+---------------------------------------------------
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    email_verified_at DATETIME,
+    password TEXT NOT NULL,
+    remember_token TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted_at DATETIME
+);
+
+---------------------------------------------------
+-- PROJECTS
+---------------------------------------------------
+CREATE TABLE projects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    status TEXT DEFAULT 'active', -- active, archived, deleted
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted_at DATETIME,
+    FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+---------------------------------------------------
+-- PROJECT COLLABORATORS
+---------------------------------------------------
+CREATE TABLE project_collaborators (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    role TEXT DEFAULT 'member', -- owner, editor, viewer
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE (project_id, user_id)
+);
+
+---------------------------------------------------
+-- PERSONAS (shared across all projects)
+---------------------------------------------------
+CREATE TABLE personas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    role TEXT,
+    description TEXT,
+    prompt_template TEXT,
+    is_default BOOLEAN DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted_at DATETIME
+);
+
+---------------------------------------------------
+-- REQUIREMENTS
+---------------------------------------------------
+CREATE TABLE requirements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    content TEXT,
+    priority TEXT DEFAULT 'medium', -- low, medium, high
+    confidence_score REAL,
+    status TEXT DEFAULT 'draft', -- draft, review, approved
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted_at DATETIME,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+---------------------------------------------------
+-- REQUIREMENT ↔ PERSONA LINK (many-to-many)
+---------------------------------------------------
+CREATE TABLE requirement_personas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    requirement_id INTEGER NOT NULL,
+    persona_id INTEGER NOT NULL,
+    generated BOOLEAN DEFAULT 0,
+    FOREIGN KEY (requirement_id) REFERENCES requirements(id) ON DELETE CASCADE,
+    FOREIGN KEY (persona_id) REFERENCES personas(id) ON DELETE CASCADE,
+    UNIQUE (requirement_id, persona_id)
+);
+
+---------------------------------------------------
+-- REQUIREMENT CONFLICTS (project-specific)
+---------------------------------------------------
+CREATE TABLE requirement_conflicts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    requirement_id_1 INTEGER NOT NULL,
+    requirement_id_2 INTEGER NOT NULL,
+    conflict_description TEXT,
+    severity TEXT, -- low, medium, high
+    resolution_status TEXT DEFAULT 'unresolved',
+    resolution_notes TEXT,
+    resolved_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (requirement_id_1) REFERENCES requirements(id) ON DELETE CASCADE,
+    FOREIGN KEY (requirement_id_2) REFERENCES requirements(id) ON DELETE CASCADE
+);
+
+---------------------------------------------------
+-- CONVERSATIONS (LLM chat sessions)
+---------------------------------------------------
+CREATE TABLE conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    requirement_id INTEGER,
+    context TEXT,
+    status TEXT DEFAULT 'open', -- open, closed
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (requirement_id) REFERENCES requirements(id) ON DELETE SET NULL
+);
+
+---------------------------------------------------
+-- MESSAGES (within a conversation)
+---------------------------------------------------
+CREATE TABLE messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL,
+    role TEXT NOT NULL, -- user, assistant, system
+    content TEXT,
+    model_used TEXT,
+    tokens_used INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+);
+
+---------------------------------------------------
+-- DOCUMENTS (uploaded in a conversation)
+---------------------------------------------------
+CREATE TABLE documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    conversation_id INTEGER,
+    user_id INTEGER NOT NULL,
+    filename TEXT NOT NULL,
+    original_filename TEXT,
+    file_path TEXT,
+    file_size INTEGER,
+    file_type TEXT,
+    status TEXT DEFAULT 'uploaded',
+    processed_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE SET NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);

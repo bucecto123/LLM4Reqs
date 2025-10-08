@@ -10,16 +10,14 @@ class CreateRequirementsTable extends Migration
     {
         Schema::create('requirements', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('project_id')->constrained()->onDelete('cascade');
-            $table->foreignId('document_id')->nullable()->constrained('documents')->onDelete('set null');
-            $table->foreignId('conversation_id')->nullable()->constrained('conversations')->onDelete('set null');
-            $table->longText('requirement_text');
-            $table->string('requirement_type')->nullable();
-            $table->string('priority')->default('medium');
-            $table->string('status')->default('draft');
-            $table->string('source')->default('manual');
-            $table->decimal('confidence_score', 5, 4)->nullable();
+            $table->foreignId('project_id')->constrained('projects')->onDelete('cascade');
+            $table->string('title');
+            $table->text('content')->nullable();
+            $table->string('priority')->default('medium'); // low, medium, high
+            $table->float('confidence_score')->nullable();
+            $table->string('status')->default('draft'); // draft, review, approved
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

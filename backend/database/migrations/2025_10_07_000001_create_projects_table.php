@@ -15,11 +15,13 @@ class CreateProjectsTable extends Migration
     {
         Schema::create('projects', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            // owner_id per scheme.txt
+            $table->foreignId('owner_id')->constrained('users')->onDelete('cascade');
             $table->string('name');
             $table->text('description')->nullable();
-            $table->string('status')->default('active');
+            $table->string('status')->default('active'); // active, archived, deleted
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

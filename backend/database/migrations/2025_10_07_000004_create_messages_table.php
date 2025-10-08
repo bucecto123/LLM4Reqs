@@ -10,11 +10,11 @@ class CreateMessagesTable extends Migration
     {
         Schema::create('messages', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('conversation_id')->constrained()->onDelete('cascade');
-            $table->string('role');
-            $table->longText('content');
-            $table->integer('tokens_used')->nullable();
+            $table->foreignId('conversation_id')->constrained('conversations')->onDelete('cascade');
+            $table->string('role'); // user, assistant, system
+            $table->longText('content')->nullable();
             $table->string('model_used')->nullable();
+            $table->integer('tokens_used')->nullable();
             $table->timestamps();
         });
     }

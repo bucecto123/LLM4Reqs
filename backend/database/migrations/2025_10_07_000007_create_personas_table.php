@@ -11,11 +11,13 @@ class CreatePersonasTable extends Migration
         Schema::create('personas', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            $table->string('role')->nullable();
             $table->text('description')->nullable();
-            $table->json('focus_areas')->nullable();
             $table->longText('prompt_template')->nullable();
             $table->boolean('is_default')->default(false);
+            $table->json('focus_areas')->nullable();
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 
