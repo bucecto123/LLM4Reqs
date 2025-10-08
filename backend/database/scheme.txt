@@ -78,19 +78,6 @@ CREATE TABLE requirements (
 );
 
 ---------------------------------------------------
--- REQUIREMENT ↔ PERSONA LINK (many-to-many)
----------------------------------------------------
-CREATE TABLE requirement_personas (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    requirement_id INTEGER NOT NULL,
-    persona_id INTEGER NOT NULL,
-    generated BOOLEAN DEFAULT 0,
-    FOREIGN KEY (requirement_id) REFERENCES requirements(id) ON DELETE CASCADE,
-    FOREIGN KEY (persona_id) REFERENCES personas(id) ON DELETE CASCADE,
-    UNIQUE (requirement_id, persona_id)
-);
-
----------------------------------------------------
 -- REQUIREMENT CONFLICTS (project-specific)
 ---------------------------------------------------
 CREATE TABLE requirement_conflicts (
