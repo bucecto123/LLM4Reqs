@@ -39,6 +39,8 @@ class AuthRequest extends FormRequest
         if ($this->routeIs('auth.register')) {
             $rules['email'] .= '|unique:users';
             $rules['password'] .= '|min:6';
+            // Require name on registration because the users table requires it
+            $rules['name'] = 'required|string|max:255';
         }
 
         return $rules;
