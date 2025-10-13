@@ -39,6 +39,10 @@ GROQ_API_KEY=gsk_your_groq_api_key_here
 GROQ_MODEL=mixtral-8x7b-32768
 ```
 
+python -m venv .venv 
+.\.venv\Scripts\Activate.ps1   
+
+
 **Groq Models Available (tất cả FREE!):**
 - `mixtral-8x7b-32768` - **RECOMMENDED** - Best cho complex tasks, 32k context
 - `llama-3.1-8b-instant` - Nhanh nhất, tốt cho simple tasks

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { apiFetch } from '../utils/auth';
 import { useAuth, useLogout } from '../hooks/useAuth.jsx';
 import { Home, TrendingUp, Plane, ShoppingBag, Plus, Search, Grid3x3, Mic, Send, Globe, Paperclip, ChevronRight, Sparkles, MessageSquare, Loader2, MoreVertical, Edit2, Trash2, Check, X } from 'lucide-react';
+import FileUpload from '../components/FileUpload.jsx';
 
 export default function LLMDashboard() {
   const [message, setMessage] = useState('');
@@ -29,6 +30,10 @@ export default function LLMDashboard() {
   const [editingTitle, setEditingTitle] = useState('');
   const [showDropdownId, setShowDropdownId] = useState(null);
   const messagesEndRef = useRef(null);
+  
+  // File upload state
+  const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState([]);
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -154,7 +159,7 @@ export default function LLMDashboard() {
 
   // Handle sending message (creates new conversation if needed)
   const handleSendMessage = async () => {
-    if (!message.trim() || isLoading || isLoadingMessages) return;
+    if ((!message.trim() && attachedFiles.length === 0) || isLoading || isLoadingMessages) return;
 
     if (!selectedConversation) {
       if (!currentProjectId) {
@@ -167,11 +172,17 @@ export default function LLMDashboard() {
         setError(null);
         setIsLoading(true);
         
+        const conversationTitle = message.trim() 
+          ? message.slice(0, 50) // Use first 50 chars of message as title
+          : attachedFiles.length > 0 
+            ? `Files: ${attachedFiles[0].name}${attachedFiles.length > 1 ? ` +${attachedFiles.length - 1} more` : ''}`
+            : 'New Chat';
+        
         const newConversation = await apiFetch('/api/conversations', {
           method: 'POST',
           body: {
             project_id: currentProjectId,
-            title: message.slice(0, 50), // Use first 50 chars of message as title
+            title: conversationTitle,
             context: null,
             status: 'active'
           }
@@ -182,7 +193,8 @@ export default function LLMDashboard() {
         setMessages([]);
         
         // Now send the message to the new conversation
-        await sendMessageToConversation(newConversation.id, message.trim());
+        const messageToSend = message.trim() || "Here are the uploaded files:";
+        await sendMessageToConversation(newConversation.id, messageToSend);
         
       } catch (err) {
         console.error('Failed to create conversation:', err);
@@ -207,24 +219,85 @@ export default function LLMDashboard() {
   // Helper function to send message to a specific conversation
   const sendMessageToConversation = async (conversationId, messageContent) => {
     const userMessage = messageContent.trim();
+    const filesToUpload = [...attachedFiles]; // Copy attached files
     setMessage('');
+    setAttachedFiles([]); // Clear attached files
     setIsLoading(true);  // Set loading at the start
+    
+    // Create message content with file info
+    let fullMessageContent = userMessage;
+    if (filesToUpload.length > 0) {
+      const fileNames = filesToUpload.map(file => file.name).join(', ');
+      fullMessageContent += `\n\n📎 Attached files: ${fileNames}`;
+    }
     
     // Add user message to UI immediately
     const newUserMessage = {
       id: `temp-${Date.now()}`,
       role: 'user',
-      content: userMessage,
+      content: fullMessageContent,
       created_at: new Date().toISOString()
     };
     setMessages(prev => [...prev, newUserMessage]);
     setError(null);
 
     try {
+      // First, upload any attached files
+      const uploadedDocuments = [];
+      for (const file of filesToUpload) {
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('project_id', currentProjectId.toString());
+          formData.append('conversation_id', conversationId.toString());
+          
+          const uploadResponse = await fetch('/api/documents', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+            },
+            body: formData
+          });
+          
+          if (uploadResponse.ok) {
+            const uploadData = await uploadResponse.json();
+            uploadedDocuments.push(uploadData.document);
+            
+            // Process the document to extract requirements
+            try {
+              await apiFetch(`/api/documents/${uploadData.document.id}/process`, {
+                method: 'POST'
+              });
+            } catch (processErr) {
+              console.warn('Failed to process document:', processErr);
+              // Continue anyway - the document is uploaded
+            }
+          } else {
+            console.warn(`Failed to upload file ${file.name}:`, await uploadResponse.text());
+          }
+        } catch (uploadErr) {
+          console.warn(`Error uploading file ${file.name}:`, uploadErr);
+        }
+      }
+      
+      // Create enhanced message content for the AI
+      let messageForAI = userMessage;
+      if (uploadedDocuments.length > 0) {
+        const documentContents = uploadedDocuments
+          .filter(doc => doc.content && doc.content.trim())
+          .map(doc => `File: ${doc.original_filename}\n${doc.content}`)
+          .join('\n\n---\n\n');
+          
+        if (documentContents) {
+          messageForAI += `\n\nUploaded document contents:\n\n${documentContents}`;
+        }
+      }
+      
+      // Send message with document context to the conversation
       await apiFetch(`/api/conversations/${conversationId}/messages`, {
         method: 'POST',
         body: {
-          content: userMessage,
+          content: messageForAI,
           role: 'user'
         }
       });
@@ -254,15 +327,18 @@ export default function LLMDashboard() {
 
   // Send message
   const sendMessage = async () => {
-    if (!message.trim() || !selectedConversation || isLoading || isLoadingMessages) return;
-    await sendMessageToConversation(selectedConversation.id, message.trim());
+    if ((!message.trim() && attachedFiles.length === 0) || !selectedConversation || isLoading || isLoadingMessages) return;
+    const messageToSend = message.trim() || "Here are the uploaded files:";
+    await sendMessageToConversation(selectedConversation.id, messageToSend);
   };
 
   // Handle Enter key press
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !isLoading && !isLoadingMessages) {
       e.preventDefault();
-      handleSendMessage();
+      if (message.trim() || attachedFiles.length > 0) {
+        handleSendMessage();
+      }
     }
   };
 
@@ -375,6 +451,24 @@ export default function LLMDashboard() {
     } else if (e.key === 'Escape') {
       cancelEditing();
     }
+  };
+
+  // File upload handlers
+  const handleFileUpload = (files) => {
+    setAttachedFiles(prev => [...prev, ...files]);
+    setIsFileUploadOpen(false);
+  };
+
+  const removeAttachedFile = (index) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const openFileUpload = () => {
+    setIsFileUploadOpen(true);
+  };
+
+  const closeFileUpload = () => {
+    setIsFileUploadOpen(false);
   };
 
   useEffect(() => {
@@ -641,6 +735,34 @@ export default function LLMDashboard() {
                   
                   {/* Compact Input Area - Moved up and made smaller */}
                   <div className="max-w-2xl mx-auto">
+                    {/* Attached Files Display */}
+                    {attachedFiles.length > 0 && (
+                      <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-gray-700">
+                            Attached Files ({attachedFiles.length})
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {attachedFiles.map((file, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center space-x-2 bg-white px-3 py-2 rounded-md border text-sm"
+                            >
+                              <Paperclip className="w-3 h-3 text-gray-500" />
+                              <span className="truncate max-w-32">{file.name}</span>
+                              <button
+                                onClick={() => removeAttachedFile(index)}
+                                className="text-gray-400 hover:text-red-500 transition-colors"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3">
                       <div className="flex items-center space-x-3">
                         <textarea
@@ -659,7 +781,7 @@ export default function LLMDashboard() {
                         />
                         <button 
                           onClick={handleSendMessage}
-                          disabled={!message.trim() || isLoading || isLoadingMessages || isInitializing || !currentProjectId}
+                          disabled={(!message.trim() && attachedFiles.length === 0) || isLoading || isLoadingMessages || isInitializing || !currentProjectId}
                           className="p-2 rounded-lg text-white transition-all duration-200 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                           style={{ backgroundColor: '#4A7BA7' }}
                         >
@@ -686,7 +808,7 @@ export default function LLMDashboard() {
                       </button>
                       <ActionButton icon={<Grid3x3 size={14} />} />
                       <ActionButton icon={<Globe size={14} />} />
-                      <ActionButton icon={<Paperclip size={14} />} />
+                      <ActionButton icon={<Paperclip size={14} />} onClick={openFileUpload} />
                       <ActionButton icon={<Mic size={14} />} />
                     </div>
                   </div>
@@ -737,6 +859,34 @@ export default function LLMDashboard() {
               {/* Input Area */}
               <div className="bg-white border-t border-gray-200 p-4">
                 <div className="max-w-4xl mx-auto">
+                  {/* Attached Files Display */}
+                  {attachedFiles.length > 0 && (
+                    <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">
+                          Attached Files ({attachedFiles.length})
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {attachedFiles.map((file, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center space-x-2 bg-white px-3 py-2 rounded-md border text-sm"
+                          >
+                            <Paperclip className="w-3 h-3 text-gray-500" />
+                            <span className="truncate max-w-32">{file.name}</span>
+                            <button
+                              onClick={() => removeAttachedFile(index)}
+                              className="text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3">
                     <div className="flex items-center space-x-3">
                       <textarea
@@ -755,7 +905,7 @@ export default function LLMDashboard() {
                       />
                       <button 
                         onClick={sendMessage}
-                        disabled={!message.trim() || isLoading || isLoadingMessages || isInitializing || !currentProjectId}
+                        disabled={(!message.trim() && attachedFiles.length === 0) || isLoading || isLoadingMessages || isInitializing || !currentProjectId}
                         className="p-2 rounded-lg text-white transition-all duration-200 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                         style={{ backgroundColor: '#4A7BA7' }}
                       >
@@ -768,7 +918,7 @@ export default function LLMDashboard() {
                   <div className="flex items-center justify-center space-x-2 mt-3">
                     <ActionButton icon={<Grid3x3 size={14} />} />
                     <ActionButton icon={<Globe size={14} />} />
-                    <ActionButton icon={<Paperclip size={14} />} />
+                    <ActionButton icon={<Paperclip size={14} />} onClick={openFileUpload} />
                     <ActionButton icon={<Mic size={14} />} />
                   </div>
                 </div>
@@ -777,6 +927,16 @@ export default function LLMDashboard() {
           )}
         </div>
       </div>
+
+      {/* File Upload Modal */}
+      {isFileUploadOpen && (
+        <FileUpload
+          onFilesSelected={handleFileUpload}
+          onClose={closeFileUpload}
+          maxFiles={5}
+          maxSizePerFile={10}
+        />
+      )}
     </div>
   );
 }
@@ -838,9 +998,12 @@ function NavItem({ icon, label, active, isOpen }) {
   );
 }
 
-function ActionButton({ icon }) {
+function ActionButton({ icon, onClick }) {
   return (
-    <button className="p-1.5 hover:bg-gray-100 rounded-md text-gray-600 transition-all duration-200">
+    <button 
+      onClick={onClick}
+      className="p-1.5 hover:bg-gray-100 rounded-md text-gray-600 transition-all duration-200"
+    >
       {icon}
     </button>
   );
