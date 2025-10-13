@@ -1,0 +1,24 @@
+This is a sample requirements document for testing the document upload API.
+
+## System Requirements
+
+1. The system must allow users to upload documents
+2. The system should validate file types and sizes
+3. Users must be authenticated to upload files
+4. The system shall extract text content from uploaded files
+5. Document metadata should be stored in the database
+
+## Functional Requirements
+
+- File upload functionality
+- Content extraction
+- User authentication
+- Database storage
+- Error handling
+
+## Non-functional Requirements
+
+- Maximum file size: 10MB
+- Supported formats: PDF, DOC, DOCX, TXT, MD
+- Response time: < 2 seconds for upload
+- Security: Authentication required

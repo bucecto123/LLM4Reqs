@@ -10,11 +10,16 @@ class Requirement extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['project_id', 'title', 'content', 'priority', 'confidence_score', 'status'];
+    protected $fillable = ['project_id', 'document_id', 'title', 'requirement_text', 'requirement_type', 'priority', 'confidence_score', 'status', 'source'];
 
     public function project()
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function document()
+    {
+        return $this->belongsTo(Document::class);
     }
 
     // Persona mapping handled elsewhere; pivot table removed.
