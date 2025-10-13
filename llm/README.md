@@ -548,3 +548,45 @@ curl http://localhost:8000/api/projects/1/requirements
 ```
 
 [Dataset: Software Requirements Dataset by SOUVIK](https://www.kaggle.com/datasets/iamsouvik/software-requirements-dataset)
+
+---
+
+## 🔁 RAG (Retrieval-Augmented Generation) - Quickstart
+
+This repo includes a small RAG workflow using sentence-transformers + FAISS to index the provided `enriched_requirements.csv` and enable retrieval for LLM prompts.
+
+### Install extra dependencies
+
+```powershell
+cd llm
+pip install sentence-transformers faiss-cpu
+```
+
+If `faiss-cpu` is unavailable on your platform, install the appropriate faiss package or use conda.
+
+### Build the FAISS index
+
+```powershell
+python build_faiss.py --csv data\enriched_requirements.csv --out faiss_store --model all-MiniLM-L6-v2
+```
+
+This produces `llm/faiss_store/faiss_index.bin` and `llm/faiss_store/faiss_meta.pkl`.
+
+### Query the index
+
+```powershell
+python query_rag.py --query "Which requirements relate to security and payment?" --index faiss_store/faiss_index.bin --meta faiss_store/faiss_meta.pkl --top-k 5
+```
+
+The script prints the retrieved chunks and a composed prompt you can send to the Groq LLM via the FastAPI service.
+
+### Integrating with Groq
+
+Use the `query_rag.py` prompt as the `context` or part of the `system` message to the Groq model. Keep the generation model lightweight for faster responses.
+
+### Next steps / enhancements
+
+- Chunk longer requirements and index each chunk.
+- Filter by metadata (domain, stakeholder) before searching.
+- Cache embeddings and avoid rebuilding index for small updates.
+- Build a small UI (Streamlit/Gradio) for interactive querying.

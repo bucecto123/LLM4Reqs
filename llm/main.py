@@ -7,6 +7,13 @@ from groq import Groq
 import os
 from dotenv import load_dotenv
 import json
+from typing import Tuple, List
+
+# Lazy import of RagManager (may raise at runtime if deps missing)
+try:
+    from rag import RagManager
+except Exception:
+    RagManager = None
 
 load_dotenv()
 
@@ -32,7 +39,86 @@ if not GROQ_API_KEY:
     print("WARNING: GROQ_API_KEY is not set. Groq calls will fail until you set this in your .env file.")
 
 groq_client = Groq(api_key=GROQ_API_KEY)
-DEFAULT_MODEL = os.getenv("GROQ_MODEL", "gemma2-9b-it")
+DEFAULT_MODEL = os.getenv("GROQ_MODEL", "moonshotai/kimi-k2-instruct-0905")
+
+# RAG configuration (environment-controllable)
+def _clean_env(val: str):
+    """Strip surrounding whitespace and quotes, return None for empty strings."""
+    if val is None:
+        return None
+    v = str(val).strip()
+    # remove surrounding quotes if present
+    if (v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'")):
+        v = v[1:-1]
+    v = v.strip()
+    if v == "":
+        return None
+    return v
+
+
+# Read and normalize env vars
+_raw_rag_enabled = _clean_env(os.getenv("RAG_ENABLED", "true"))
+RAG_ENABLED = str(_raw_rag_enabled).lower() in ("1", "true", "yes") if _raw_rag_enabled is not None else True
+
+_raw_rag_index = _clean_env(os.getenv("RAG_INDEX_PATH", "llm/faiss_store/faiss_index.bin"))
+RAG_INDEX_PATH = os.path.normpath(_raw_rag_index) if _raw_rag_index else os.path.normpath("llm/faiss_store/faiss_index.bin")
+
+# If the env-provided value contains control characters (dotEnv may have unescaped sequences like \f -> formfeed),
+# try to read the raw .env file and parse the value without processing escapes.
+def _contains_control_chars(s: str) -> bool:
+    return any(ord(c) < 32 for c in s) if s is not None else False
+
+if _contains_control_chars(_raw_rag_index):
+    try:
+        with open(os.path.join(os.path.dirname(__file__), '.env'), 'r', encoding='utf-8') as fh:
+            for line in fh:
+                if line.strip().startswith('RAG_INDEX_PATH'):
+                    # split on first '=' and preserve backslashes literally
+                    parts = line.split('=', 1)
+                    if len(parts) == 2:
+                        raw_val = parts[1].strip()
+                        # remove surrounding quotes if present
+                        if (raw_val.startswith('"') and raw_val.endswith('"')) or (raw_val.startswith("'") and raw_val.endswith("'")):
+                            raw_val = raw_val[1:-1]
+                        raw_val = raw_val.strip()
+                        if raw_val:
+                            RAG_INDEX_PATH = os.path.normpath(raw_val)
+                    break
+    except Exception as e:
+        print(f"Failed to parse raw .env for RAG_INDEX_PATH fallback: {e}")
+
+_raw_rag_meta = _clean_env(os.getenv("RAG_META_PATH", "llm/faiss_store/faiss_meta.pkl"))
+RAG_META_PATH = os.path.normpath(_raw_rag_meta) if _raw_rag_meta else os.path.normpath("llm/faiss_store/faiss_meta.pkl")
+
+if _contains_control_chars(_raw_rag_meta):
+    try:
+        with open(os.path.join(os.path.dirname(__file__), '.env'), 'r', encoding='utf-8') as fh:
+            for line in fh:
+                if line.strip().startswith('RAG_META_PATH'):
+                    parts = line.split('=', 1)
+                    if len(parts) == 2:
+                        raw_val = parts[1].strip()
+                        if (raw_val.startswith('"') and raw_val.endswith('"')) or (raw_val.startswith("'") and raw_val.endswith("'")):
+                            raw_val = raw_val[1:-1]
+                        raw_val = raw_val.strip()
+                        if raw_val:
+                            RAG_META_PATH = os.path.normpath(raw_val)
+                    break
+    except Exception as e:
+        print(f"Failed to parse raw .env for RAG_META_PATH fallback: {e}")
+
+_raw_rag_model = _clean_env(os.getenv("RAG_MODEL", "all-MiniLM-L6-v2"))
+RAG_MODEL = _raw_rag_model or "all-MiniLM-L6-v2"
+RAG_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
+RAG_SIM_THRESHOLD = float(os.getenv("RAG_SIM_THRESHOLD", "0.35"))
+# comma-separated keywords that strongly signal RAG is needed
+RAG_KEYWORDS = os.getenv("RAG_KEYWORDS", "requirement,requirements,specification,standard,security,privacy,compliance,regulation,payment,billing").split(",")
+
+# internal lazy-loaded artifacts
+_rag_manager = None
+_rag_index = None
+_rag_chunks = None
+_rag_available = False
 
 # ==================== REQUEST/RESPONSE MODELS ====================
 
@@ -175,6 +261,78 @@ def call_groq_chat(messages: List[Dict], max_tokens: int = 1000, temperature: fl
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Groq API error: {str(e)}")
 
+
+def _load_rag_artifacts() -> Tuple[bool, object, list]:
+    """Lazily load RagManager, FAISS index and metadata. Returns (available, index, chunks)."""
+    global _rag_manager, _rag_index, _rag_chunks, _rag_available
+    if not RAG_ENABLED:
+        return False, None, None
+
+    if _rag_available:
+        return True, _rag_index, _rag_chunks
+
+    if RagManager is None:
+        # sentence-transformers or faiss not installed or rag import failed
+        _rag_available = False
+        return False, None, None
+
+    try:
+        _rag_manager = RagManager(model_name=RAG_MODEL)
+        _rag_index, _rag_chunks = _rag_manager.load_index_and_meta(RAG_INDEX_PATH, RAG_META_PATH)
+        _rag_available = True
+        return True, _rag_index, _rag_chunks
+    except Exception as e:
+        print(f"RAG load failed: {e}")
+        _rag_available = False
+        return False, None, None
+
+
+def needs_rag(user_query: str, use_model: bool = True) -> bool:
+    """Decide whether to use RAG. First apply rule-based keywords, then optional model-based similarity check.
+
+    Returns True if RAG should be used.
+    """
+    if not RAG_ENABLED:
+        return False
+
+    q = (user_query or "").lower()
+    # Rule-based: if any keyword appears
+    for kw in RAG_KEYWORDS:
+        kw = kw.strip().lower()
+        if not kw:
+            continue
+        if kw in q:
+            return True
+
+    # If model-based classification requested, try similarity against the index
+    if use_model:
+        avail, index, chunks = _load_rag_artifacts()
+        if not avail:
+            return False
+        try:
+            # use the rag manager to query top-1 and inspect score
+            results = _rag_manager.query(user_query, index, chunks, top_k=1)
+            if results and len(results) > 0:
+                top_score = results[0].get('score', 0.0)
+                return float(top_score) >= float(RAG_SIM_THRESHOLD)
+        except Exception as e:
+            print(f"RAG classification error: {e}")
+            return False
+
+    return False
+
+
+def _build_rag_context_message(retrieved: list) -> str:
+    """Format retrieved chunks into a single system message string."""
+    if not retrieved:
+        return ""
+    lines = ["Use the following retrieved context when helpful (do not fabricate answers):\n"]
+    for i, item in enumerate(retrieved, start=1):
+        # include score for debugging usefulness
+        lines.append(f"{i}. {item.get('text', '')} (score: {item.get('score', 0.0):.4f})")
+    lines.append('\nIf the context does not contain the answer, say so explicitly.')
+    return "\n".join(lines)
+
 def parse_json_response(content: str) -> Dict:
     """Parse JSON from LLM response, handling markdown code blocks"""
     # Remove markdown code blocks if present
@@ -266,7 +424,28 @@ async def chat(request: ChatRequest):
         
         # Add current message
         messages.append({"role": "user", "content": request.message})
-        
+
+        # RAG decision: decide whether to enrich with retrieved context
+        try:
+            use_rag = needs_rag(request.message, use_model=True)
+        except Exception as e:
+            # If RAG check fails for any reason, fall back to no RAG
+            print(f"RAG decision error: {e}")
+            use_rag = False
+
+        if use_rag:
+            avail, index, chunks = _load_rag_artifacts()
+            if avail and _rag_manager is not None:
+                try:
+                    retrieved = _rag_manager.query(request.message, index, chunks, top_k=RAG_TOP_K)
+                    rag_system = _build_rag_context_message(retrieved)
+                    if rag_system:
+                        # Prepend retrieved context as a system instruction to guide the model
+                        messages.insert(1, {"role": "system", "content": rag_system})
+                except Exception as e:
+                    print(f"RAG retrieval failed: {e}")
+                    # continue without RAG
+
         # Call Groq
         response_text, tokens_used = call_groq_chat(messages, max_tokens=2000, temperature=0.7)
         
