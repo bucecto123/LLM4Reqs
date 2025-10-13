@@ -28,7 +28,17 @@ Route::get('/test-document-routes', function () {
 Route::post('/chat', [ChatController::class, 'chat']);
 
 // Authentication routes
-Route::post('/register', [AuthController::class, 'register'])->name('auth.register');
+Route::prefix('auth')->group(function () {
+    Route::post('/register', [AuthController::class, 'register'])->name('auth.register');
+    Route::post('/login', [AuthController::class, 'login'])->name('auth.login');
+    Route::post('/refresh', [AuthController::class, 'refresh'])->middleware('auth:sanctum')->name('auth.refresh');
+    Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum')->name('auth.logout');
+    Route::post('/logout-all', [AuthController::class, 'logoutAll'])->middleware('auth:sanctum')->name('auth.logout-all');
+    Route::get('/me', [AuthController::class, 'me'])->middleware('auth:sanctum')->name('auth.me');
+});
+
+// Backward compatibility routes (keep existing login/register endpoints)
+Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 

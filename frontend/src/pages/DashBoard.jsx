@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { clearAuth, getUser, apiFetch } from '../utils/api';
+import { apiFetch } from '../utils/auth';
+import { useAuth, useLogout } from '../hooks/useAuth.jsx';
 import { Home, TrendingUp, Plane, ShoppingBag, Plus, Search, Grid3x3, Mic, Send, Globe, Paperclip, ChevronRight, Sparkles, MessageSquare, Loader2, MoreVertical, Edit2, Trash2, Check, X } from 'lucide-react';
 
 export default function LLMDashboard() {
@@ -7,7 +8,12 @@ export default function LLMDashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const accountRef = useRef();
-  const [fullName, setFullName] = useState(null);
+  
+  // Use the new authentication hooks
+  const { user, isAuthenticated } = useAuth();
+  const { logout: performLogout, isLoading: logoutLoading } = useLogout();
+  
+  const fullName = user?.name;
   
   // Chat state
   const [conversations, setConversations] = useState([]);
@@ -71,7 +77,7 @@ export default function LLMDashboard() {
       
       if (err.status === 401) {
         errorMessage = 'You are not authenticated. Please log in again.';
-        clearAuth();
+        await performLogout();
       } else if (err.status === 422) {
         errorMessage = 'Failed to create project. Invalid data.';
       }
@@ -137,7 +143,7 @@ export default function LLMDashboard() {
       
       if (err.status === 401) {
         errorMessage = 'You are not authenticated. Please log in again.';
-        clearAuth();
+        await performLogout();
       } else if (err.status === 422) {
         errorMessage = 'Invalid conversation data. Please try again.';
       }
@@ -184,7 +190,7 @@ export default function LLMDashboard() {
         
         if (err.status === 401) {
           errorMessage = 'You are not authenticated. Please log in again.';
-          clearAuth();
+          await performLogout();
         } else if (err.status === 422) {
           errorMessage = 'Invalid conversation data. Please try again.';
         }
@@ -231,7 +237,7 @@ export default function LLMDashboard() {
       
       if (err.status === 401) {
         errorMessage = 'You are not authenticated. Please log in again.';
-        clearAuth();
+        await performLogout();
       } else if (err.status === 404) {
         errorMessage = 'Conversation not found. Please select a different conversation.';
       } else if (err.status === 422) {
@@ -310,8 +316,8 @@ export default function LLMDashboard() {
       
       if (err.status === 401) {
         errorMessage = 'You are not authenticated. Please log in again.';
-        clearAuth();
-      } else if (err.status === 403) {
+        await performLogout();
+      } else if (err.status === 422) {
         errorMessage = 'You do not have permission to edit this conversation.';
       } else if (err.status === 404) {
         errorMessage = 'Conversation not found.';
@@ -350,8 +356,8 @@ export default function LLMDashboard() {
       
       if (err.status === 401) {
         errorMessage = 'You are not authenticated. Please log in again.';
-        clearAuth();
-      } else if (err.status === 403) {
+        await performLogout();
+      } else if (err.status === 404) {
         errorMessage = 'You do not have permission to delete this conversation.';
       } else if (err.status === 404) {
         errorMessage = 'Conversation not found.';
@@ -385,24 +391,7 @@ export default function LLMDashboard() {
     return () => window.removeEventListener('click', handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    function updateUser() {
-      const user = getUser();
-      if (user) {
-        // Prefer full_name, then name, then combine first/last if available
-        const name = user.full_name || user.name || ((user.first_name || user.last_name) ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : null);
-        setFullName(name);
-      } else {
-        setFullName(null);
-      }
-    }
-
-    // initial read
-    updateUser();
-    // update when other parts of the app change auth
-    window.addEventListener('authChanged', updateUser);
-    return () => window.removeEventListener('authChanged', updateUser);
-  }, []);
+  // User state is now managed by the useAuth hook - no manual useEffect needed
 
   // Load projects on mount
   useEffect(() => {
@@ -595,11 +584,12 @@ export default function LLMDashboard() {
                 style={{ backgroundColor: '#112D4E', border: '1px solid rgba(255,255,255,0.06)' }}
               >
                 <button
-                  onClick={() => { clearAuth(); }}
-                  className="w-full text-left px-4 py-2 text-sm text-white font-medium hover:opacity-90"
+                  onClick={performLogout}
+                  disabled={logoutLoading}
+                  className="w-full text-left px-4 py-2 text-sm text-white font-medium hover:opacity-90 disabled:opacity-50"
                   style={{ backgroundColor: 'transparent' }}
                 >
-                  Log out
+                  {logoutLoading ? 'Logging out...' : 'Log out'}
                 </button>
               </div>
             )}
@@ -707,39 +697,41 @@ export default function LLMDashboard() {
             /* Chat Messages and Input */
             <>
               {/* Messages Area */}
-              <div className="flex-1 overflow-y-auto p-6">
-                {messages.length === 0 && !isLoading ? (
-                  <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                    <MessageSquare size={48} className="mb-4 opacity-50" />
-                    <p className="text-lg font-medium">No messages yet</p>
-                    <p className="text-sm">Start the conversation by typing a message below</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {messages.map((msg) => (
-                      <MessageBubble key={msg.id} message={msg} />
-                    ))}
-                    {isLoading && (
-                      <div className="flex justify-start">
-                        <div className="bg-gray-100 rounded-lg p-4 max-w-xs border rounded-bl-none">
-                          <div className="flex items-center space-x-2">
-                            <Loader2 className="animate-spin h-4 w-4 text-gray-500" />
-                            <span className="text-gray-500 text-sm">AI is thinking...</span>
+              <div className="flex-1 overflow-y-auto p-6" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+                <div className="min-h-full">
+                  {messages.length === 0 && !isLoading ? (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-500 min-h-[400px]">
+                      <MessageSquare size={48} className="mb-4 opacity-50" />
+                      <p className="text-lg font-medium">No messages yet</p>
+                      <p className="text-sm">Start the conversation by typing a message below</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 pb-4">
+                      {messages.map((msg) => (
+                        <MessageBubble key={msg.id} message={msg} />
+                      ))}
+                      {isLoading && (
+                        <div className="flex justify-start">
+                          <div className="bg-gray-100 rounded-lg p-4 max-w-xs border rounded-bl-none">
+                            <div className="flex items-center space-x-2">
+                              <Loader2 className="animate-spin h-4 w-4 text-gray-500" />
+                              <span className="text-gray-500 text-sm">AI is thinking...</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
-                    {isLoadingMessages && (
-                      <div className="flex justify-center py-4">
-                        <div className="flex items-center space-x-2 text-gray-500">
-                          <Loader2 className="animate-spin h-4 w-4" />
-                          <span className="text-sm">Loading messages...</span>
+                      )}
+                      {isLoadingMessages && (
+                        <div className="flex justify-center py-4">
+                          <div className="flex items-center space-x-2 text-gray-500">
+                            <Loader2 className="animate-spin h-4 w-4" />
+                            <span className="text-sm">Loading messages...</span>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
+                      )}
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
               </div>
 
               {/* Input Area */}
@@ -807,13 +799,13 @@ function MessageBubble({ message }) {
   
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
-      <div className={`max-w-xs lg:max-w-md xl:max-w-lg px-4 py-3 rounded-lg shadow-sm ${
+      <div className={`max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-2xl px-4 py-3 rounded-lg shadow-sm ${
         isUser 
           ? 'bg-blue-500 text-white rounded-br-none' 
           : 'bg-gray-100 text-gray-800 rounded-bl-none border'
       }`}>
         {/* Message content */}
-        <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+        <div className="text-sm leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
           {message.content}
         </div>
         

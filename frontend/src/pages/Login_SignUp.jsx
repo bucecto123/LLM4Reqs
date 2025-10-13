@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock, User, Eye, EyeOff, ArrowRight, Check, X } from 'lucide-react';
-import api, { apiFetch, saveAuth } from '../utils/api';
+import { useLogin, useRegister } from '../hooks/useAuth.jsx';
 
 export default function AuthPages() {
   const [isLogin, setIsLogin] = useState(true);
@@ -15,6 +15,12 @@ export default function AuthPages() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [passwordStrength, setPasswordStrength] = useState({ score: 0, label: 'Very weak' });
+
+  // Get authentication hooks
+  const { login: loginUser, isLoading: loginLoading, error: loginError, clearError: clearLoginError } = useLogin();
+  const { register: registerUser, isLoading: registerLoading, error: registerError, clearError: clearRegisterError } = useRegister();
+
+  const isLoading = loginLoading || registerLoading;
 
   const getPasswordStrength = (pw) => {
     if (!pw) return { score: 0, label: 'Very weak' };
@@ -67,12 +73,14 @@ export default function AuthPages() {
     setFormData({ name: '', email: '', password: '', confirmPassword: '' });
   };
 
-  // async submit handler for register/login (uses apiFetch)
+  // async submit handler for register/login (uses new auth hooks)
   const submitAsync = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
     setFieldErrors({});
+    clearLoginError();
+    clearRegisterError();
 
     // client-side validation (collect all errors and show them)
     const newErrors = {};
@@ -91,11 +99,10 @@ export default function AuthPages() {
       newErrors.name = ['Full name is required'];
     }
     
-
     if (!password) {
       newErrors.password = ['Password is required'];
-    } else {
-      // password strength: min 8 chars, at least 1 upper, 1 lower, 1 digit, 1 special
+    } else if (!isLogin) {
+      // Stricter validation for registration
       const strengthRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
       if (!strengthRegex.test(password)) {
         newErrors.password = ['Password must be at least 8 characters and include uppercase, lowercase, a number and a special character'];
@@ -114,32 +121,19 @@ export default function AuthPages() {
 
     try {
       if (isLogin) {
-        const data = await apiFetch('/api/login', {
-          method: 'POST',
-          body: { email: formData.email, password: formData.password },
-        });
-
-        // expected { token, user } from backend
-        // backend returns { user, token }
-        saveAuth(data.token || data.token, data.user || data.user);
+        const data = await loginUser(formData.email, formData.password);
         setSuccess('Logged in successfully');
         console.log('Logged in', data.user);
         // App listens for authChanged and will navigate to dashboard
-
       } else {
-        const data = await apiFetch('/api/register', {
-          method: 'POST',
-          body: {
-            name: formData.name,
-            email: formData.email,
-            password: formData.password,
-            password_confirmation: formData.confirmPassword,
-          },
+        const data = await registerUser({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          password_confirmation: formData.confirmPassword,
         });
-
-        // backend returns { user, token }
-        saveAuth(data.token, data.user);
-        setSuccess('Account created');
+        setSuccess('Account created successfully');
+        console.log('Registered', data.user);
         // App will switch to dashboard when token saved
       }
     } catch (err) {
@@ -152,7 +146,7 @@ export default function AuthPages() {
       }
 
       // other errors
-      const message = (err && (err.message || (err.body && err.body.message))) || 'Request failed';
+      const message = (err && (err.message || (err.body && err.body.message))) || loginError || registerError || 'Authentication failed';
       setError(message);
     }
   };

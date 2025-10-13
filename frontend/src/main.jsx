@@ -4,13 +4,56 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import LLMDashboard from './pages/DashBoard'
 import AuthPages from './pages/Login_SignUp'
-import { getAuthToken } from './utils/api'
+import { AuthProvider, useAuth } from './hooks/useAuth.jsx'
+import { isAuthenticated, getAccessToken } from './utils/auth'
+import ErrorBoundary from './components/ErrorBoundary'
 
+// Loading component
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+// Main App Component
+function AppContent() {
+  const { isAuthenticated: authState, isLoading, user } = useAuth();
+  
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  if (!authState) {
+    return <AuthPages />;
+  }
+
+  return <LLMDashboard />;
+}
+
+// App wrapper with providers
 function App() {
-  const [token, setToken] = useState(() => getAuthToken());
+  return (
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
+  );
+}
+
+// Fallback for apps that don't use the new auth hooks
+function LegacyApp() {
+  const [token, setToken] = useState(() => getAccessToken());
 
   useEffect(() => {
-    function onAuth() { setToken(getAuthToken()); }
+    function onAuth() { 
+      setToken(getAccessToken()); 
+    }
     window.addEventListener('authChanged', onAuth);
     return () => window.removeEventListener('authChanged', onAuth);
   }, []);
