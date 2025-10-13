@@ -546,3 +546,5 @@ curl -X POST http://localhost:8000/api/documents/1/process
 # 4. Check results
 curl http://localhost:8000/api/projects/1/requirements
 ```
+
+[Dataset: Software Requirements Dataset by SOUVIK](https://www.kaggle.com/datasets/iamsouvik/software-requirements-dataset)

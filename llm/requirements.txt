@@ -4,3 +4,7 @@ requests
 python-dotenv
 pydantic
 groq
+pandas
+numpy
+faiss-cpu
+tqdm

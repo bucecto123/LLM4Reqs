@@ -1,0 +1,627 @@
+label,requirement,enriched_domain_tags,enriched_stakeholder,enriched_complexity_level,enriched_action_type
+PE,The system shall refresh the display every 60 seconds.,"['Display', 'Refresh', 'Timing']",User,Low,Update
+LF,The application shall match the color of the schema set forth by Department of Homeland Security,"['Compliance', 'Security', 'Color Schema']",Legal,Medium,Create
+US,If projected  the data must be readable.  On a 10x10 projection screen  90% of viewers must be able to read Event / Activity data from a viewing distance of 30,"['Readability', 'Projection', 'Viewing Distance']",User,High,Read
+A,The product shall be available during normal business hours. As long as the user has access to the client PC  the system will be available 99% of the time during the first six months of operation.,"['Availability', 'Uptime', 'Business Hours']",User,Medium,Other
+US,If projected  the data must be understandable. On a 10x10 projection screen  90% of viewers must be able to determine that Events or Activities are occuring in current time from a viewing distance of 100,"['Understandability', 'Projection', 'Viewing Distance']",User,High,Read
+SE,The product shall ensure that it can only be accessed by authorized users.  The product will be able to distinguish between authorized and unauthorized users in all access attempts,"['Security', 'Authentication', 'Authorization']",Security,High,Create
+US,The product shall be intuitive and self-explanatory.  :  90% of new users shall be able to start the display of Events or Activities within 90 minutes of using the product.,"['Usability', 'Intuitive', 'User Experience']",User,Medium,Create
+PE,The product shall respond fast to keep up-to-date data in the display.,"['Performance', 'Response Time', 'Data Display']",User,Medium,Update
+F,The system shall have a MDI form that allows for the viewing of the graph and the data table.,"['User Interface', 'Graphical Display', 'Data Visualization']",User,Medium,Create
+F,The system shall display Events in a vertical table by time.,"['Data Display', 'Event Display', 'Time-based Display']",User,Low,Read
+F,The system shall display the Events in a graph by time.,"['Events', 'Graph', 'Visualization']",User,Medium,Read
+L,All business rules specified in the Disputes System shall be in compliance to the guidelines of Regulation E and Regulation Z.,"['Regulations', 'Compliance', 'Business Rules']",Legal,High,Other
+L,The Disputes application must maintain a detailed history of every action that a user takes on a dispute case.  This ensures a complete audit trail if questions arise later on with regard to a particular dispute case.,"['Audit Trail', 'Disputes', 'Compliance']",Security,Medium,Create
+L,All actions that modify an existing dispute case must be recorded in the case history.,"['Disputes', 'Case History', 'Audit']",User,Low,Update
+F,The Disputes System must be accessible by both internal and external users.,"['Accessibility', 'User Management', 'Security']",Admin,Medium,Other
+F,The Disputes System must prevent users from accessing any dispute cases that do not belong to their cardholder base.,"['Security', 'Access Control', 'Disputes']",Security,High,Other
+F,The Disputes System will facilitate direct data entry of a dispute case via a user interface that supports real time responses to the users.,"['User Interface', 'Data Entry', 'Disputes']",User,Medium,Create
+F,The Disputes System must provide different levels of access with regard to disputes case initiation and follow-up actions.,"['Access Control', 'Disputes', 'User Management']",Admin,Medium,Other
+F,The Disputes System shall provide view access capability for authorized users of the application.,"['Access Control', 'Disputes', 'Security']",User,Low,Read
+F,The Disputes System shall provide update access capability for authorized users of the application.,"['Access Control', 'Disputes', 'Security']",User,Low,Update
+F,The Disputes System must allow the users to select disputable transactions (based on the age of the transaction) from a user interface and initiate a dispute (ticket retrieval request or chargeback notification) on the selected transaction.,"['Dispute Resolution', 'Transaction Management', 'User Interface']",User,Medium,Create
+F,The Disputes System must provide the user the ability to initiate a single dispute case on multiple transactions that belong to a single merchant.,"['Dispute Resolution', 'Transaction Management', 'Merchant Management']",User,Medium,Create
+F,The Disputes System will provide the user the ability to create or initiate a ticket retrieval request.   As part of ticket retrieval creation process the system must prompt the user to enter all the required information to create the ticket retrieval request.  The ticket retrieval request is a document that is sent to merchant inquiring the validity of a transaction.,"['Dispute Resolution', 'Transaction Management', 'Document Management']",User,High,Create
+F,The Disputes System must allow the user to create three unique types of ticket retrieval requests.  The three types of ticket retrieval requests are (1) Request for original receipt (2) Request for a copy of the receipt or (3) Request for a portfolio. A portfolio consists of documentation that would provide proof of a purchase such as the documentation that is received from a car rental agency that is more than a sales receipt.,"['Dispute Resolution', 'Document Management', 'Transaction Management']",User,Medium,Create
+F,The Disputes System must prevent external users from requesting original receipts. Requests for original receipts are restricted to internal users.,"['Access Control', 'Dispute Resolution', 'Security']",Security,Low,Other
+F,The Disputes System must provide a confirmation to the user upon the creation of ticket retrieval request that contains the following information; the dispute case number  the type of retrieval requested (copy  original or portfolio)  and the date that the merchant response is due.,"['Dispute Resolution', 'Transaction Management', 'User Interface']",User,Medium,Read
+F,The Disputes System shall allow the user to create or initiate a chargeback request.  The system must prompt the user to enter the required information to initiate a chargeback request. The chargeback request results in a printed chargeback notification that is sent to merchant indicating that their account will be charged back if no proof is provided that the disputed transaction is valid.,"['Dispute Resolution', 'Transaction Management', 'Document Management']",User,High,Create
+F,The Disputes System must provide a confirmation to the user upon the creation of a chargeback request. The confirmation must contain the following information; the dispute case number  the type of chargeback requested (pending or immediate)  and the date that the merchant response is due.,"['Dispute Resolution', 'Transaction Management', 'User Interface']",User,Medium,Read
+F,The Disputes System shall prevent the creation of duplicate dispute requests 100% of the time.,"['Data Integrity', 'Dispute Resolution', 'Security']",Security,High,Other
+F,The Disputes System shall accurately provide a list of possible reason codes for a given transaction.  The list of possible reason codes must be derived based on the type of transaction and the industry that the merchant belongs to  according to the business rules defined for the Disputes System.,"['Dispute Resolution', 'Transaction Management', 'Business Rules']",User,High,Read
+F,The Disputes System must provide the ability to view existing dispute cases.,"['Dispute Management', 'Case Management', 'View Existing Disputes']",User,Low,Read
+F,The Disputes System must provide Search functionality.  The search method must include the ability to search by (1) the dispute case number  (2) the merchant account number  (3) the cardmember account number and (4) the issuer number.  In addition to the above criteria  the search functionality must further allow the user to limit the results of the search by a date range  the type of dispute (ticket retrieval request or chargeback notification)  the case status (open  closed or all) and the dispute reason code.,"['Dispute Search', 'Case Search', 'Advanced Search']",User,High,Read
+F,A list of all disputes cases that meet the entered search criteria must be provided to the user.  The list of cases must differentiate the type and/or status of the case by color -coding the line item in the list.  For example all open cases will be yellow and all closed cases will be gray.,"['Search Results', 'Color-Coded List', 'Case List']",User,Medium,Read
+F,The Disputes System shall provide the users the ability to view the history of all activities that have occurred on the dispute case.,"['Activity History', 'Dispute Case History', 'Audit Trail']",User,Medium,Read
+F,The Dispute System shall provide the users with the ability to follow up on a dispute case via follow-up actions.  The list of available follow up actions for a given dispute case must be filtered by the status of the case and the access level of the user.,"['Follow-up Actions', 'Dispute Case Management', 'User Access Control']",User,Medium,Update
+F,The Disputes System shall record the name of the user and the date for any activity that creates or modifies the disputes case in the system.  A detailed history of the actions taken on the case  including the date and the user that performed the action must be maintained for auditing purposes.,"['Audit Trail', 'Activity Logging', 'Compliance']",Security,High,Create
+F,For any systematic (non-user initiated) action that occurs on a case such as the disputes aging process  a case activity will be generated.  Upon the next logon the user that initiated the dispute case must be notified that a systematic action has occurred on the dispute case.,"['Systematic Actions', 'Case Activity', 'User Notification']",User,High,Other
+F,All letter requests must be formatted according to guidelines specified by the Print Letter Utility system.,"['Letter Formatting', 'Print Letter Utility', 'Compliance']",Admin,Low,Other
+F,Any disputes cases that have been closed for over 6 months must be purged from the online disputes database.,"['Data Purging', 'Disputes Database', 'Compliance']",Admin,Medium,Delete
+O,The product must support Internet Explorer 5.5 and above.,"['Browser Compatibility', 'Internet Explorer', 'Technical Requirements']",User,Low,Other
+O,The product must support Mozilla Firefox 1.0 and above.,"['Browser Support', 'Product Compatibility', 'Software Requirements']",User,Low,Other
+O,The product shall interface with the Choice Parts System.  This provides the feed of recycled parts data.,"['Data Integration', 'System Interface', 'Recycled Parts']",Admin,Medium,Read
+O,The product shall run on the existing hardware for all environments.,"['Hardware Compatibility', 'Environment Support', 'Infrastructure']",Admin,Medium,Other
+O,The product shall adhere to the corporate Architecture guidelines,"['Architecture', 'Corporate Guidelines', 'Design Principles']",Security,Medium,Other
+LF,The product shall comply with corporate User Interface Guidelines,"['User Experience', 'Interface Design', 'Corporate Standards']",User,Low,Other
+LF,The product shall comply with corporate color scheme,"['Brand Identity', 'Visual Design', 'Corporate Standards']",User,Low,Other
+LF,The appearance of the product shall appear professional,"['User Experience', 'Visual Design', 'Professionalism']",User,Low,Other
+PO,The software product is expected to run on Windows or Linux platforms.,"['Platform Support', 'Operating System', 'Software Compatibility']",Admin,Low,Other
+US,The product shall be easy to use by Adjusters and Collision Estimators.  95% of Adjusters and Collision Estimators shall find the product easy to use.,"['Usability', 'User Experience', 'Accessibility']",User,High,Other
+US,The product shall increase productivity of Collision Estimators. 80% of the Collision Estimators shall agree their productivity has increase within 1 month of using the product.,"['Productivity', 'Efficiency', 'User Performance']",User,High,Other
+US,Users shall feel satisfied using the product.  85% of all users will be satisfied with the product.,"['User Experience', 'Customer Satisfaction', 'Product Quality']",User,High,Other
+US,The product shall be easy to learn by Adjusters and Collision Estimators.  The product shall be learned with two days onsite training,"['Training', 'Usability', 'User Adoption']",Admin,Medium,Create
+US,The user shall easily locate instructions while using the product.  User help can be found within 90% of the system.,"['User Support', 'Documentation', 'User Experience']",User,Medium,Read
+PE,The search for recycled parts shall take no longer than 15 seconds.  The search results shall be returned in under 15 seconds.,"['Search Functionality', 'Performance', 'Recycled Parts']",User,High,Read
+PE,The search for the preferred repair facility shall take no longer than 8 seconds.  The preferred repair facility is returned within 8 seconds,"['Search Functionality', 'Performance', 'Repair Facility']",User,High,Read
+PE,The recycled parts audit report shall be returned to the user within 10 seconds.  The audit report shall be returned within 10 seconds.,"['Reporting', 'Performance', 'Audit']",User,High,Read
+PE,The preferred repair facility ratings shall be saved within 5 seconds. The save shall occur within 5 seconds.,"['Data Storage', 'Performance', 'Repair Facility']",User,High,Create
+A,The product shall adhere to the corporate online availability schedule.  The application is brought down only within 98% of the scheduled outages per the availability schedule.,"['Availability', 'Uptime', 'Maintenance']",Admin,High,Other
+A,The product shall achieve a 98% uptime. The product shall not fail more than 2% of the available online time.,"['Uptime', 'Availability', 'Reliability']",Admin,High,Other
+SC,The product shall be able to handle up to 1500 simultaneous users. The system shall perform with 1500 users as a time.,"['Scalability', 'Performance', 'Concurrency']",Admin,High,Other
+SC,The average number of recycled parts records per day shall be 50 000.,"['Recycling', 'Record Keeping', 'Performance Metrics']",User,Low,Read
+SC,The product shall be able to handle 10 000 concurrent users within 2 years of the initial launch.,"['Scalability', 'Concurrent Users', 'System Performance']",Admin,High,Other
+O,For estimators  the product shall be able to be operated in a repair facility during dirty and noisy conditions.,"['Usability', 'Operating Conditions', 'Estimation']",User,Medium,Other
+O,The product shall interface with the ChoiceParts system once per day at approximately 1:00 AM.,"['System Integration', 'Scheduling', 'ChoiceParts']",Admin,Medium,Other
+O,The maintenance of the product will fall within the established corporate maintenance windows.,"['Maintenance', 'Corporate Policies', 'Scheduling']",Admin,Low,Other
+O,The product shall be supported using the corporate support center.,"['Support', 'Corporate Policies', 'Troubleshooting']",User,Low,Read
+O,Product installations and upgrades shall be handled by the middleware technology team within established launch time frames.,"['Installation', 'Upgrades', 'Middleware']",Admin,Medium,Create
+SE,Only adjusters can request recycled parts audit reports. No users without an adjuster role shall request recycled parts audits.,"['Access Control', 'Recycled Parts', 'Audit Reports']",Security,Medium,Read
+SE,Only adjusters with a supervisor role can update preferred repair facility ratings. Users without the supervisor role cannot access the repair facility ratings.,"['Access Control', 'Repair Facilities', 'Rating Systems']",Security,Medium,Update
+SE,Only collision estimators shall search for recycled parts.  Users without the collision estimator role shall not have access to the search for recycled parts.,"['Access Control', 'Recycled Parts', 'Estimation']",Security,Medium,Read
+SE,Only valid data shall be entered into the system.  No invalid data shall be entered into the system.,"['Data Validation', 'Data Integrity', 'System Security']",Security,Low,Create
+SE,One insurance company shall not be able to view another insurance companys claim data.,"['Insurance Claims', 'Data Access Control', 'Company Privacy']",Insurance Company,Medium,Read
+SE,The product shall free of computer viruses.,"['Software Security', 'Malware Protection', 'Product Quality']",Security,High,Other
+SE,The system shall prevent malicious attacks including denial of service.,"['System Security', 'Network Protection', 'Denial of Service']",Security,High,Other
+L,The product must comply with Sarbanes-Oxley.,"['Regulatory Compliance', 'Financial Regulations', 'Corporate Governance']",Legal,Medium,Other
+L,The product shall comply with the estimatics laws relating to recycled parts usage.,"['Environmental Regulations', 'Recycled Parts', 'Estimatics Laws']",Legal,Medium,Other
+L,The product shall comply with insurance regulations regarding claims processing.,"['Insurance Regulations', 'Claims Processing', 'Regulatory Compliance']",Insurance Company,Medium,Other
+F,The user shall search for the preferred repair facility using vehicle  vehicle location  and radius in miles,"['User Interface', 'Search Functionality', 'Location-based Services']",User,Low,Read
+F,The vehicle data shall include vehicle year  make  and model,"['Vehicle Data', 'Data Storage', 'Vehicle Information']",User,Low,Create
+F,The vehicle location shall include street address  city  state  and zipcode,"['Vehicle Location', 'Address Data', 'Geographic Information']",User,Low,Create
+F,The system shall resolve the zipcode for the street address  city  and state if zipcode is unknown.,"['Geolocation', 'Address Validation', 'Data Enrichment']",User,Medium,Update
+F,The search radius shall be between 1 and 30 miles,"['Search Configuration', 'Geolocation', 'Settings']",Admin,Low,Create
+F,The system shall locate the preferred repair facility with the highest ratings for the input criteria,"['Facility Management', 'Rating System', 'Search']",User,High,Read
+F,The adjuster shall enter the preferred repair facility on the estimate assignment.,"['Estimate Management', 'Facility Assignment', 'Adjuster Workflow']",Adjuster,Medium,Create
+F,The adjuster shall be able to override the preferred repair facitlity on the estimate assignment.,"['Estimate Management', 'Facility Assignment', 'Override Mechanism']",Adjuster,Medium,Update
+F,The preferred repair facility shall be returned to the user.,"['Facility Management', 'Search Results', 'User Interface']",User,Low,Read
+F,The system shall return a list of repair facilities within the radius if the preferred repair facility cannot be determined.,"['Facility Management', 'Search Results', 'Fallback Mechanism']",User,High,Read
+F,The estimator shall search for available recycled parts using damaged vehicle parts information.,"['Parts Management', 'Recycled Parts', 'Estimator Workflow']",Estimator,Medium,Read
+F,The estimator shall search for available recycled parts using a list of preferred parts suppliers.,"['Parts Management', 'Recycled Parts', 'Supplier Management']",Estimator,Medium,Read
+F,The system shall search for available recycled parts for the supplied vehicle parts and suppliers.,"['Parts Management', 'Recycled Parts', 'Search']",User,High,Read
+F,The estimator shall search by zipcode with a radius of 30 miles if no parts are found for the preferred parts suppliers,"['Estimation', 'Parts Sourcing', 'Geolocation']",Estimator,Medium,Search
+F,The system shall retain the available recycled parts and suppliers returned from the search.,"['Data Storage', 'Recycled Parts', 'Search Results']",System,Low,Create
+F,The available recycled parts information and their suppliers shall be returned to the user.,"['User Interface', 'Recycled Parts', 'Information Retrieval']",User,Medium,Read
+F,The estimator shall apply selected recycled parts to the collision estimate.,"['Estimation', 'Recycled Parts', 'Collision Repair']",Estimator,High,Update
+F,The estimator shall not apply recycled parts to the collision estimate if no available parts are returned.,"['Estimation', 'Recycled Parts', 'Collision Repair']",Estimator,Medium,Other
+F,The adjuster shall review the collision estimate.,"['Quality Assurance', 'Collision Repair', 'Estimation Review']",Adjuster,Low,Read
+F,The adjuster shall request a recycled parts audit of the collision estimate.,"['Audit and Compliance', 'Recycled Parts', 'Collision Repair']",Adjuster,Medium,Create
+F,The recycled parts search results provided to the estimator shall be retrieved by the system.,"['Search Results', 'Recycled Parts', 'System Retrieval']",System,Low,Read
+F,The system shall generate an audit report based on the available recycled parts and the collision estimate.,"['Reporting', 'Audit and Compliance', 'Recycled Parts']",System,High,Create
+F,The audit report shall include the total number of recycled parts used in the estimate.,"['Reporting', 'Recycled Parts', 'Estimation Metrics']",Auditor,Medium,Update
+F,The audit report shall include the number of available recycled parts from the original search results.,"['Recycled Parts', 'Audit Report', 'Search Results']",User,Medium,Read
+F,The audit report shall include the percentage of available recycled parts used in the estimate,"['Recycled Parts', 'Audit Report', 'Estimate']",User,Medium,Read
+F,The audit report shall include the total score of the audit which sums the indivual line items.,"['Audit Report', 'Score', 'Line Items']",User,Medium,Read
+F,The audit report shall be displayed to the user.,"['Audit Report', 'User Interface', 'Display']",User,Low,Read
+F,The audit report shall be available to other adjusters at later points in time.,"['Audit Report', 'Accessibility', 'Adjusters']",Adjuster,Low,Read
+F,The user shall select to view the preferred repair facility ratings.,"['User Interface', 'Repair Facility', 'Ratings']",User,Low,Read
+F,The current repair facility ratings shall be displayed to the user.,"['Repair Facility', 'Ratings', 'Display']",User,Low,Read
+F,The system will display a blank set of ratings if there are not ratings yet defined.,"['System Function', 'Ratings', 'Display']",User,Low,Read
+F,The user shall enter new ratings based on the audit report,"['User Input', 'Ratings', 'Audit Report']",User,Medium,Create
+F,The ratings shall be from a scale of 1-10,"['Ratings', 'Scaling', 'Validation']",User,Low,Other
+F,The ratings shall include categories for attempted use of recycled parts and actual use of recycled parts,"['Sustainability', 'Recycling', 'Rating System']",User,Medium,Create
+F,The user shall select to save the preferred repair facility ratings.,"['User Interface', 'Settings', 'Repair Facility']",User,Low,Update
+F,The preferred repair facility ratings shall be saved by the system.,"['System Functionality', 'Data Storage', 'Repair Facility']",System,Low,Create
+O,The product must work with most database management systems (DBMS) on the market  whether the DBMS is colocated with the product on the same machine or is located on a different machine on the computer network.,"['Database Integration', 'System Compatibility', 'DBMS']",Admin,High,Other
+O,The product will function alongside server software on any operating system where the Java runtime can be installed.,"['Server Software', 'Java Runtime', 'Operating System']",Admin,High,Other
+O,The product will require collaboration with a database management system (DBMS).  The DBMS may be located on the same machine as the product or on a separate machine residing on the same computer network.,"['Database Integration', 'System Collaboration', 'DBMS']",Admin,High,Other
+O,The product must make use of web/application server technology.  Open source examples include Apache web server  Tomcat  and the JBoss application server.,"['Web Server', 'Application Server', 'Server Technology']",Admin,High,Create
+O,A database management system such as Oracle  DB2  MySql or HSQL will need to be integrated with the product.,"['Database Integration', 'DBMS Options', 'System Compatibility']",Admin,High,Other
+LF,The product�s Look and Feel shall be able to incorporate aspects of the customer�s organization such as logo  branding  and identity,"['User Interface', 'Branding', 'Customization']",User,Medium,Update
+LF,The product shall have a conservative and professional appearance.,"['User Interface', 'Design', 'Professionalism']",User,Low,Create
+US,The product shall make the users want to use it. 80% of the users surveyed report they are regularly using the product after the first 2 weeks post-launch.,"['User Engagement', 'Product Adoption', 'Customer Satisfaction']",User,High,Other
+US,The product shall be easy to use. 90% of users will be able to successfully reserve a conference room within 5 minutes of product use.,"['Usability', 'User Experience', 'Conference Management']",User,Medium,Create
+US,The product shall give users feedback when necessary. 80% of the users surveyed report that the product accurately confirms their actions.,"['User Feedback', ' Interaction Design', 'Usability']",User,Medium,Read
+US,The product shall allow the user to select a chosen language from one of the target market countries.,"['Internationalization', 'Localization', 'User Preferences']",User,Low,Update
+US,The product shall allow for customization of start page and views preferences.,"['Personalization', 'User Interface', 'Customization']",User,Low,Update
+US,An employee will be able to successfully use the product within a few minutes.  After informally navigating the product for less than 15 minutes  users shall be able to successfully setup meetings and reserve conference rooms.,"['Onboarding', 'User Experience', 'Conference Management']",User,Medium,Create
+US,The product shall use a standard navigation menu familiar to most web users.,"['User Interface', 'Navigation', 'Usability']",User,Low,Read
+US,The product shall allow for intuitive searching of available conference rooms.,"['Search Functionality', 'Conference Management', 'User Experience']",User,Medium,Read
+US,The product shall conform to the Americans with Disabilities Act.,"['Accessibility', 'Compliance', 'Regulatory Requirements']",Legal,High,Other
+PE,The response shall be fast enough to avoid interrupting the user�s flow of thought.  90% of tasks shall complete within 5 seconds.  98% of tasks shall complete within 8 seconds.,"['Performance', 'Response Time', 'User Experience']",User,High,Other
+A,Aside from server failure  the software product shall achieve 99.99% up time.,"['High Availability', 'System Reliability', 'Uptime']",User,High,Other
+FT,The product shall create an exception log of problems encountered within the product for transmission to our company for analysis and resolution.,"['Error Handling', 'Logging', 'Debugging']",Admin,Medium,Create
+SC,The product shall be capable of handling up to 1 000 concurrent requests.  This number will increase to 2 000 by Release 2.  The concurrency capacity must be able to handle peak scheduling times such as early morning and late afternoon hours.,"['Concurrency', 'Scalability', 'Performance']",User,High,Other
+SC,The product shall be able to process 10 000 transactions per hour within two years of its launch.  This number will increase to 20 000 by Release 2.,"['Performance', 'Throughput', 'Scalability']",User,High,Other
+SC,The product shall be expected to operate for at least 5 years for each customer installation.,"['Lifespan', 'Maintenance', 'Durability']",User,Low,Other
+O,The product shall be used in office environments.,"['Office Software', 'Productivity', 'Business Applications']",User,Low,Other
+O,The product must be able to interface with any HTML browser.  The product shall transmit data between the user and the product without problems. The product shall display HTML properly in 80% of all HTML browsers tested (minimum is to test 8 browsers).,"['Browser Compatibility', 'Interoperability', 'Web Standards']",User,Medium,Read
+O,The product must be able to interface with various database management systems. The product shall communicate successfully with the database management system on 100% of all transactions.,"['Database Integration', 'Interoperability', 'Data Management']",Admin,High,Read
+O,The product must be able to interface with various email servers. The product shall be able to send email.,"['Email Integration', 'Notification', 'Communication']",User,Medium,Create
+O,The product shall be available for distribution via the Internet as a binary or ZIP file.,"['Software Distribution', 'Digital Delivery', 'Installation']",Admin,Low,Other
+O,The product shall be available for distribution as a packaged CD.,"['Distribution', 'Packaging', 'Media']",Admin,Low,Create
+O,The product will be available for licensing as a one-server  two-five servers  or five-or-more servers license.,"['Licensing', 'Pricing', 'Servers']",Legal,Medium,Create
+US,A new user must be able to be added to the system within 10 minutes.  90% of new users are able to log into the system within 10 minutes.,"['User Management', 'Onboarding', 'Performance']",User,Medium,Create
+MN,The product must be designed using Design Patterns and coding best practices.  90% of maintenance software developers are able to integrate new functionality into the product with 2 working days.,"['Software Development', 'Maintenance', 'Design Patterns']",Security,High,Update
+MN,The product must be highly configurable for use with various database management systems for the end users.  80% of end users are able to integrate new database management systems with the product without changing the product�s software code.,"['Database Management', 'Configurability', 'Interoperability']",User,High,Update
+MN,Maintenance releases will be offered to customers once a year.  The releases shall take no longer than 5 minutes for 80% of the customer base to install.,"['Maintenance', 'Releases', 'Installation']",Admin,Medium,Update
+US,Every registered user will have access to the product�s support site via the Internet.  70% of registered users shall find a solution to their problem within 5 minutes of using the support site.,"['Support', 'Self-Service', 'User Experience']",User,Medium,Read
+MN,The customer shall be able to easily integrate new building maps with the product throughout the product�s lifecycle.  Integration of new maps with the product shall be possible with little to no support from product support staff.,"['Integration', 'Maps', 'Lifecycle']",User,Medium,Update
+US,The product shall be translated into foreign languages other than the target market countries� languages in future releases.  For each emerging target market  it shall take no more than 5 days to configure the product for that market�s language.,"['Localization', 'Translation', 'Internationalization']",Admin,High,Update
+O,The product is expected to integrate with multiple database management systems.  The product will operate with Oracle  SQL Server  DB2  MySQL  HSQL  and MS Access.,"['Database Management', 'Interoperability', 'Compatibility']",User,High,Other
+O,The product shall be able to be installed in any operating environment within 2 days.,"['Installation', 'Operating Environment', 'Deployment']",Admin,Medium,Create
+SE,The product shall ensure that only company employees or external users with company-approved user IDs may have product access.  100% of all logons shall be by either company employees or external users with company-approved user IDs.,"['Security', 'Access Control', 'Authentication']",Security,High,Read
+SE,Only managers are able to perform search queries for reservations by user.  100% of all search queries for reservations by user shall be from logons of only management logons.,"['Authorization', 'Search Queries', 'Reservations']",User,Medium,Read
+SE,The product shall ensure that the database�s data corresponds to the data entered by the user.  Each conference room reservation in the system will contain the same information as was entered by the user.,"['Data Integrity', 'Database', 'Validation']",User,High,Create
+SE,The product shall prevent the input of malicious data.  The product and/or adjacent hardware/software systems� data shall remain 100% uncorrupted each time malicious data is input into the product.,"['Security', 'Data Validation', 'Malicious Data']",Security,High,Other
+FT,The product and/or dependent databases/filesystems shall remain operational as a result of the input of malicious data.  The product and/or dependent databases/filesystems shall not crash 100% of the time that malicious data is input into the product.,"['Reliability', 'Fault Tolerance', 'Malicious Data']",Security,High,Other
+SE,The product shall have the ability to receive automatic software updates as new threats emerge.  100% of customers will be able to receive automatic software updates transmitted to the installed product.,"['Maintenance', 'Software Updates', 'Security']",Admin,Medium,Update
+SC,The language of the product shall accommodate all of the target market countries. 90% of survey respondents from each target market country will find that the language of the product is acceptable.,"['Internationalization', 'Localization', 'Language Support']",User,Medium,Create
+US,The product shall be able to display calendar dates and times according to the user�s locale.  90% of survey respondents from each target market country will find that the date and time formatting of the product is correct.,"['Localization', 'Date and Time Formatting', 'Internationalization']",User,Low,Read
+O,The product must be developed with the J2SE/J2EE programming language libraries,"['Development', 'Programming Languages', 'Technologies']",Developer,Low,Other
+F,The product shall record meeting entries.,"['Meeting Management', 'Record Keeping', 'Product Functionality']",User,Low,Create
+F,The product will notify employees of meeting invitations.,"['Meeting Management', 'Notification System', 'Employee Communication']",User,Medium,Other
+F,The product shall have the ability to send meeting reminders to employees.,"['Meeting Management', 'Reminder System', 'Employee Communication']",User,Medium,Other
+F,The product shall assign the organizers contact information to each meeting they create.,"['Meeting Management', 'Contact Information', 'Meeting Organization']",User,Medium,Create
+F,The product will record meeting acknowledgements.,"['Meeting Management', 'Record Keeping', 'Meeting Response']",User,Low,Create
+F,The product shall store new conference rooms.,"['Conference Room Management', 'Room Inventory', 'Product Functionality']",Admin,Low,Create
+F,The product shall update existing conference rooms.,"['Conference Room Management', 'Room Inventory', 'Product Functionality']",Admin,Low,Update
+F,The product will be able to delete conference rooms.,"['Conference Room Management', 'Room Inventory', 'Product Functionality']",Admin,Low,Delete
+F,The product shall be able to store new room equipment.,"['Room Equipment Management', 'Equipment Inventory', 'Product Functionality']",Admin,Low,Create
+F,The product will update existing room equipment.,"['Room Equipment Management', 'Equipment Inventory', 'Product Functionality']",Admin,Low,Update
+F,The product shall be able to delete room equipment.,"['Equipment Management', 'Room Management', 'Product Functionality']",Admin,Low,Delete
+F,The product shall allow an organizer to invite other employees to meetings.,"['Meeting Management', 'User Management', 'Communication']",User,Medium,Create
+F,Each time a conference room is reserved  the conference room schedule shall be updated to reflect the time and date of the reservation.,"['Conference Room Management', 'Scheduling', 'Reservation']",User,Medium,Update
+F,The product shall record the transportation status of equipment reserved.,"['Equipment Management', 'Reservation', 'Logistics']",Admin,Medium,Create
+F,The product shall display a map of the company building showing conference room locations.,"['Company Infrastructure', 'Conference Room Management', 'Visualization']",User,High,Read
+F,The product shall record updated meeting agendas.,"['Meeting Management', 'Agenda Management', 'Documentation']",User,Low,Update
+F,The product shall send a meeting confirmation to the meeting organizer.,"['Meeting Management', 'Communication', 'Notification']",User,Medium,Create
+F,The product shall display room equipment according to search parameters.,"['Equipment Management', 'Search Functionality', 'Room Management']",User,Medium,Read
+F,The product shall display conference rooms according to search parameters.,"['Conference Room Management', 'Search Functionality', 'Room Management']",User,Medium,Read
+F,The product shall record different meeting types.,"['Meeting Management', 'Meeting Types', 'Documentation']",Admin,Low,Create
+F,The product shall record all the equipment that has been reserved.,"['Equipment Management', 'Reservation System', 'Asset Tracking']",Admin,Low,Create
+F,The product shall notify building personnel of equipment transport requests.,"['Notification System', 'Equipment Transport', 'Facility Management']",Building Personnel,Medium,Notify
+F,The product will allow priviledged users to view meeting schedules in multiple reporting views.,"['Meeting Management', 'Reporting Analytics', 'User Authentication']",User,Medium,Read
+F,The product shall be able to send meeting notifications via different kinds of end-user specified methods.,"['Notification System', 'Meeting Management', 'User Preference']",User,High,Send
+F,The product shall have a customizable Look and Feel.,"['User Experience', 'Customization', 'User Interface']",User,High,Update
+F,The product shall have an intuitive user interface.,"['User Experience', 'User Interface', 'Usability']",User,High,Other
+F,The product will display an available status for unreserved conference rooms.,"['Meeting Management', 'Room Scheduling', 'Availability Tracking']",User,Low,Read
+PE,Recreation of Inventory Quantity Adjustment for the period of previous 30 days shall take no more than 30min.,"['Inventory Management', 'Performance Optimization', 'Data Processing']",Admin,High,Update
+PE,The System shall allow for a minimum of  6 users to work at the same time.,"['System Capacity', 'Concurrent Users', 'Scalability']",Admin,Medium,Other
+O,The System shall utilize currently owned computer equipment.,"['Hardware Utilization', 'Resource Optimization', 'IT Assets']",Admin,Low,Other
+O,The System shall be able to automatically backup business data and restore them on demand.,"['Data Management', 'Backup and Recovery', 'Business Continuity']",Admin,Medium,Create
+SE,The System shall maintain consistent security.  Any changes in user passwords and/or permissions should take affect in all parts of the System.,"['Security', 'Access Control', 'User Management']",Security,High,Update
+SE,The System shall granularly control access rights to all major subsystems.  It should be possible to assign access rights to all subsystems independently.,"['Access Control', 'Security', 'System Administration']",Admin,High,Create
+L,The System shall meet all applicable accounting standards.  The final version of the System must successfully pass independent audit performed by a certified auditor.,"['Accounting', 'Compliance', 'Audit']",Legal,High,Other
+O,The System shall not require additional third party licenses resulting in royalty fees.,"['Licensing', 'Cost Management', 'Intellectual Property']",Admin,Low,Other
+F,The System shall allow generation of Inventory Quantity Adjustment documents on demand.,"['Inventory Management', 'Document Generation', 'Reporting']",User,Medium,Create
+F,The System shall allow on demand generation of all Inventory Quantity Adjustment documents since certain point of time.,"['Inventory Management', 'Document Generation', 'Reporting']",User,Medium,Read
+F,The IQA subsystem shall take into account current inventory status and adjust inventory of substitutionary ingredients accordingly.,"['Inventory Management', 'Substitutionary Ingredients', 'Automated Adjustments']",User,High,Update
+F,The System shall allow entering  storing and modifying product formulas.,"['Product Management', 'Formula Management', 'Data Storage']",User,Medium,Create
+F,Product formulas shall allow use of semi-products  which have own formulas.,"['Product Management', 'Formula Management', 'Semi-Products']",User,Medium,Create
+F,Product formula ingredients shall allow defining substitutionary ingredients.,"['Product Management', 'Formula Ingredients', 'Substitutionary Ingredients']",User,Medium,Create
+F,Product formula substitutionary ingredients shall be entered automatically by the PFE subsystem.,"['PFE Subsystem', 'Substitutionary Ingredients', 'Automation']",Admin,High,Create
+F,Formula substitutionary ingredients shall be kept in persisted order,"['Data Persistence', 'Substitutionary Ingredients', 'Order Management']",Security,Low,Update
+F,Product shall allow entering  storing and modifying product menus used by POS terminals.,"['Product Menus', 'POS Terminals', 'Menu Management']",User,Medium,Create
+F,PME Subsystem shall allow building product menus based on the list of products kept in the accounting system.,"['PME Subsystem', 'Product Menus', 'Accounting System']",Admin,High,Read
+F,PME Subsystem shall allow keeping submenus within menus and products within submenus in a managed and persisted order.,"['PME Subsystem', 'Menu Management', 'Order Management']",User,Medium,Update
+F,PME Subsystem shall allow for a product to exist in more than one submenu,"['PME Subsystem', 'Menu Management', 'Product Management']",User,Low,Create
+F,The RMS System shall have Windows XP look and feel and use GUI futures making its use intuitive.,"['RMS System', 'GUI', 'User Experience']",User,Medium,Other
+F,The System shall generate Inventory Quantity Adjustment document based on product daily sales data and product formulas.,"['Inventory Management', 'Document Generation', 'Sales Data']",Admin,High,Create
+F,The System shall generate Inventory Quantity Adjustment document automatically when daily Product Sales data is available.,"['Inventory Management', 'Automation', 'Document Generation']",Admin,High,Create
+PE,Administrator shall be able to activate a pre-paid card via the Administration section in under 5 seconds.,"['Payment', 'Administration', 'Card Management']",Admin,Medium,Update
+PE,Customer shall be able to check the status of their prepaid card  by entering in the PIN number  in under 5 seconds.,"['Payment', 'Card Management', 'Customer Service']",User,Low,Read
+PE,System shall let customers register on the website as a �pay as you go� user in under 5 minutes.,"['Registration', 'Payment', 'User Management']",User,Medium,Create
+PE,System shall let customers register on the website as a �unlimited movie subscriber� user in under 10 minutes.,"['Registration', 'Subscription', 'User Management']",User,Medium,Create
+PE,System shall let existing customers log into the website with their email address and password in under 5 seconds.,"['Authentication', 'Login', 'Security']",User,Low,Read
+PE,System shall let customers cancel their account  process shall take no longer than 2 minutes.  Database will mark the account as inactive  and user will not be able to log into the website.,"['Account Management', 'Cancellation', 'User Management']",User,Medium,Update
+PE,System shall let administrator de-activate a customer account in under 1 minute. Customer will no longer be able to access the website.,"['Account Management', 'Administration', 'User Management']",Admin,Medium,Update
+PE,System shall let administrator add/remove movies on the website in under 5 minutes.  Entered movie information will be stored in the database and will now be available on the website.,"['Content Management', 'Administration', 'Movie Management']",Admin,High,Create
+PE,System shall let the administrator add/remove categories on the website in under 5 minutes.,"['Content Management', 'Administration', 'Category Management']",Admin,High,Create
+PE,System shall let Izogn Manager access sales and usage statistics in under 2 minutes.,"['Reporting', 'Analytics', 'Sales Management']",Manager,Low,Read
+PE,System shall let administrators generate unique pre-paid pins in under 2 minutes and generate an Excel file with the generated PINs.,"['Payment', 'Administration', 'Reporting']",Admin,Medium,Create
+LF,The website shall be attractive to all audiences.  The website shall appear to be fun and the colors should be bright and vibrant.,"['User Experience', 'Design', 'Branding']",User,Low,Other
+LF,The website should have an African feel  but should not alienate non-Africans.  The website should use animation on pages which are describing the services  to grab the users attention and encourage them to sign up.,"['Cultural Adaptation', 'User Engagement', 'Design']",User,Medium,Other
+LF,The website design should be modern  clean  and concise.,"['Design', 'User Experience', 'Branding']",User,Low,Other
+US,The product should be able to be used by 90% of novice users on the Internet.,"['Usability', 'User Experience', 'Accessibility']",User,High,Other
+US,Users should only have to navigate through a maximum of 4 pages  to create an account with the website.,"['User Experience', 'Registration', 'Navigation']",User,Low,Create
+US,Users should be able to access their streaming movies in under 2 clicks after logging into the website.,"['Media Streaming', 'User Experience', 'Navigation']",User,Medium,Read
+US,An anonymous survey will show that 70% of customers are comfortable purchasing streaming movies after 2 weeks using the website.,"['Market Research', 'Customer Satisfaction', 'Streaming Media']",User,High,Other
+US,An anonymous survey will show that 95% of customers are comfortable using and purchasing pre-paid cards after a month of using the system.,"['Market Research', 'Customer Satisfaction', 'Payment Systems']",User,High,Other
+US,The product shall retain the customer�s buying preferences and information.,"['Data Storage', 'Customer Information', 'Personalization']",User,Medium,Update
+US,The product shall be easy for customers with novice skills on the  Internet to purchase and watch streaming movies.  Customers should be able to purchase and watch a pre-determined movie in under 3 minutes.,"['E-commerce', 'Streaming', 'User Experience']",User,Medium,Create
+US,The product shall use symbols and words that are naturally understandable by users familiar with websites,"['User Interface', 'User Experience', 'Web Design']",User,Low,Read
+US,The website will use standard Internet conventions when interacting with the user.,"['Web Development', 'User Interface', 'Internet Standards']",User,Low,Other
+PE,Any interface between a user and the automated system shall have a maximum response time of 5 seconds  unless noted by an exception below.,"['Performance', 'System Design', 'User Experience']",User,Medium,Read
+PE,When purchasing a streaming movie or pre-paid card via credit card  the processing time should have a maximum response time of 15 seconds.,"['E-commerce', 'Payment Processing', 'Streaming']",User,Medium,Create
+PE,When streaming a movie  the buffering time should take no longer than 10 seconds (plus any latency on the user�s connection.),"['Streaming', 'Performance', 'User Experience']",User,High,Read
+PE,While streaming a movie  buffering should only occur if there is latency in the user�s connection.,"['Streaming', 'Performance', 'Network Optimization']",User,High,Other
+SE,All credit card information will be secured on the server  and only accessible by authorized Izogn administrators.  Information will be encrypted in the database.,"['Security', 'Payment Processing', 'Data Protection']",Security,High,Update
+A,The website shall be available for use 24 hours per day  365 days per year.,"['Availability', 'System Design', 'Web Development']",Admin,Medium,Other
+A,The website shall achieve 99.5% up time.,"['Availability', 'System Design', 'Performance']",Admin,High,Other
+A,All movies shall be streamed on demand  at any time of the day.,"['Streaming', 'On-demand', 'Movies']",User,Low,Read
+FT,The website shall continue to operate if the streaming server goes down.,"['High Availability', 'Server', 'Fault Tolerance']",Admin,High,Other
+FT,The website shall continue to operate if the payment gateway goes down.,"['E-commerce', 'Payment', 'High Availability']",Admin,High,Other
+SC,The streaming server will support 50 simultaneous streaming connections.,"['Server', 'Streaming', 'Performance']",Admin,Medium,Other
+SC,The streaming server will support a maximum of 700 movies; new servers can be added to support more movies.,"['Server', 'Streaming', 'Scalability']",Admin,Medium,Other
+SC,The server will support a maximum of 1 000 simultaneous users.,"['Server', 'Performance', 'Capacity']",Admin,Medium,Other
+SC,The website shall be capable of supporting 100 000 customers.,"['Scalability', 'E-commerce', 'Performance']",Admin,High,Other
+MN,The product shall be expected to operate within the maximum maintenance budget for a minimum of 2 years.,"['Maintenance', 'Budget', 'Cost']",Legal,Low,Other
+O,All aspects of the website shall be accessed by a web browser over the Internet.,"['Web', 'Accessibility', 'Internet']",User,Low,Read
+O,The same hardware supporting the current website will be used to support the new system.,"['Infrastructure', 'Hardware', 'Reuse']",Admin,Low,Other
+O,We must be able to interface with the following browsers: IE 5.X  6.0  Netscape 6.x  7.x  8.x and Firefox 1.0.,"['Browser Compatibility', 'Frontend Development', 'Technical Requirements']",User,Medium,Other
+O,Website must interface with the CyberSource API to process credit card transactions.,"['Payment Gateway', 'E-commerce', 'API Integration']",User,High,Create
+O,Website must be fully operational with MSN TV2.,"['Device Compatibility', 'Frontend Development', 'Technical Requirements']",User,Medium,Other
+O,Movies shall be encoded and streamed via Windows Media Player 9.0.,"['Video Encoding', 'Streaming Media', 'Technical Requirements']",User,Medium,Create
+O,Movies shall be encoded for 56k and 256k streams.,"['Video Encoding', 'Streaming Media', 'Technical Requirements']",User,Low,Create
+MN,Promotional updates to the website should take a day to update.,"['Content Management', 'Backend Development', 'Time-to-Market']",Admin,Low,Update
+PE,Izogn Administrator must be able to update the category listings on the website within 2 minutes.,"['Content Management', 'Backend Development', 'Administrative Tasks']",Admin,Low,Update
+PE,Izogn Administrator must be able to add new products to the website within 2 minutes.,"['Content Management', 'Backend Development', 'E-commerce']",Admin,Low,Create
+A,The system will provide a 24 hour 800 toll free number for support to its customers.,"['Customer Support', 'Technical Support', 'Service Level Agreement']",User,High,Other
+US,The website will provide a help section with answers and solutions to common problems.,"['Customer Support', 'Knowledge Base', 'User Experience']",User,Low,Read
+A,Velkat staff will be available for phone support between 7am-7pm  M-F to provide technical support to the Izogn administrators.,"['Technical Support', 'Customer Service', 'IT']",Admin,Low,Other
+O,The product shall be able to be installed in the specified environment within 1 working day.,"['System Installation', 'Environment Setup', 'Deployment']",Admin,Medium,Create
+SE,Only registered customers can purchase streaming movies.,"['E-commerce', 'Customer Management', 'Streaming Services']",User,Low,Create
+SE,A customer can only stream a movie if they purchased it  and are within the 2 day viewing period.,"['Digital Rights Management', 'Streaming Services', 'E-commerce']",User,Medium,Read
+SE,Only authorized personnel can access customer records in the database.,"['Data Protection', 'Access Control', 'Customer Data']",Security,High,Read
+SE,Only administrators can activate a pre-paid card.,"['Payment Processing', 'Access Control', 'Administration']",Admin,Low,Update
+SE,Only authorized personnel can access sales information.,"['Sales Management', 'Access Control', 'Data Protection']",Security,High,Read
+SE,The website shall prevent its data from being corrupted when incorrect data is entered in.,"['Data Validation', 'Error Handling', 'Data Protection']",Security,High,Other
+SE,The website shall protect itself from intentional abuse  and notify the administrator at all occurrences.,"['Security Measures', 'Abuse Prevention', 'Notification System']",Security,High,Other
+SE,Data integrity scripts will be run on a weekly basis to verify the integrity of the database.,"['Data Integrity', 'Database Management', 'Maintenance']",Admin,Medium,Other
+SE,The website shall make its user aware of its information practices before collection data from them via a Privacy Policy  accessible on all pages of the website.,"['Data Privacy', 'Compliance', 'Security']",User,Medium,Read
+SE,The system shall notify customers of changes to its information policy.,"['Information Policy', 'Compliance', 'Customer Notification']",Customer,Medium,Create
+SE,The system shall reveal private information only in compliance with the organization�s information policy.,"['Data Privacy', 'Compliance', 'Security']",User,High,Read
+SE,All customer information will be stored on a secure database  accessible only to authorized personnel.,"['Data Storage', 'Security', 'Compliance']",Admin,High,Create
+SE,All credit card information will be encrypted in the database.,"['Data Encryption', 'Security', 'Compliance']",Customer,High,Update
+SE,The streaming server will have anti-virus software to prevent infection of malicious viruses.,"['Server Security', 'Malware Protection', 'System Integrity']",Admin,Medium,Create
+LF,The website should cater to all tribes in Nigeria.,"['Cultural Sensitivity', 'Geographic Targeting', 'User Experience']",User,Low,Other
+LF,The website shall not be offensive to religious or ethnic groups.,"['Cultural Sensitivity', 'Inclusivity', 'Social Responsibility']",User,Low,Other
+LF,The website should appeal to all Africans  not only Nigerians.,"['Geographic Targeting', 'User Experience', 'Market Expansion']",User,Low,Other
+O,The website should use Flash to provide animation on the home page.,"['User Interface', 'User Experience', 'Front-end Development']",User,Low,Create
+L,IzognMovies shall meet the licensing requirements set forth by the appropriate organizations in order to stream African movies.,Licensing; Media Compliance; Content Distribution,Regulators; Legal Team; Content Providers,Medium,Ensure compliance
+L,The website will comply with W3C standards.,Web Standards; Accessibility; Frontend Development,Developers; QA Team; Regulatory Bodies,Low,Comply with standards
+L,The PHP code will comply with PEAR standards.,Code Quality; Backend Development; Maintainability,Developers; QA Team,Low,Follow coding standards
+F,The website will allow customers to search for movies by title  actor  or director.,Search Functionality; UX; Content Retrieval,End Users; Developers,Medium,Enable content search
+F,viewing a movie details  the website will display the movies description  actor  and director entered in by the administrator.,Content Presentation; UI/UX; Media Information,End Users; Administrators,Low,Display content
+F,Website shall request  and authorize credit card payment before allowing a user to stream a movie.,E-commerce; Payment Gateway; Security,End Users; Finance; Security Team,High,Process payments
+F,shall be able to stream purchased movie via Windows Media Player  for up to 2 days aftere purchase date.,Media Streaming; DRM; Access Control,End Users; Content Providers,Medium,Allow controlled streaming
+F,Website shall allow customers to browse movies by categories entered in by izogn administrator.,Content Navigation; UX; Media Catalog,End Users; Administrators,Low,Enable browsing
+F,Website shall allow customers to view reviews of selected movies by other customers.,Social Interaction; Review System; Content Display,End Users,Low,Display user reviews
+F,Website shall allow customers to add their own movie review for a selected movie.,User Engagement; Review System; Content Input,End Users,Medium,Allow user input
+F,Website shall allow the Izogn administrator to approve a review posted by a customer.,"['Content Moderation', 'User Reviews', 'Administration']",Admin,Medium,Update
+F,System will allow customers to pay for a streaming movie with a pre-paid card.,"['Payment Processing', 'Streaming Services', 'E-commerce']",User,Medium,Create
+F,Website shall allow customers to purchase pre-paid cards of $5  $10  or $20 value either by credit card or mail-in payment option.,"['E-commerce', 'Payment Options', 'Pre-paid Services']",User,High,Create
+F,System shall automatically update the main page of the website every Friday  and show the 4 latest movies that have been added to the website.,"['Content Management', 'Streaming Services', 'Automation']",User,High,Update
+F,System shall allow users to update their billing and contact information via the �My Account� section of the website.,"['User Management', 'Account Settings', 'E-commerce']",User,Low,Update
+F,Pre-paid cards shall be distributed via email  or via a printed paper card.,"['Payment Options', 'Pre-paid Services', 'Distribution Channels']",User,Low,Other
+F,Only registered customers can purchase streaming movies.,"['Access Control', 'Streaming Services', 'User Management']",Security,Low,Read
+F,Movies can only be streamed if the customer has purchased a movie  and is within the 2-day time period to stream the movie.,"['Streaming Services', 'Access Control', 'Digital Rights Management']",Security,Medium,Read
+F,Website must be able to support free trial periods with various parameters set by the Izogn Manager.,"['Marketing Promotions', 'Subscription Services', 'Administration']",Admin,High,Create
+F,All streaming movie sales will be logged in the database  and accessible by the administrator.,"['Sales Tracking', 'Database Management', 'Administration']",Admin,Low,Create
+F,All registered customer information shall be stored and maintained in the database  even after the customer cancels their account.,"['Customer Management', 'Data Storage', 'Account Management']",User,Medium,Update
+F,Daily usage statistics should be logged  and accessible by the administrator.,"['Usage Analytics', 'Administrator Access', 'Logging']",Admin,Low,Read
+F,The owner shall have free access to all of the streaming movies.,"['Streaming Service', 'Access Control', 'Content Management']",User,Low,Read
+PE,Total lead cycle time must be completed in 5 minutes for 90% of lead volume between the business hours of 8AM CST to 8PM CST; then 3 minutes for 99% of lead volume during off business hours.,"['Lead Management', 'Time Constraints', 'Business Hours']",User,High,Other
+PE,No lead evaluation will complete in a time period longer than 25 seconds for 97% of all leads processed.,"['Lead Evaluation', 'Time Constraints', 'Performance Metrics']",User,High,Other
+PE,For leads that process longer than 25 seconds the system will record the event and duration,"['Lead Processing', 'Event Recording', 'Performance Monitoring']",User,Medium,Create
+PE,The process must fit within the processing time conditions set forth by the Auto Rep Assignment process in which a lead is assigned within 3 minutes of the total life cycle.,"['Lead Assignment', 'Time Constraints', 'Process Integration']",User,High,Other
+O,The lead washing process will operate within the established physical web service structure.,"['Lead Washing', 'Web Service', 'System Integration']",User,Medium,Other
+O,The washing process must use a non binding  neutral data format  such as xml  when receiving and processing lead data.,"['Data Format', 'Lead Processing', 'System Integration']",User,Medium,Other
+A,Defect reports will be available to technical units on a 24x7 basis.,"['Defect Reporting', 'Technical Support', 'Availability']",Technical,Low,Read
+MN,Washing parameters will be updated during scheduled maintenance hours.,"['Maintenance', 'Washing Parameters', 'Scheduling']",Admin,Low,Update
+F,The vendor will verify the invalid lead.,"['Lead Management', 'Vendor Interaction', 'Verification']",Vendor,Medium,Read
+F,Vendor will submit a credit validation record to be applied to the enterprise billing system.,"['Credit Validation', 'Billing System', 'Vendor Submission']",Vendor,Medium,Create
+F,If a lead is scored to the high range the system will supply the lead data and score to the enterprise system.,"['Lead Scoring', 'Data Sharing', 'Enterprise System']",System,High,Read
+F,The leads washing functionality will validate all leads received by the web service for valid data,"['Lead Validation', 'Data Quality', 'Web Service']",System,High,Read
+F,The leads washing functionality will insert all leads captured by the web service.,"['Lead Insertion', 'Web Service', 'Data Capture']",System,Medium,Create
+F,If the leads score falls within the high average score then it will be process by the ARA functionality.,"['Lead Scoring', 'ARA Functionality', 'Automation']",System,High,Update
+F,If the leads score falls within the medium average then it will be set for manual verification by an Enrollment Coordinator through the eleads system.,"['Lead Scoring', 'Manual Verification', 'Enrollment']",Enrollment Coordinator,Medium,Update
+F,If the leads score falls within the low average then it will be returned to the supplying vendor,"['Lead Scoring', 'Vendor Interaction', 'Lead Return']",Vendor,Low,Update
+F,The leads washing functionality will compile both contact and academic scoring information for a total score.,"['Scoring Information', 'Lead Washing', 'Academic Scoring']",System,High,Read
+F,The leads washing functionality will use the parameters supplied by corporate and schools to score part of the lead.,"['Lead Management', 'Data Scoring', 'Corporate Parameters']",User,Medium,Update
+F,The leads washing functionality will return the lead data supplied to the vendor along with the reason of rejection.,"['Lead Management', 'Data Return', 'Vendor Integration']",User,Medium,Read
+F,The leads washing functionality will have an interface in which lead data parameters can be maintained.,"['Lead Management', 'Interface Design', 'Data Maintenance']",Admin,High,Create
+F,The leads washing functionality will verify the users authentication and rights to make parameter updates.,"['Security Authentication', 'Lead Management', 'User Rights']",Security,High,Other
+F,The leads washing functionality will store any potential lead duplicates returned by the enterprise system.,"['Lead Management', 'Data Storage', 'Duplicate Detection']",User,Medium,Create
+F,Prior to submitting the lead to the enterprise system the leads washing functionality will assign the lead to an admissions rep.,"['Lead Management', 'Admissions Assignment', 'Enterprise System']",Admin,Medium,Update
+F,The leads washing functionality shall receive a period list of available reps from the enterprise system.,"['Lead Management', 'Rep Assignment', 'Enterprise Integration']",Admin,Medium,Read
+LF,The product shall simulate the look of ships at sea.,"['Gaming Simulation', 'Maritime Environment', 'Visual Effects']",User,High,Other
+LF,The product shall display the grids within a circle as a view from a periscope.,"['Gaming Visualization', 'Periscope View', 'Grid Display']",User,High,Read
+LF,The product shall display each type of ship in a grid using an image of the specific type of ship.,"['Gaming Visualization', 'Ship Classification', 'Grid Display']",User,Medium,Read
+LF,When the offensive player takes a shot  the product shall simulate the sound of a ship at sea.,"['Gaming', 'Simulation', 'Audio']",User,Medium,Create
+LF,When a shot is marked as a miss  the product shall simulate the sound of a shot missing its target.,"['Gaming', 'Simulation', 'Audio']",User,Medium,Create
+LF,When a shot is marked as a hit  the product shall simulate the sound of a shot hitting its target.,"['Gaming', 'Simulation', 'Audio']",User,Medium,Create
+LF,When a ship is sunk  the product shall simulate the sound of a sinking ship.,"['Gaming', 'Simulation', 'Audio']",User,Medium,Create
+A,The product shall be available 24 hours per day  seven days per week.,"['Availability', 'Reliability', 'Uptime']",Admin,Low,Other
+PE,The product shall able to handle a large number of games simultaneously.,"['Scalability', 'Performance', 'Gaming']",Admin,High,Other
+PE,The response time shall be fast enough to maintain the flow of the game.  The response time shall be no more than 2 seconds for 95% of responses and no more than 4% for the remaining responses.,"['Performance', 'Response Time', 'Gaming']",User,High,Other
+PE,The product shall protect the identity of the players. The product shall provide players no access to information that might reveal the identity of another player.,"['Security', 'Privacy', 'Compliance']",Security,High,Read
+US,The product shall be intuitive and self-explanatory.  Nine out ten users shall be able to successfully complete a game with no training.,"['Usability', 'User Experience', 'Gaming']",User,Medium,Other
+US,The product shall be available to players who understand English  Spanish and French.  The product shall allow the user to select the language upon accessing the product.,"['Localization', 'Internationalization', 'Gaming']",User,Medium,Update
+SE,The product shall provide players no access to information that might reveal the identity of another player,"['Security', 'Privacy', 'Anonymity']",Security,Medium,Read
+PE,The response time shall be fast enough to maintain the flow of the game. The response time shall be no more than 2 seconds for 95% of responses and no more than 4% for the remaining responses.,"['Performance', 'Response Time', 'Gameplay']",User,High,Other
+F,The product shall maintain a list of players.,"['Game Management', 'Player Management', 'Data Storage']",Admin,Low,Create
+F,The product shall allow a user to identify himself or herself as a player.,"['User Management', 'Authentication', 'Registration']",User,Medium,Create
+F,Once a game has been initiated  the product shall make the players assigned to the game unavailable for selection from the list of players.,"['Gameplay', 'Player Management', 'Game State']",User,Medium,Update
+F,The product shall allow a user to remove himself or herself from the list of players at any time.,"['User Management', 'Player Management', 'Registration']",User,Low,Delete
+F,The product shall make inactive players unavailable for selection from the list of players.,"['Gameplay', 'Player Management', 'Game State']",User,Medium,Update
+F,The product shall remove players who have been inactive for 24 hours from the list of players.,"['Game Management', 'Player Management', 'Data Maintenance']",Admin,Medium,Delete
+F,The product shall allow a player to initiate a game by selecting another available player from the list of players.,"['Gameplay', 'Player Management', 'Game State']",User,Medium,Create
+F,Once a game is initiated  the product shall display a defensive grid to each player,"['Gameplay', 'Game State', 'User Interface']",User,Medium,Read
+F,Once a game is initiated  the product shall display an offensive grid to each player.,"['Gaming', 'Grid Management', 'Player Interface']",User,Medium,Create
+F,The product shall prevent a player from viewing the offensive or defensive grids of the other player.,"['Security', 'Gaming', 'Player Isolation']",Security,High,Other
+F,Once a game is initiated  the product shall allow each player to position their 5 ships on their respective defensive grids.,"['Gaming', 'Grid Management', 'Ship Placement']",User,Medium,Update
+F,The product shall allow a player to position ships horizontally on their grid.,"['Gaming', 'Grid Management', 'Ship Orientation']",User,Low,Update
+F,The product shall allow the player to position ships vertically on their grid.,"['Gaming', 'Grid Management', 'Ship Orientation']",User,Low,Update
+F,The product shall allow the player to position ships diagonally on their grid,"['Gaming', 'Grid Management', 'Ship Orientation']",User,Low,Update
+F,The product shall prevent the player from overlapping ships on their grid.,"['Gaming', 'Grid Management', 'Collision Detection']",User,Medium,Other
+F,When both players have positioned their 5 ships on their defensive grids  the product shall define the status of each player for the first turn.,"['Gaming', 'Turn Management', 'Player Status']",User,Medium,Create
+F,For each turn  the product shall identify one player as offensive status and one player as defensive status.,"['Gaming', 'Turn Management', 'Player Status']",User,Medium,Update
+F,The product shall maintain the status of each player for a turn  either offensive or defensive.,"['Gaming', 'Turn Management', 'Player Status']",User,Medium,Read
+F,At the start of each turn  the product shall notify each player of his or her status.,"['Gameplay', 'Notification', 'Player Status']",User,Low,Notify
+F,For each turn  the product shall allow the offensive player to define a shot.,"['Gameplay', 'Player Action', 'Shot Definition']",User,Medium,Create
+F,For each shot  the product shall examine the defensive grid of the defensive player to determine whether the shot was a hit or miss.,"['Gameplay', 'Shot Detection', 'Defensive Grid']",User,High,Read
+F,For each shot  the product shall notify the players whether the shot was a hit or miss.,"['Gameplay', 'Notification', 'Shot Result']",User,Low,Notify
+F,For each shot  the product shall mark the shot as a hit or miss on the defensive grid of the defensive player.,"['Gameplay', 'Defensive Grid', 'Shot Marking']",User,Medium,Update
+F,For each shot  the product shall mark the shot as a hit or miss on the offensive grid of the offensive player.,"['Gameplay', 'Offensive Grid', 'Shot Marking']",User,Medium,Update
+F,When the hit results in sinking a ship  the product shall notify the players that the ship was sunk.,"['Gameplay', 'Notification', 'Ship Sinking']",User,Low,Notify
+F,When the hit results in sinking a ship  the product shall mark the ship as sunk on the defensive grid of the defensive player.,"['Gameplay', 'Defensive Grid', 'Ship Sinking']",User,Medium,Update
+F,When the hit results in sinking a ship  the product shall indicate the type of ship sunk on the defensive grid of the defensive player.,"['Gameplay', 'Defensive Grid', 'Ship Type']",User,Medium,Update
+F,When the hit results in sinking a ship  the product shall mark the ship as sunk on the offensive grid of the offensive player.,"['Gameplay', 'Offensive Grid', 'Ship Sinking']",User,Medium,Update
+F,If the shot was marked as a hit  the product shall allow the offensive player to define a shot.,"['Gameplay', 'Shot Tracking', 'Player Action']",User,Medium,Create
+F,If the shot was marked as a miss  the product shall change the status of the offensive player to defensive,"['Gameplay', 'Player Status', 'Shot Tracking']",User,Medium,Update
+F,If the shot was marked as a miss  the product shall change the status of the defensive player to offensive,"['Gameplay', 'Player Status', 'Shot Tracking']",User,Medium,Update
+F,The product shall continue to assign turns until the game is ended.,"['Gameplay', 'Turn Management', 'Game State']",User,Low,Other
+F,The product shall end a game when a hit by the offensive player results in sinking the last of the defensive player�s ships  which had not been previously marked as sunk.,"['Gameplay', 'Win Condition', 'Ship Tracking']",User,High,Delete
+F,The product shall allow a player to end a game at any time during the game.,"['Gameplay', 'Player Action', 'Game State']",User,Low,Delete
+F,When a game is ended  the product shall notify the players that the game is ended.,"['Gameplay', 'Notification', 'Game State']",User,Medium,Create
+F,The notification of the game ending will include the reason the game is ended (i.e.  a player has won the game or a player has ended the game).,"['Notification', 'Gameplay', 'Game State']",User,Medium,Read
+F,When a game is ended  the product shall allow each player to identify himself or herself as an available player in the list of players.,"['Player Management', 'Game State', 'Player Action']",User,Medium,Update
+F,When a game is ended  the product shall allow each player to remove himself or herself from the list of players.,"['Player Management', 'Game State', 'Player Action']",User,Medium,Delete
+US,The system shall be easy to use by callers and supervisors. Callers and supervisors must be able to accomplish any system task within 2 minutes.,"['Usability', 'User Experience', 'System Efficiency']",User,Low,Other
+US,The system shall be easy to learn by callers and supervisors. Callers and supervisors shall learn how to use the system within 10 minutes.,"['Usability', 'Learning Curve', 'System Efficiency']",User,Low,Other
+PE,The system shall be responsive. At the DePaul TeleServices Center  when a supervisor uses the system to view a callers schedule  the system response time must be no more than 2 seconds 90% of the time and no more than 5 seconds the rest of the time.,"['System Performance', 'Response Time', 'TeleServices']",Admin,Medium,Read
+PE,On a 56k connection  the system response time for all operations must be no more than 6 seconds 90% of the time.,"['System Performance', 'Network Connection', 'Response Time']",User,Medium,Other
+PE,On a 112k connection or faster  the system response time for all operations must be no more than 3 seconds 90% of the time.,"['System Performance', 'Network Connection', 'Response Time']",User,Medium,Other
+A,The system shall have high availability every day of the year.The system must be available for use between 12:00AM and 6:00PM all days of the year.,"['System Availability', 'Uptime', 'Downtime']",Admin,High,Other
+A,The system must be available for use between 7:00AM and 11:59PM all days of the year.,"['System Availability', 'Uptime', 'Downtime']",Admin,High,Other
+MN,The product shall be internet browser independent.The product must run using Internet Explorer and Netscape Navigator.,"['Cross-Browser Compatibility', 'Internet Explorer', 'Netscape Navigator']",User,Medium,Other
+SE,The product shall ensure that only supervisors can advertise empty time slots.The product must ensure that supervisors are allowed to access advertise empty time slots.,"['Access Control', 'Supervisor Role', 'Time Slot Management']",Security,Medium,Create
+SE,The product shall ensure that only supervisors can enter a caller�s schedule.The product must ensure that supervisors are allowed to access advertise empty time slots.,"['Access Control', 'Supervisor Role', 'Caller Schedule']",Security,Medium,Update
+SE,The product shall ensure that only supervisors can view schedule of all callers.The product must ensure that supervisors are allowed to access advertise empty time slots.,"['Security', 'Access Control', 'Scheduling']",Supervisor,Medium,Read
+LF,The interface shall have a simple look. In the interface and usability survey  90% of beta testers must report that the interface is adequately simple.,"['Usability', 'User Experience', 'Interface Design']",User,Low,Other
+LF,The interface shall be appealing to callers and supervisors. In the interface and usability survey  80% of beta testers must report that the interface is appealing.,"['Usability', 'User Experience', 'Interface Design']",User,Low,Other
+LF,The product shall provide GUI based Monitoring Services.System Administrators shall monitor message exchanges will predict and determine problems and will also provide internal and external support.,"['Monitoring', 'System Administration', 'Technical Support']",System Administrator,High,Read
+LF,The product shall comply with City of Chicago Application Development Guide Framework.Application Development Framework will provide structured Graphical User Interface.,"['Compliance', 'Framework', 'Interface Design']",Developer,Medium,Other
+US,The product shall provide Monitoring Services.The product shall be easy for System Administrators and DBAs to use after two weeks of usage.,"['Monitoring', 'Usability', 'System Administration']",System Administrator,Medium,Read
+US,The product shall provide Error Tracking Services.The product shall help the System Administrators and DBAs to resolve transaction errors 99% of the time.,"['Error Handling', 'Technical Support', 'System Administration']",System Administrator,High,Update
+US,The product shall provide Portals.The product shall help System Administrators to analyze the transactions with ad-hoc reporting and KPIs (Key Performance Indicators),"['Reporting', 'Analytics', 'System Administration']",System Administrator,Medium,Read
+PE,The product shall provide Asynchronous Messaging.The product shall provide asynchronous messaging to enable parallel processing and reduce the overhead in communications,"['Messaging', 'Performance Optimization', 'System Architecture']",System Administrator,High,Create
+PE,The product shall provide Multi-threading and Load Balancing.The product shall provide multi-threading technology as well as load balancing to overcome data load spikes and traffic.,"['Performance Optimization', 'Scalability', 'System Architecture']",System Administrator,High,Create
+PE,The product shall process messages within 2 seconds.The product shall have a maximum message processing time of 2 seconds,"['Real-time Processing', 'Message Handling', 'Performance']",User,Medium,Read
+PE,The product shall poll the system for messages every second.The product shall poll the system for new messages at a maximum of every 1 second.,"['Real-time Processing', 'Message Handling', 'Scheduling']",System,Low,Read
+PE,The product shall provide Dynamic Change Support and Transparent resource addition.The product shall support Transparent Resource addition and Dynamic Change support to provide scalability and avoid service interruptions of more than 1 day.,"['Scalability', 'Resource Management', 'High Availability']",Admin,High,Update
+A,The product shall be available 99% of the time. Rationale: To avoid service interruption during busiest customer service response periods. The product shall be available 99.99% of the time for regular business days.,"['High Availability', 'Uptime', 'Reliability']",User,High,Other
+FT,The product shall be robust.The product shall have fault avoidance based on standards adoption.,"['Robustness', 'Fault Tolerance', 'Standards Compliance']",Security,Medium,Other
+FT,The product shall be robust with fault tolerance.The product shall have fault tolerance by using recovery technique compensatory transaction and routing around failures.,"['Robustness', 'Fault Tolerance', 'Recovery Techniques']",Security,High,Other
+SC,The product shall be able to process all transactions.The product shall process minimum of 1 million transactions per year.,"['Transaction Processing', 'Scalability', 'Performance']",User,Medium,Create
+O,The product shall be platform independent.The product shall enable access to any type of development environment and platform.,"['Platform Independence', 'Interoperability', 'Flexibility']",Developer,High,Other
+O,The product shall interface CSR and Datastream.The product shall exchange messages between CSR and EAM on a real time basis without any direct interfaces between two systems.,"['Integration', 'Real-time Processing', 'Message Exchange']",System,High,Read
+MN,The product shall continue to operate during upgrade  change or new resource addition.The product shall be able to continue to operate with no interruption in service due to new resource additions.,"['High Availability', 'Scalability', 'Zero Downtime']",Admin,High,Update
+MN,The product shall be updated on a regular basis.The product will have a new major feature introduced every six months and quarterly maintenance releases every six months.,"['Maintenance', 'Release Management', 'Product Updates']",Admin,Medium,Update
+MN,The product shall operate with every platform.The product shall accommodate any new technology without any change in its architecture.,"['Cross-Platform Compatibility', 'Technology Integration', 'Architecture']",User,High,Other
+SE,The product shall have security.The product shall provide authentication  and authorization.,"['Security', 'Authentication', 'Authorization']",Security,High,Create
+SE,The product shall information Security. The product shall enable privacy by encryption WS-Security and Integrity Checking.,"['Data Protection', 'Encryption', 'Integrity Checking']",Security,High,Create
+SE,The product shall have audit capabilities.The product shall store messages for a minimum of one year for audit and transaction tracking purposes.,"['Audit Trails', 'Compliance', 'Data Storage']",Admin,Medium,Create
+LF,The system shall use IBM and CCR branding standards. The interface must have one IBM logo and one CCR logo.,"['Branding', 'UI Design', 'Logo Usage']",User,Low,Create
+LF,The system shall be displayable on any work computer a CCR user may have. The system interface shall be formatted to display at 800 by 600 pixel resolution.,"['Cross-Platform Compatibility', 'UI Design', 'Resolution']",User,Medium,Read
+LF,The system interface will use CCR nomenclature. The system must use the same nomenclature used in the existing WCS system and reports,"['Nomenclature', 'Consistency', 'System Integration']",User,Low,Other
+LF,The interface must summarize the data in a fashion that�s appealing to CCR management. Every report type must have at least one high level summary shown in the results dashboard/interface,"['Data Visualization', 'Reporting', 'Dashboard']",Admin,Medium,Read
+US,The system must use a point and click interface. 100% of all selection and navigation functionality must be able to be activated/selected by either a mouse or a keyboard,"['UI Design', 'Accessibility', 'Navigation']",User,Medium,Other
+US,The interface shall be easy to use. 90% of users should be able to successfully use the system to generate a report on their first use. The interface should adhere to IBM usability standards.,"['Usability', 'User Experience', 'IBM Standards']",User,Medium,Read
+US,Rreports must be easy to generate. eports must be generated within one button click and exported within one button click (after selecting the report),"['Report Generation', 'User Interface', 'User Experience']",User,Low,Create
+US,A user shall be able to use the system without instruction after a short amount of time. After one use a user should understand and remember 90% of the system usage and navigation.,"['User Experience', 'System Navigation', 'Usability']",User,Medium,Read
+US,All CCR users shall receive training before the WCS system is deployed. One training session will be held for 100% of CCR users before system deployment (based on a CCR user being available),"['Training', 'System Deployment', 'CCR Users']",Admin,High,Other
+US,The WCS system shall use appropriate nomenclature and terminology as defined by the Corporate Community Grants organization. All interfaces and reports will undergo usability tests by CCR users.,"['Terminology', 'Usability Testing', 'Corporate Community Grants']",Legal,Medium,Update
+A,The WCS system shall be available at all times as long as IBM�s internal intranet W3 is accessible. The WCS system will be available 95% of the time IBM�s internal intranet W3 is available.,"['System Availability', 'IBM Intranet', 'Uptime']",Security,High,Other
+SC,The WCS system shall have the ability to connect other designated WCS databases currently not included in the system.,"['Database Connection', 'System Integration', 'WCS Databases']",Admin,High,Create
+SC,The WCS system shall have the ability to include data for regions outside the United States and be accessed by users outside of the United States if approved by CCR management.,"['Data Region', 'User Access', 'CCR Management']",Admin,Medium,Update
+O,The WCS system shall be run in a Windows environment. The WCS shall be accessed by users through the Internet on an IBM computer running a Windows 2000 or above operating system.,"['System Environment', 'Windows Operating System', 'IBM Computer']",Admin,Low,Other
+O,The Brio portion of the WCS system must be able to export files in spreadsheet form (Microsoft Excel and Lotus 1-2-3 formats).  Brio will provide buttons in the user interface that produce/export reports in .xls or .123 file formats.,"['File Export', 'Brio', 'Spreadsheet Formats']",User,Low,Create
+MN,The WCS system must run queries to the WCS databases once again (on a specified day) to update the available data available to CCR users. Queries must be made to external databases for data refresh once a week.,"['Database Management', 'Data Refresh', 'WCS System']",User,Medium,Update
+MN,All changes  updates  and additions to the WCS system shall be updated in the WCS Developer and WCS User Guides. Every change must be reflected in WCS system documentation,"['Documentation', 'System Updates', 'WCS Guides']",Admin,Low,Update
+SE,The system shall only be accessed by authorized Corporate Community Grants (CCR) employees. Users must be authenticated using their IBM intranet user name and password.,"['Authentication', 'Authorization', 'Security']",Security,Medium,Read
+SE,The WCS system shall not allow automatic logins by any user. Cookies containing WCS login information about a user will not be stored on a user�s computer.,"['Security', 'Authentication', 'Cookie Management']",Security,High,Other
+SE,Each team owner will need to use a username and password in order to be authenticated to reach the team owner�s page,"['Authentication', 'Team Management', 'Access Control']",User,Low,Read
+SE,The Commissioner will be the only authorized user per league to adjust league settings.,"['Authorization', 'League Management', 'User Roles']",Admin,Low,Update
+LF,Each page shall contain a navigation menu which shows the index into which the current page is contained.,"['User Interface', 'Navigation', 'Page Structure']",User,Low,Read
+LF,Each page shall contain a similar format with action items in one location and navigation buttons in a different location.,"['User Interface', 'Page Layout', 'Navigation']",User,Low,Read
+LF,The message board shall contain the 5 most recently posted messages on the league page. The messages will contain up to the first 150 characters of the message.,"['Message Board', 'League Page', 'Content Display']",User,Medium,Read
+US,A new user shall be able to navigate through the league and team pages within 30 seconds of reaching the start-up page.,"['User Experience', 'Navigation', 'Performance']",User,High,Other
+US,Users shall be able to reach the �add�  �drop�  and �trade player� pages with one click from the team owner�s page.,"['User Interface', 'Sports', 'Navigation']",User,Low,Read
+US,Users shall be able to view at least 25 NFL player statistics and points on each page.,"['Data Visualization', 'Sports', 'Statistics']",User,Medium,Read
+US,The application shall ask the user to confirm dropping a player or trading a player before performing the action.,"['User Interface', 'Security', 'Confirmation']",User,Low,Other
+PE,The application shall be able to complete every user transaction within one fourth of a second of receiving the request over the network.,"['Performance', 'Networking', 'Transaction Processing']",User,High,Create
+A,The application shall have a downtime of at most 10 minutes per year.,"['Availability', 'Uptime', 'Maintenance']",Admin,High,Other
+O,The application shall run on a web application server.,"['Infrastructure', 'Server', 'Deployment']",Admin,Low,Other
+PE,The maximum wait time for a user navigating from one screen to another within the Disputes application shall be no more than 5 seconds.,"['Performance', 'User Experience', 'Navigation']",User,Medium,Read
+PE,The Disputes application shall support 350 concurrent users without any degradation of performance in the application.,"['Scalability', 'Concurrent Users', 'Performance']",Admin,High,Other
+O,The Disputes application shall be available 24x7x365  with the exception of the following scheduled maintenance windows.  Monday � Saturday 3:00am to 4:00am EST Sunday 1:00amd to 5:00am EST,"['Availability', 'Uptime', 'Maintenance']",Admin,High,Other
+O,The Disputes application shall interface with the Statement Database. The Statement Database provides the transaction details to the Disputes System. All transaction details must be obtained from the Statement Database,"['Data Integration', 'Database', 'Interface']",Security,Medium,Read
+O,A primary database will be used to store cached data for active users.,"['Database Management', 'Data Storage', 'Caching']",Security,Medium,Create
+A,The system shall achieve 95% up time.,"['System Performance', 'Reliability', 'Uptime']",Admin,High,Other
+LF,The system shall have a professional appearance,"['User Experience', 'UI Design', 'Branding']",User,Medium,Create
+LF,The product shall have a consistent color scheme and fonts.,"['UI Design', 'Branding', 'Visual Identity']",User,Low,Create
+US,The system shall be used by realtors with no training.,"['User Experience', 'Usability', 'Realtor']",User,High,Other
+US,The system shall be intuitive and self explanatory.,"['User Experience', 'Usability', 'Intuitive Design']",User,High,Other
+US,The product shall be easy for a realtor to learn.,"['User Experience', 'Learning Curve', 'Realtor']",User,Medium,Other
+US,The product shall use symbols and words that are naturally understandable by the realtor community.,"['User Experience', 'Terminology', 'Realtor']",User,Medium,Create
+PE,The product shall produce search results in an acceptable time,"['Search Functionality', 'Performance', 'Response Time']",User,High,Read
+PE,The search results shall be returned no later 30      seconds  after the user has entered the search criteria,"['Search Functionality', 'Response Time', 'Timeout']",User,High,Read
+PE,The product shall generate a CMA report in an acceptable time.,"['Reporting', 'Performance', 'Compliance']",User,Medium,Create
+PE,The CMA report shall be returned no later 60 seconds after the user has entered the CMA report criteria.,"['Reporting', 'Performance', 'Timeliness']",User,Medium,Read
+PE,The product shall synchronize contacts and appointments in an acceptable time.,"['Data Management', 'Integration', 'Synchronization']",User,High,Update
+PE,The product shall synchronize with the office system every hour.,"['Data Management', 'Integration', 'Scheduling']",Admin,Medium,Update
+A,The product shall be available for use 24 hours per day  365 days  per year,"['Availability', 'Reliability', 'Uptime']",User,High,Other
+A,Out of 1000 accesses to the system  the system is available 999 times.,"['Availability', 'Reliability', 'Quality of Service']",User,High,Other
+FT,The product shall operate in offline mode whenever internet connection is unavailable.,"['Mobility', 'Connectivity', 'Resilience']",User,High,Other
+FT,The product shall allow the user to view previously downloaded search results  CMA reports  and appointments.,"['Data Retrieval', 'Search', 'Reporting']",User,Medium,Read
+FT,The product shall retain user preferences in the event of a failure.,"['Data Persistence', 'Reliability', 'User Experience']",User,Medium,Other
+FT,100% of saved user preferences shall be restored when system comes back online.,"['Data Recovery', 'Reliability', 'User Experience']",User,High,Other
+SC,The product shall be able to support multiple remote users,"['Remote Access', 'Multi-User Support', 'Scalability']",User,Medium,Create
+SC,The product shall be able support 1000 simultaneous users.,"['Scalability', 'Performance', 'Concurrency']",User,High,Create
+SC,The product shall be capable of handling the existing 1000 users. This number is expected to grow 5 times within the next year.,"['Scalability', 'Growth', 'Capacity Planning']",User,Medium,Create
+US,The product shall be installed by an untrained realtor   without recourse to separately-printed instructions.,"['Usability', 'Installability', 'User Experience']",User,Low,Create
+US,90% of untrained realtors shall be able to install the product on their device without printed instructions,"['Usability', 'Installability', 'Quality Assurance']",User,Low,Read
+PO,The product is expected to run on Windows CE and Palm operating systems.,"['Platform Support', 'Operating System', 'Compatibility']",Admin,Medium,Create
+SE,Only registered realtors shall be able to access the system.,"['Security', 'Access Control', 'Authentication']",Security,Medium,Update
+SE,Every user of the system shall be authenticated and authorized.,"['Security', 'Authentication', 'Authorization']",Security,High,Read
+SE,The product shall prevent its data from incorrect data being introduced.,"['Data Integrity', 'Data Validation', 'Error Prevention']",Security,High,Other
+F,The system shall allow a real estate agent to query MLS information,"['Data Retrieval', 'Information Query', 'Real Estate']",User,Medium,Read
+F,The user shall be able to get driving directions to a selected property,"['Mapping', 'Navigation', 'Real Estate']",User,Medium,Read
+F,The user shall be able to download appointments and contact information for clients,"['Client Management', 'Scheduling', 'Data Export']",User,Medium,Read
+F,The system shall display clear property images in the search results,"['Real Estate', 'Image Processing', 'Search']",User,Low,Read
+SC,system shall be able to handle all of the user requests/usage during business hours.,"['System Performance', 'Scalability', 'Availability']",User,High,Other
+SC,The system shall cater to 10 simultaneous users from 9am to 5pm.,"['System Capacity', 'Concurrency', 'Scheduling']",Admin,Medium,Other
+SC,The system shall be capable of processing 100% of nursing students and their classes for the next 10 years.,"['Education', 'Student Management', 'Capacity Planning']",Admin,High,Other
+SC,The system shall be expected to manage the nursing program curriculum and class/clinical scheduling for a minimum of 5 years.,"['Curriculum Management', 'Scheduling', 'Education']",Admin,High,Create
+O,The system shall able to operate within a business office environment typical of the Nursing Department at DePaul University.,"['System Integration', 'Environment', 'Compliance']",Admin,Medium,Other
+O,The system shall be used within the specifications defined by the computers used by the Program Administrators/Nursing Staff Members.,"['System Configuration', 'Hardware', 'Compliance']",Admin,Low,Other
+O,A secondary database will be used to store historical statistics and data.,"['Data Storage', 'Database Management', 'Analytics']",Admin,Medium,Create
+F,The system shall be able to call the seller or buyer to schedule an appointment,"['Telecommunication', 'Scheduling', 'Real Estate']",User,Medium,Create
+F,The realtor shall be notified of new client appointments after automatic synchronization with office system,"['Notification', 'Synchronization', 'Real Estate']",Realtor,Medium,Read
+F,The realtor shall be able to retrieve a map showing property locations for a specified area,"['Geographic Information System', 'Real Estate', 'Mapping']",Realtor,High,Read
+F,The system shall notify the realtor when a seller or buyer responds to an appointment request,"['Notification', 'Real Estate', 'Scheduling']",Realtor,Medium,Read
+F,The product shall allow the user to save the property search results.,"['Data Storage', 'Real Estate', 'Search']",User,Low,Create
+US,The system shall be easy to use by the Program Administrators/Nursing Staff Members.,"['Usability', 'Healthcare', 'Administration']",Admin,Medium,Other
+US,All of the users shall be able to use the system after one day of training.,"['Training', 'Usability', 'Healthcare']",User,Low,Other
+US,The system shall help the user avoid making mistakes while scheduling classes and clinicals for the nursing students.,"['Scheduling', 'Healthcare', 'Education']",User,High,Create
+US,The number of mistakes noted by the students shall be decreased by 50% in the first year.,"['Quality Improvement', 'Healthcare', 'Education']",User,High,Other
+US,The system shall be intuitive to the Program Administrators/Nursing Staff Members.,"['Usability', 'Healthcare', 'Administration']",Admin,Medium,Other
+US,2 out of 3 Program Administrators/Nursing Staff Members shall successfully be able to use the system to manage the scheduling of classes and clinicals.,"['Education', 'Healthcare', 'Scheduling']",User,Medium,Create
+US,The system shall use symbols and words that are naturally understandable by the user community.,"['User Experience', 'Usability', 'Accessibility']",User,Low,Read
+US,The verbiage used within the system shall be consistent with Standard English and the terminology of the national Nursing Community.,"['Language', 'Healthcare', 'Standards']",User,Low,Read
+PE,Staff members shall be able to complete a set of tasks in a timely manner.,"['Productivity', 'Time Management', 'Staff']",User,Medium,Update
+PE,The response time of general student management tasks shall take no longer than 5 seconds and the response time of schedule generation shall take no longer than 30 seconds.,"['Performance', 'Response Time', 'Student Management']",User,High,Read
+A,The system shall be available for use between the hours of 8am and 6pm.,"['Availability', 'Uptime', 'Scheduling']",Admin,Low,Other
+O,The system shall operate within the Windows XP Professional operating system.,"['Operating System', 'Compatibility', 'Windows']",Security,Medium,Create
+O,The system shall interface with CampusConnect�s central server,"['Integration', 'Server', 'CampusConnect']",Admin,High,Create
+O,The system shall interface with the faculty central server.,"['Integration', 'Server', 'Faculty']",Admin,High,Create
+O,The system shall interface with the student master server.,"['Integration', 'Server', 'Student']",Admin,High,Create
+O,We must be able to interface with any HTML browser.,"['Browser', 'HTML', 'Interface']",User,Low,Create
+SE,Only authorized users shall have access to clinical site information.,"['Security', 'Authorization', 'Clinical Site']",User,Medium,Read
+SE,Program Administrators/Nursing Staff Members are the only people who shall have access to clinical site details.,"['Security', 'Authorization', 'Nursing Staff']",Admin,Medium,Read
+SE,Only authorized users shall have access to students� personal information.,"['Security', 'Authorization', 'Student Information']",User,Medium,Read
+SE,Dr Susan Poslusny and Dr Julie Donalek are the only people who shall have access to students� personal information.,"['Security', 'Authorization', 'Student Information']",Admin,Medium,Read
+SE,Only authorized users shall have access to the portion of the system that interfaces with CampusConnect.,"['Security', 'Authorization', 'CampusConnect']",User,Medium,Read
+SE,Fit Criterion: Dr Susan Poslusny and Karen Sysol are the only people who shall have access to the final class section scheduling for the system that interfaces with CampusConnect.,"['Security', 'Authorization', 'Scheduling']",Admin,Medium,Read
+SE,The system shall have basic data integrity checking to reduce the possibility of incorrect or invalid data being introduced.,"['Data Integrity', 'Data Validation', 'System Security']",Security,High,Other
+SE,The system shall protect private information in accordance with the organization�s information policy.,"['Data Protection', 'Information Policy', 'Organizational Security']",Security,High,Other
+SE,The system shall be built such that it is as secure as possible from malicious interference.,"['System Security', 'Malicious Interference', 'Security Measures']",Security,High,Other
+SE,The system shall use the organization�s standard virus protection software to help monitor threats to itself.,"['Security', 'IT', 'Compliance']",Security,Low,Other
+F,A cohort shall be associated to one Program of Study offered by the department.,"['Education', 'Program Management', 'Study Planning']",Admin,Medium,Create
+F,Program Administrators and Nursing Staff Members shall be able to add a listing of students to a cohort.,"['Student Management', 'Education', 'Cohort Planning']",Admin,Medium,Create
+F,Program Administrators and Nursing Staff Members shall be able to add a single student to a cohort,"['Student Management', 'Education', 'Cohort Planning']",Admin,Low,Create
+F,Students added to a cohort shall be eligible for the cohort�s Program of Study.,"['Education', 'Program Management', 'Eligibility']",User,Medium,Other
+F,Program Administrators and Nursing Staff Members shall be able to specify the preferred sequence of classes for a given cohort.,"['Curriculum Planning', 'Education', 'Class Scheduling']",Admin,High,Update
+F,For each class within a sequence for a cohort  Program Administrators and Nursing Staff Members shall be able to specify which quarter that class will be offered.,"['Class Scheduling', 'Education', 'Quarter Planning']",Admin,High,Update
+F,For each class within a sequence for a cohort  Program Administrators and Nursing Staff Members shall be able to specify which quarter that class will be offered.,"['Class Scheduling', 'Education', 'Quarter Planning']",Admin,High,Update
+F,Program Administrators and Nursing Staff Members shall be able to add new classes to a sequence of classes,"['Curriculum Planning', 'Education', 'Class Management']",Admin,Medium,Create
+MN,Application updates shall occur between 3AM and 6 AM CST on Wednesday morning during the middle of the NFL season.,"['Maintenance', 'IT', 'Scheduling']",IT,Low,Other
+MN,New System version releases shall be released at the beginning of each NFL season.,"['Software Release', 'Scheduling', 'NFL']",Admin,Medium,Create
+F,The system shall display data from the Sync Matrix 1.0 and Exercise Management Tool 1.0 applications,"['Data Integration', 'Exercise Management', 'Sync Matrix']",User,High,Read
+F,The system shall link Events back to either the Sync Matrix 1.0 or the Exercise Managment Tool 1.0 applications for modifications.,"['Event Management', 'Sync Matrix', 'Exercise Management']",User,High,Update
+F,The system shall allow modification of the display.,"['User Interface', 'Display Settings', 'Customization']",User,Low,Update
+F,The system shall offer a display of all the Events in the exercise.,"['Event Management', 'Exercise Management', 'Data Visualization']",User,Medium,Read
+F,The system shall filter data by: Venues and Key Events.,"['Data Filtering', 'Event Management', 'Venue Management']",User,Medium,Read
+F,The system shall allow a user to define the time segments,"['Time Management', 'User Settings', 'Customization']",User,Low,Create
+F,The system shall display the local and exercise time in separate clocks,"['Time Display', 'User Interface', 'Exercise Management']",User,Low,Read
+F,The system shall offer the ability to pause and resume the refresh of data.,"['Data Refresh', 'User Interface', 'Control Settings']",User,Medium,Other
+F,The system shall provide charts for the Activity or Event actual versus assumed time.,"['Data Visualization', 'Event Management', 'Activity Management']",User,High,Read
+A,The RFS system should be available 24/7  especially during the budgeting period. The RFS system shall be available 90% of the time all year  and 98% during the budgeting period. 2% of the time  the system will become available within 1 hour of the time that the situation is reported.,"['System Availability', 'Uptime', 'Reliability']",User,Medium,Other
+O,98% of the user workstations shall meet the minimum hardware requirements prior to implementation. Minimum Hard Disk Space:  400MB.,"['Hardware Requirements', 'Workstation Configuration', 'Technical Specifications']",User,Low,Read
+O,98% of the user workstations shall meet the minimum software requirements prior to implementation: Microsoft Internet Explorer 5.0. Microsoft .NET Framework 1.1. Microsoft Internet Explorer Web Controls,"['Software Requirements', 'Browser Compatibility', 'Technical Specifications']",User,Low,Read
+O,"""The RFS system should be able to easily interface with the BDW environment  in order to load the data. �	7 data files shall be received from the BDW and loaded into the RFS system within 3 hours one day prior to the start of budgeting process  every year. The data will be as of October month-end. 	Test files (7) shall be loaded up to 5 times throughout the year  from the BDW.""","['Data Integration', 'System Interface', 'Data Loading']",Admin,High,Create
+MN,Changes to revenue and expense formulae must be applied to the RFS system  every year  prior to the budgeting process start. Revenue and expense formulae will be updated within one week of their receipt  after which 2 weeks will be allotted to testing of the budget calculations  to be conducted jointly by the project development team and PCG Finance.,"['Budgeting Process', 'Formula Updates', 'Testing']",Admin,Medium,Update
+MN,New branches/complexes/districts/regions and revenue/expense accounts added to the BDW  must be reflected in the RFS system. 100% of the entities (mentioned above) available as of October month-end  will be loaded into the RFS system  prior to the budget start process.,"['Data Synchronization', 'Entity Mapping', 'System Update']",Admin,Medium,Update
+SE,Only authorized user shall access the RFS system. ONLY users that exist in the UAS system  with the RFS system assigned to their role(s)  shall access the RFS system and use it.,"['Access Control', 'User Authentication', 'Role-Based Access']",Security,Medium,Read
+SE,User access should be limited to the permissions granted to their role(s) Each level in the PCG hierarchy will be assigned a role and users will be assigned to these roles. Access to functionality within RFS system is dependent on the privileges/permission assigned to the role..,"['Role-Based Access Control', 'User Permissions', 'System Security']",Security,High,Other
+LF,The product must comply with the intranet page standards and requirements of ENET Securities. 95% of the product look & feel will be approved by the Architecture group  prior to implementation. The remaining 5% will be corrected and approved within one month of product release.,"['Compliance', 'Standards', 'Intranet Page Design']",Legal,Medium,Other
+LF,The intranet pages should display appropriately in all resolutions  from 800x600 and higher. The display of all the pages will be correct in 95% of the resolutions  prior to implementation. The remaining 5% will be corrected within a week of notification of the incorrect display.,"['Display Compatibility', 'Resolution Support', 'User Experience']",User,Low,Read
+US,The users should be able to easily use the system to successfully complete their budgets  within the stipulated time for completion. With a week of training prior to product implementation  98% of the users shall complete their budgets within the stipulated time.,"['Budgeting', 'User Experience', 'Time Management']",User,Medium,Create
+PE,The product interface should be fast. The response time of the product interface should not exceed 2 seconds 90% of the time. For 10% of the time  the response time should not be more than 10 seconds.not be more than 10 seconds.,"['Performance', 'User Interface', 'Response Time']",User,High,Read
+F,The system will use the stored e-mail addresses as a primary means of communicating information to affected parties.,"['Communication', 'Email', 'Notification']",User,Low,Read
+F,The system will notify affected parties for routine communication purposes  including but not limited to informing students of upcoming offered classes (timeline) and what their schedule will be/shall be.,"['Education', 'Scheduling', 'Notification']",Student,Medium,Update
+F,The system will notify affected parties when changes occur affecting clinicals  including but not limited to clinical section capacity changes  and clinical section cancellations.,"['Healthcare', 'Clinical Management', 'Notification']",Clinical Staff,High,Update
+F,The system will notify affected parties when changes occur affecting classes  including but not limited to class cancellations  class section detail changes  and changes to class offerings for a given quarter.,"['Education', 'Scheduling', 'Notification']",Student,Medium,Update
+F,The system shall display Events or Activities.,"['Event Management', 'Activity Tracking', 'Display']",User,Low,Read
+F,The display shall have two regions:  left 2/3 of the display is graphical  right 1/3 of the display is a data table,"['User Interface', 'Data Visualization', 'Display']",User,High,Create
+F,The data displayed in both the nodes within the graph and the rows in the table are MSEL Summary data,"['Data Analytics', 'Summary Data', 'Visualization']",User,Medium,Read
+F,The table side of the display shall be split into 2 regions: sequential and temporal.,"['Data Visualization', 'User Interface', 'Display']",User,High,Create
+F,The top 1/4 of the table will hold events that are to occur sequentially.,"['Event Management', 'Table Display', 'Sequential Events']",User,Low,Create
+F,The bottom 3/4 of the table will hold events that occur according to its relevance to current time.,"['Event Management', 'Table Display', 'Time-Based Events']",User,Low,Create
+F,The system shall color code events according to their variance from current time.,"['Event Visualization', 'Color Coding', 'Time-Based Events']",User,Medium,Read
+F,The system shall provide a history report of changes made to the Activity or Event data,"['Audit Trail', 'Data History', 'Activity Tracking']",Admin,Medium,Read
+LF,The look and feel of the system shall conform to the user interface standards of the smart device.,"['User Interface', 'Smart Device Compatibility', 'Design Standards']",User,High,Other
+LF,The user interface shall have standard menus  buttons for navigation,"['User Interface', 'Navigation', 'Menu Design']",User,Low,Read
+F,The system shall update or create new property listings in the MLS,"['Property Listings', 'MLS Integration', 'Data Synchronization']",Realtor,Medium,Create
+F,Realtor shall be able to generate a CMA report based on property criteria,"['Report Generation', 'CMA Report', 'Property Criteria']",Realtor,Medium,Read
+F,Program Administrators and Nursing Staff Members shall be able to add clinical classes or sections to a sequence of classes,"['Clinical Classes', 'Class Scheduling', 'Administrative Tasks']",Program Administrators,Medium,Create
+F,Program Administrators and Nursing Staff Members shall be able to add a new cohort to the system  identified by start month and year.,"['Cohort Management', 'Administrative Tasks', 'Student Tracking']",Program Administrators,Medium,Create
+F,Program Administrators and Nursing Staff Members shall be able to add new classes for the nursing department into the system.,"['Education', 'Nursing', 'Administration']",Admin,Medium,Create
+F,A class shall be either a non-clinical class or a clinical class.,"['Education', 'Classification', 'Nursing']",User,Low,Other
+F,A non-clinical class shall specify the course name  lecture room requirements  and instructor needs.,"['Education', 'Course Planning', 'Nursing']",User,Low,Other
+F,A clinical class shall specify the course name  lecture room requirements  clinical site needs  lecture instructor needs  and clinical lab instructor needs.,"['Education', 'Course Planning', 'Clinical']",User,Low,Other
+F,Program Administrators/Nursing Staff Members shall be able to create a new Program of Study.,"['Education', 'Program Management', 'Nursing']",Admin,Medium,Create
+F,A Program of Study shall consist of a program name and listing of required classes (both clinical and non-clinical) that must be completed.,"['Education', 'Program Management', 'Curriculum']",User,Low,Other
+F,Program Administrators and Nursing Staff Members shall have the ability to specify which classes are required for a Program of Study,"['Education', 'Program Management', 'Nursing']",Admin,Medium,Update
+F,The system shall be able to display a report of needed classes for a given quarter for all cohorts of all programs for Program Administrators/Nursing Staff Members� planning purposes.,"['Reporting', 'Education', 'Administration']",Admin,High,Read
+F,The report of needed classes shall include (but not be limited to) classes to be offered  number of sections needed  number of labs needed  and room types needed.,"['Reporting', 'Education', 'Course Planning']",User,Low,Other
+F,Classes for a given cohort shall not conflict with regards to the time and day that they are offered.,"['Scheduling', 'Education', 'Conflict Resolution']",User,High,Other
+F,Program Administrators and Nursing Staff Members shall be able to add a new clinical site into the system.,"['Healthcare', 'Education', 'Administration']",Admin,Medium,Create
+F,Clinical site information shall include (but not be limited to) the name of the site  contact person  and contact information.,"['Healthcare', 'Data Management', 'Compliance']",User,Low,Read
+F,Program Administrators and Nursing Staff Members shall be able to add a new clinical lab section for an existing clinical class into the System.,"['Education', 'Healthcare', 'Curriculum']",Admin,Medium,Create
+F,A clinical lab section shall include the clinical site name  the class  instructor  day and time of the lab.,"['Education', 'Healthcare', 'Scheduling']",User,Low,Read
+F,Program Administrators and Nursing Staff Members shall be able to add a student who has registered for a clinical class to a clinical lab section for that class.,"['Education', 'Healthcare', 'Enrollment']",Admin,Medium,Update
+F,The system shall allow a Program Administrator or Nursing staff member to remove a student from a clinical lab section.,"['Education', 'Healthcare', 'Enrollment']",Admin,Medium,Update
+F,The system shall allow a Program Administrator/Nursing Staff Member to move a student from one clinical lab section to another clinical lab section corresponding to the same clinical class.,"['Education', 'Healthcare', 'Scheduling']",Admin,High,Update
+F,Program Administrators/Nursing Staff Members shall be able to cancel a clinical lab section only if there are no students registered for that clinical lab section.,"['Education', 'Healthcare', 'Compliance']",Admin,Medium,Delete
+F,A Program Administrator/Nursing Staff Member shall be able to add a new nursing student to the system.,"['Healthcare', 'Education', 'Admissions']",Admin,Medium,Create
+F,A staff member shall have the ability to manage the progress of a part time student  which includes modifying their sequence of classes and timeline of classes.,"['Education', 'Student Affairs', 'Advising']",Admin,High,Update
+F,The system shall be able to display a printable summary for individual cohorts  which will include the students enlisted  the Program of study  sequence of classes  cohort progress through the program  and timeline of completion.,"['Education', 'Student Management', 'Cohort Management']",User,Medium,Read
+F,The system shall be able to display a printable summary for individual clinical sites  which will include information on labs being held at that site for the given quarter (Clinical site  general information on labs held at that location  dates and times of all labs held there).,"['Clinical Management', 'Site Management', 'Lab Management']",User,Medium,Read
+F,The system shall be able to display a printable summary for individual clinical labs  which will include (but not be limited to) class name  class number  lab section  listing of students enrolled  instructor  day(s)  time  and location.,"['Clinical Management', 'Lab Management', 'Student Enrollment']",User,Medium,Read
+F,The system shall be able to display a printable summary for individual nursing students  which will include (but not be limited to) student name  student ID  admission date  classes  credits  GPA  and the cohort that the student is enrolled in.,"['Student Management', 'Nursing Education', 'Student Enrollment']",User,Medium,Read
+F,The system shall be able to display a printable summary of the system log.,"['System Administration', 'Logging', 'Auditing']",Admin,Low,Read
+F,The system shall contain contact information (e-mail and phone number) for all people relevant to the system  including (but not limited to) staff members  students  lecture instructors  clinical lab instructors  and clinical site administrators.,"['Contact Management', 'Staff Management', 'Communication']",Admin,Low,Create
+F,The system will notify affected parties when changes occur affecting cohorts  including but not limited to changes to the sequence for a cohort�s program of study and changes to a given week�s schedule (lab cancelled this week due to instructor illness).,"['Notification Management', 'Cohort Management', 'Schedule Management']",User,High,Other
+F,The system will notify affected parties when changes occur affecting specific students  including but not limited to changing a student�s status from full time to part time and moving a student to a different clinical section.,"['Notification Management', 'Student Management', 'Enrollment Management']",User,High,Other
+F,Program Administrators/Nursing Staff Members shall have the ability to modify information relating to cohorts  including cohort identifier  program of study  preferred sequence of classes and quarters that a cohort will be taking specific classes.,"['Cohort Management', 'Program Management', 'Administrative Management']",Admin,Medium,Update
+F,Program Administrators/Nursing Staff Members shall have the ability to modify information relating to a Program of Study within the Nursing Department  including the Program of study name  and required classes for that Program of Study.,"['Program Management', 'Curriculum Management', 'Administrative Management']",Admin,Medium,Update
+F,Program Administrators/Nursing Staff Members shall have the ability to modify information relating to a Clinical Site  including the clinical site name  site contact person  contact information  and address.,"['Healthcare', 'Clinical Site Management', 'Staff Management']",Admin,Medium,Update
+F,Program Administrators/Nursing Staff Members shall have the ability to modify information relating to a Clinical Lab Section  including the clinical site name  the department/section for the lab  the class  instructor  day and time of lab  and contact information.,"['Healthcare', 'Lab Management', 'Clinical Site Management']",Admin,Medium,Update
+F,Program Administrators/Nursing Staff Members shall have the ability to modify information relating to a Nursing Student  including student ID  student name  phone number  e-mail  status (full time or part time)  and program of study.,"['Healthcare', 'Student Management', 'Education']",Admin,Medium,Update
+LF,The Disputes application shall comply with the corporate standards for user interface creation for internally and externally used applications.,"['Software Development', 'User Interface', 'Corporate Standards']",Security,Low,Other
+LF,All screens created as part of the Disputes application must comply with corporate standards for interface creation.,"['Software Development', 'User Interface', 'Corporate Standards']",Security,Low,Other
+US,The list of dispute cases that are displayed after a search is performed must be color coded for easy identification of dispute cases based upon the dispute case status.,"['Dispute Management', 'User Experience', 'Search Functionality']",User,Medium,Read
+US,100% of the cardmember and merchant services representatives shall use the Disputes application regularly after a 2-day training course.,"['Adoption', 'Training', 'Dispute Management']",User,High,Other
+US,100% of cardmember services representatives shall be able to successfully create a dispute case on the first encounter after completing the training course.,"['Dispute Management', 'Training', 'Adoption']",User,High,Create
+US,100% of merchant services representatives shall be able to successfully perform a follow up action on a dispute case on the first encounter after completing the training course.,"['Dispute Management', 'Training', 'Adoption']",User,High,Update
+O,The Disputes application shall interface with the Cardmember Information Database.  The Cardmember Information Database provides detailed information with regard to a cardmember.  All cardmember detail information must be obtained from the Cardmember Information Database.,"['Data Integration', 'Dispute Management', 'Database Management']",Security,High,Read
+O,The Disputes applications shall interface with the Merchant Information Database.  The Merchant Information Database provides detailed information with regard to the merchant. All merchant detail information shall be obtained from the Merchant Information Database.,"['Merchant Information', 'Database Integration', 'Disputes Application']",Admin,Medium,Read
+O,The Disputes application shall interface with the Letters application.  This will allow the Disputes application to request letters as part of the dispute initiation and dispute follow up process. All letter requests must be sent to the Print Letter Utility application.,"['Disputes Application', 'Letters Application', 'Print Letter Utility']",User,Medium,Create
+O,The Disputes application shall interface with the Cardmember Posting and Billing System.  This will allow the Disputes application to request adjustments to cardmember and merchant�s accounts. All adjustment requests must be sent to the Cardmember Posting and Billing System.,"['Disputes Application', 'Cardmember Posting', 'Billing System']",User,High,Update
+SE,The Disputes application shall ensure that only users with the appropriate access level are allowed to initiate dispute requests.,"['Access Control', 'Disputes Application', 'Security']",Security,Medium,Other
+SE,Only users with Update access must be able to initiate dispute requests.,"['Access Control', 'Disputes Application', 'User Roles']",Security,Low,Other
+SE,The Disputes application shall ensure that only authorized users are allowed to logon to the application.,"['Access Control', 'Disputes Application', 'Authentication']",Security,Medium,Other
+SE,All authorized users  once authenticated must be able to logon to the Disputes System,"['Authentication', 'Disputes System', 'Access Control']",User,Low,Read
+SE,The Disputes System shall generate a User Report that details any new users that have been added and any changes to an existing user�s access level.  The report will be reviewed for auditing purposes.,"['User Report', 'Disputes System', 'Auditing']",Admin,High,Create
+SE,All additions of new users and modifications to users access shall be recorded on the User Report.,"['User Report', 'Access Modifications', 'Auditing']",Admin,Medium,Update
+SE,If a user account is revoked  it can only be re-instantiated by the System Administrator.,"['Account Management', 'System Administrator', 'Access Control']",Admin,Low,Update
+SE,Only the System Administrator shall be able to reset a revoked user logon account,"['User Management', 'System Administration', 'Security']",Admin,Low,Update
+SE,The Disputes application shall manipulate and view business data. Users will not have direct access to data files or databases.,"['Data Management', 'Business Operations', 'Disputes Resolution']",User,Medium,Read
+SE,All updates to data files or database must be initiated from the Disputes System.,"['Data Integrity', 'System Integration', 'Disputes Resolution']",System,Medium,Update
+L,The Disputes application must conform to the legal requirements as specified by the Merchant Operating Regulations.,"['Regulatory Compliance', 'Merchant Operations', 'Legal Requirements']",Legal,High,Other
+L,All business rules specified in the Disputes System shall be in compliance with the Merchant Operating Regulations.,"['Business Rules', 'Regulatory Compliance', 'Merchant Operations']",Legal,High,Other
+L,The Disputes application must conform to the legal requirements as specified by Regulation E and Regulation Z that govern credit card disputes processing.,"['Payment Card Regulations', 'Disputes Resolution', 'Regulatory Compliance']",Legal,High,Other
