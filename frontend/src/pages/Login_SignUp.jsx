@@ -54,11 +54,12 @@ export default function AuthPages() {
       if (isLogin) {
         const data = await apiFetch('/api/login', {
           method: 'POST',
-          body: JSON.stringify({ email: formData.email, password: formData.password }),
+          body: { email: formData.email, password: formData.password },
         });
 
-        // expected { token, user }
-        saveAuth(data.token, data.user);
+        // expected { token, user } from backend
+        // backend returns { user, token }
+        saveAuth(data.token || data.token, data.user || data.user);
         setSuccess('Logged in successfully');
         console.log('Logged in', data.user);
         // App listens for authChanged and will navigate to dashboard
@@ -66,14 +67,15 @@ export default function AuthPages() {
       } else {
         const data = await apiFetch('/api/register', {
           method: 'POST',
-          body: JSON.stringify({
+          body: {
             name: formData.name,
             email: formData.email,
             password: formData.password,
             password_confirmation: formData.confirmPassword,
-          }),
+          },
         });
 
+        // backend returns { user, token }
         saveAuth(data.token, data.user);
         setSuccess('Account created');
         // App will switch to dashboard when token saved
