@@ -43,6 +43,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/projects/{project}/conversations', [ConversationController::class, 'index']);
     Route::get('/conversations/{conversation}/messages', [ConversationController::class, 'show']);
     Route::post('/conversations/{conversation}/messages', [ConversationController::class, 'sendMessage']);
+    Route::put('/conversations/{conversation}', [ConversationController::class, 'update']);
+    Route::delete('/conversations/{conversation}', [ConversationController::class, 'destroy']);
 
     // Document upload and management routes
     Route::post('/documents', [DocumentController::class, 'upload']);

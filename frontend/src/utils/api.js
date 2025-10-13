@@ -70,9 +70,20 @@ export function getAuthToken() {
   return localStorage.getItem('api_token');
 }
 
+export function getUser() {
+  try {
+    const raw = localStorage.getItem('user');
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    return null;
+  }
+}
+
 export default {
   apiFetch,
   saveAuth,
   clearAuth,
   getAuthToken,
+  getUser,
 };

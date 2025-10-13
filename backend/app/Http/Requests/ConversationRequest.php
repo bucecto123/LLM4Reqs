@@ -21,11 +21,22 @@ class ConversationRequest extends FormRequest
      */
     public function rules(): array
     {
+        // For creating conversations, project_id is required
+        if ($this->isMethod('POST')) {
+            return [
+                'project_id' => 'required|integer|exists:projects,id',
+                'requirement_id' => 'nullable|integer|exists:requirements,id',
+                'title' => 'nullable|string|max:255',
+                'context' => 'nullable|string',
+                'status' => 'nullable|string|in:active,inactive',
+            ];
+        }
+        
+        // For updating conversations, only allow certain fields
         return [
-            'project_id' => 'required|integer|exists:projects,id',
-            'requirement_id' => 'nullable|integer|exists:requirements,id',
-            'title' => 'nullable|string|max:255',
-            'context' => 'nullable|string',
+            'title' => 'sometimes|string|max:255',
+            'context' => 'sometimes|string',
+            'status' => 'sometimes|string|in:active,inactive',
         ];
     }
 }

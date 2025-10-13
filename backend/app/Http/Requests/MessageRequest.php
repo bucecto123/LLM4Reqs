@@ -22,9 +22,8 @@ class MessageRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'conversation_id' => 'required|exists:conversations,id',
             'role' => 'required|in:user,assistant,system',
-            'content' => 'nullable|string',
+            'content' => 'required|string',
             'model_used' => 'nullable|string',
             'tokens_used' => 'nullable|integer'
         ];
