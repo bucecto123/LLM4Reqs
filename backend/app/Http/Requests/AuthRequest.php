@@ -32,13 +32,15 @@ class AuthRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
-            'email' => 'required|email:rfc,dns',
+            'email' => 'required|email',
             'password' => 'required',
         ];
 
         if ($this->routeIs('auth.register')) {
+            $rules['name'] = 'required|string|max:255';
             $rules['email'] .= '|unique:users';
-            $rules['password'] .= '|min:6';
+            $rules['password'] .= '|min:6|confirmed';
+            $rules['password_confirmation'] = 'required';
         }
 
         return $rules;

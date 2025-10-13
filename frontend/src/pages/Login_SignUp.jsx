@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, ArrowRight, Check, X } from 'lucide-react';
 import api, { apiFetch, saveAuth } from '../utils/api';
 
 export default function AuthPages() {
@@ -14,6 +14,20 @@ export default function AuthPages() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [passwordStrength, setPasswordStrength] = useState({ score: 0, label: 'Very weak' });
+
+  const getPasswordStrength = (pw) => {
+    if (!pw) return { score: 0, label: 'Very weak' };
+    let score = 0;
+    if (pw.length >= 8) score += 1;
+    if (/[a-z]/.test(pw)) score += 1;
+    if (/[A-Z]/.test(pw)) score += 1;
+    if (/\d/.test(pw)) score += 1;
+    if (/[^A-Za-z0-9]/.test(pw)) score += 1;
+
+    const labels = ['Very weak', 'Weak', 'Moderate', 'Strong', 'Very strong', 'Excellent'];
+    return { score, label: labels[Math.min(score, labels.length - 1)] };
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -22,11 +36,35 @@ export default function AuthPages() {
     if (fieldErrors[name]) {
       setFieldErrors({ ...fieldErrors, [name]: undefined });
     }
+
+    // live password strength feedback
+    if (name === 'password') {
+      setPasswordStrength(getPasswordStrength(value || ''));
+    }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Will be replaced by async handler below
+    // Will be replaced by async handler below (submitAsync)
+  };
+
+  // Switch tabs and clear errors/messages to avoid stale popups
+  const switchToLogin = () => {
+    setIsLogin(true);
+    setFieldErrors({});
+    setError('');
+    setSuccess('');
+    setPasswordStrength({ score: 0, label: 'Very weak' });
+    setFormData({ name: '', email: '', password: '', confirmPassword: '' });
+  };
+
+  const switchToSignup = () => {
+    setIsLogin(false);
+    setFieldErrors({});
+    setError('');
+    setSuccess('');
+    setPasswordStrength({ score: 0, label: 'Very weak' });
+    setFormData({ name: '', email: '', password: '', confirmPassword: '' });
   };
 
   // async submit handler for register/login (uses apiFetch)
@@ -36,17 +74,41 @@ export default function AuthPages() {
     setSuccess('');
     setFieldErrors({});
 
-    // small client-side checks
-    if (!formData.email) {
-      setFieldErrors({ ...fieldErrors, email: ['Email is required'] });
-      return;
+    // client-side validation (collect all errors and show them)
+    const newErrors = {};
+
+    // trim inputs for validation
+    const name = formData.name?.trim();
+    const email = formData.email?.trim();
+    const password = formData.password || '';
+    const confirmPassword = formData.confirmPassword || '';
+
+    if (!email) {
+      newErrors.email = ['Email is required'];
     }
-    if (!formData.password) {
-      setFieldErrors({ ...fieldErrors, password: ['Password is required'] });
-      return;
+    
+    if (!isLogin && !name) {
+      newErrors.name = ['Full name is required'];
     }
-    if (!isLogin && formData.password !== formData.confirmPassword) {
-      setFieldErrors({ ...fieldErrors, confirmPassword: ['Passwords do not match'] });
+    
+
+    if (!password) {
+      newErrors.password = ['Password is required'];
+    } else {
+      // password strength: min 8 chars, at least 1 upper, 1 lower, 1 digit, 1 special
+      const strengthRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+      if (!strengthRegex.test(password)) {
+        newErrors.password = ['Password must be at least 8 characters and include uppercase, lowercase, a number and a special character'];
+      }
+    }
+
+    if (!isLogin && password !== confirmPassword) {
+      newErrors.confirmPassword = ['Passwords do not match'];
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setFieldErrors(newErrors);
+      setError('Please fix the highlighted fields');
       return;
     }
 
@@ -54,11 +116,12 @@ export default function AuthPages() {
       if (isLogin) {
         const data = await apiFetch('/api/login', {
           method: 'POST',
-          body: JSON.stringify({ email: formData.email, password: formData.password }),
+          body: { email: formData.email, password: formData.password },
         });
 
-        // expected { token, user }
-        saveAuth(data.token, data.user);
+        // expected { token, user } from backend
+        // backend returns { user, token }
+        saveAuth(data.token || data.token, data.user || data.user);
         setSuccess('Logged in successfully');
         console.log('Logged in', data.user);
         // App listens for authChanged and will navigate to dashboard
@@ -66,14 +129,15 @@ export default function AuthPages() {
       } else {
         const data = await apiFetch('/api/register', {
           method: 'POST',
-          body: JSON.stringify({
+          body: {
             name: formData.name,
             email: formData.email,
             password: formData.password,
             password_confirmation: formData.confirmPassword,
-          }),
+          },
         });
 
+        // backend returns { user, token }
         saveAuth(data.token, data.user);
         setSuccess('Account created');
         // App will switch to dashboard when token saved
@@ -157,14 +221,14 @@ export default function AuthPages() {
             {/* Tabs */}
             <div className="flex rounded-lg p-1 mb-8" style={{ backgroundColor: '#DBE2EF' }}>
               <button
-                onClick={() => setIsLogin(true)}
+                onClick={switchToLogin}
                 className="flex-1 py-3 rounded-lg font-semibold transition-all duration-200"
                 style={isLogin ? { backgroundColor: '#4A7BA7', color: 'white' } : { color: '#112D4E' }}
               >
                 Login
               </button>
               <button
-                onClick={() => setIsLogin(false)}
+                onClick={switchToSignup}
                 className="flex-1 py-3 rounded-lg font-semibold transition-all duration-200"
                 style={!isLogin ? { backgroundColor: '#4A7BA7', color: 'white' } : { color: '#112D4E' }}
               >
@@ -268,6 +332,41 @@ export default function AuthPages() {
                 {fieldErrors.password && (
                   <div className="text-xs text-red-600 mt-1">{fieldErrors.password[0]}</div>
                 )}
+                {/* Password validation checklist - show only during Sign Up */}
+                {!isLogin && (
+                  <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    {/* derive rule booleans from current password */}
+                    {(() => {
+                      const pw = formData.password || '';
+                      const rules = {
+                        length: pw.length >= 8,
+                        upper: /[A-Z]/.test(pw),
+                        lower: /[a-z]/.test(pw),
+                        number: /\d/.test(pw),
+                        special: /[^A-Za-z0-9]/.test(pw),
+                      };
+
+                      const item = (ok, text) => (
+                        <div className="flex items-center space-x-2 py-1">
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center ${ok ? 'bg-green-100 text-green-600' : 'bg-transparent text-gray-400'}`}>
+                            {ok ? <Check size={14} /> : <X size={14} />}
+                          </div>
+                          <div className={`${ok ? 'text-green-600' : 'text-gray-500'} text-sm`}>{text}</div>
+                        </div>
+                      );
+
+                      return (
+                        <div className="space-y-1">
+                          {item(rules.length, 'At least 8 characters long')}
+                          {item(rules.upper, 'At least one uppercase letter')}
+                          {item(rules.lower, 'At least one lowercase letter')}
+                          {item(rules.number, 'At least one number')}
+                          {item(rules.special, 'At least one special character')}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
 
               {!isLogin && (
@@ -289,8 +388,8 @@ export default function AuthPages() {
                       }}
                     />
                   </div>
-                  {fieldErrors.password && (
-                    <div className="text-xs text-red-600 mt-1">{fieldErrors.password[0]}</div>
+                  {fieldErrors.confirmPassword && (
+                    <div className="text-xs text-red-600 mt-1">{fieldErrors.confirmPassword[0]}</div>
                   )}
                 </div>
               )}

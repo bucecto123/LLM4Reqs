@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'llm' => [
+        'url' => env('LLM_SERVICE_URL', 'http://localhost:8000'),
+        ],
+
 ];
