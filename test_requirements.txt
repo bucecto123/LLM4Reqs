@@ -1,0 +1,21 @@
+Software Requirements Document
+
+1. User Authentication
+   - The system must allow users to register with email and password
+   - Users must be able to log in and log out securely
+   - Password must be at least 8 characters long
+
+2. File Upload
+   - Users must be able to upload documents in PDF, DOCX, and TXT formats
+   - Maximum file size should be 10MB
+   - The system should extract text content from uploaded files
+
+3. Chat Functionality
+   - Users must be able to chat with an AI assistant
+   - The AI should have access to uploaded document contents
+   - Chat history should be preserved per conversation
+
+4. Performance Requirements
+   - The system should respond within 3 seconds for most operations
+   - File uploads should complete within 30 seconds
+   - The system should handle up to 100 concurrent users

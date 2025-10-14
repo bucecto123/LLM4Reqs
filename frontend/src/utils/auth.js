@@ -56,7 +56,11 @@ class AuthManager {
 
     const headers = Object.assign({}, options.headers || {});
     headers['Accept'] = headers['Accept'] || 'application/json';
-    headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+    
+    // Don't set Content-Type for FormData - let browser set it with boundary
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+    }
 
     const accessToken = this.getAccessToken();
     if (accessToken) {

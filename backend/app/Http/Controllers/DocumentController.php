@@ -62,7 +62,7 @@ class DocumentController extends Controller
                 'filename' => $filename,
                 'original_filename' => $originalName,
                 'file_path' => $filePath,
-                'content' => $content,
+                'content' => $content, // Content is already cleaned by extractContentFromFile
                 'file_size' => $file->getSize(),
                 'file_type' => $file->getClientMimeType(),
                 'status' => 'uploaded'
@@ -91,25 +91,66 @@ class DocumentController extends Controller
         $tempPath = $file->getPathname();
 
         try {
+            $content = '';
             switch ($mimeType) {
                 case 'text/plain':
                 case 'text/markdown':
-                    return file_get_contents($tempPath);
+                    $content = file_get_contents($tempPath);
+                    break;
                 
                 case 'application/pdf':
-                    return $this->extractPdfContent($tempPath);
+                    $content = $this->extractPdfContent($tempPath);
+                    break;
                 
                 case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
                 case 'application/msword':
-                    return $this->extractDocxContent($tempPath);
+                    $content = $this->extractDocxContent($tempPath);
+                    break;
                 
                 default:
                     return '';
             }
+            
+            // Clean and validate UTF-8 encoding
+            return $this->cleanUtf8Content($content);
         } catch (\Exception $e) {
             // If extraction fails, return empty content
             return '';
         }
+    }
+
+    /**
+     * Clean and validate UTF-8 content
+     */
+    private function cleanUtf8Content($content)
+    {
+        if (empty($content)) {
+            return '';
+        }
+        
+        // Convert to UTF-8 if not already
+        if (!mb_check_encoding($content, 'UTF-8')) {
+            // Try to detect encoding and convert
+            $encoding = mb_detect_encoding($content, ['UTF-8', 'ISO-8859-1', 'Windows-1252', 'ASCII'], true);
+            if ($encoding) {
+                $content = mb_convert_encoding($content, 'UTF-8', $encoding);
+            } else {
+                // If detection fails, use utf8_encode as fallback
+                $content = utf8_encode($content);
+            }
+        }
+        
+        // Remove or replace problematic characters
+        $content = mb_convert_encoding($content, 'UTF-8', 'UTF-8'); // This removes invalid sequences
+        
+        // Remove control characters except newlines, tabs, and carriage returns
+        $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $content);
+        
+        // Replace multiple whitespace with single space, but preserve line breaks
+        $content = preg_replace('/[ \t]+/', ' ', $content);
+        $content = preg_replace('/\n{3,}/', "\n\n", $content);
+        
+        return trim($content);
     }
 
     /**
@@ -219,9 +260,15 @@ class DocumentController extends Controller
         }
         
         try {
+            // Clean and truncate document content if it's too large for LLM processing
+            $content = $this->cleanUtf8Content($document->content ?? '');
+            if (strlen($content) > 8000) { // Rough limit to stay within token constraints
+                $content = mb_substr($content, 0, 8000, 'UTF-8') . "\n... [Document truncated for processing]";
+            }
+            
             // Extract requirements using LLM
             $result = $this->llmService->extractRequirements(
-                $document->content,
+                $content,
                 $document->file_type
             );
             
@@ -254,9 +301,22 @@ class DocumentController extends Controller
             ]);
             
         } catch (\Exception $e) {
+            \Log::error('Document processing failed: ' . $e->getMessage());
+            
+            $errorMessage = 'Failed to process document';
+            
+            // Handle specific error types
+            if (strpos($e->getMessage(), 'Malformed UTF-8') !== false || 
+                strpos($e->getMessage(), 'json_encode') !== false) {
+                $errorMessage = 'Document contains invalid characters. Please check file encoding.';
+            } elseif (strpos($e->getMessage(), 'Request too large') !== false ||
+                     strpos($e->getMessage(), 'rate_limit_exceeded') !== false) {
+                $errorMessage = 'Document is too large for processing. Please use smaller files.';
+            }
+            
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to process document: ' . $e->getMessage()
+                'message' => $errorMessage . ': ' . $e->getMessage()
             ], 500);
         } 
     }

@@ -25,4 +25,9 @@ class Conversation extends Model
     {
         return $this->hasMany(Message::class);
     }
+
+    public function documents()
+    {
+        return $this->hasMany(Document::class);
+    }
 }

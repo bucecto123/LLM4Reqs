@@ -34,6 +34,7 @@ export default function LLMDashboard() {
   // File upload state
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState([]);
+  const [conversationDocuments, setConversationDocuments] = useState([]);
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -112,12 +113,30 @@ export default function LLMDashboard() {
       const data = await apiFetch(`/api/conversations/${conversationId}/messages`);
       setMessages(Array.isArray(data) ? data : []);
       setError(null);
+      
+      // Also load documents for this conversation
+      await loadConversationDocuments(conversationId);
     } catch (err) {
       console.error('Failed to load messages:', err);
       setError('Failed to load messages');
       setMessages([]);
     } finally {
       setIsLoadingMessages(false);
+    }
+  };
+
+  // Load documents for a conversation
+  const loadConversationDocuments = async (conversationId) => {
+    try {
+      // Get all documents for the current project and filter by conversation_id
+      if (!currentProjectId) return;
+      
+      const data = await apiFetch(`/api/projects/${currentProjectId}/documents`);
+      const conversationDocs = data.documents?.filter(doc => doc.conversation_id == conversationId) || [];
+      setConversationDocuments(conversationDocs);
+    } catch (err) {
+      console.error('Failed to load conversation documents:', err);
+      setConversationDocuments([]);
     }
   };
 
@@ -224,18 +243,18 @@ export default function LLMDashboard() {
     setAttachedFiles([]); // Clear attached files
     setIsLoading(true);  // Set loading at the start
     
-    // Create message content with file info
-    let fullMessageContent = userMessage;
+    // Create message content with file info for display (no file contents)
+    let displayMessageContent = userMessage;
     if (filesToUpload.length > 0) {
       const fileNames = filesToUpload.map(file => file.name).join(', ');
-      fullMessageContent += `\n\n📎 Attached files: ${fileNames}`;
+      displayMessageContent += displayMessageContent ? `\n\n📎 Attached files: ${fileNames}` : `📎 Uploaded files: ${fileNames}`;
     }
     
-    // Add user message to UI immediately
+    // Add user message to UI immediately (only shows message + file names)
     const newUserMessage = {
       id: `temp-${Date.now()}`,
       role: 'user',
-      content: fullMessageContent,
+      content: displayMessageContent,
       created_at: new Date().toISOString()
     };
     setMessages(prev => [...prev, newUserMessage]);
@@ -251,41 +270,42 @@ export default function LLMDashboard() {
           formData.append('project_id', currentProjectId.toString());
           formData.append('conversation_id', conversationId.toString());
           
-          const uploadResponse = await fetch('/api/documents', {
+          const uploadData = await apiFetch('/api/documents', {
             method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-            },
             body: formData
           });
           
-          if (uploadResponse.ok) {
-            const uploadData = await uploadResponse.json();
+          if (uploadData.success && uploadData.document) {
             uploadedDocuments.push(uploadData.document);
             
-            // Process the document to extract requirements
+            // Process the document to extract requirements (optional)
             try {
               await apiFetch(`/api/documents/${uploadData.document.id}/process`, {
                 method: 'POST'
               });
+              console.log(`Document ${uploadData.document.original_filename} processed successfully`);
             } catch (processErr) {
-              console.warn('Failed to process document:', processErr);
-              // Continue anyway - the document is uploaded
+              console.warn(`Failed to process document ${uploadData.document.original_filename}:`, processErr);
+              // Continue anyway - the document is uploaded and can still be used in chat
             }
           } else {
-            console.warn(`Failed to upload file ${file.name}:`, await uploadResponse.text());
+            console.warn(`Failed to upload file ${file.name}: Invalid response format`);
           }
         } catch (uploadErr) {
           console.warn(`Error uploading file ${file.name}:`, uploadErr);
         }
       }
       
-      // Create enhanced message content for the AI
+      // Create enhanced message content for the AI (includes full document content)
+      // This is sent to the backend but NOT displayed in the chat
       let messageForAI = userMessage;
       if (uploadedDocuments.length > 0) {
         const documentContents = uploadedDocuments
           .filter(doc => doc.content && doc.content.trim())
-          .map(doc => `File: ${doc.original_filename}\n${doc.content}`)
+          .map(doc => {
+            // Don't truncate for AI - it needs the full content
+            return `File: ${doc.original_filename}\n${doc.content}`;
+          })
           .join('\n\n---\n\n');
           
         if (documentContents) {
@@ -293,7 +313,7 @@ export default function LLMDashboard() {
         }
       }
       
-      // Send message with document context to the conversation
+      // Send message with document context to the conversation (backend only)
       await apiFetch(`/api/conversations/${conversationId}/messages`, {
         method: 'POST',
         body: {
@@ -304,6 +324,9 @@ export default function LLMDashboard() {
       
       // Reload messages to get the full conversation including AI response
       await loadMessages(conversationId);
+      
+      // Reload conversation documents to reflect newly uploaded files
+      await loadConversationDocuments(conversationId);
     } catch (err) {
       console.error('Failed to send message:', err);
       let errorMessage = 'Failed to send message. Please try again.';
@@ -315,6 +338,10 @@ export default function LLMDashboard() {
         errorMessage = 'Conversation not found. Please select a different conversation.';
       } else if (err.status === 422) {
         errorMessage = 'Invalid message format. Please check your input.';
+      } else if (err.message && err.message.includes('Request too large')) {
+        errorMessage = 'Your message is too long. Try shortening it or uploading smaller files.';
+      } else if (err.message && err.message.includes('rate_limit_exceeded')) {
+        errorMessage = 'Message too large for AI processing. Please try with smaller files or shorter messages.';
       }
       
       setError(errorMessage);
@@ -363,7 +390,7 @@ export default function LLMDashboard() {
     }
 
     try {
-      const response = await apiFetch(`/api/conversations/${conversationId}`, {
+      await apiFetch(`/api/conversations/${conversationId}`, {
         method: 'PUT',
         body: {
           title: editingTitle.trim()
@@ -393,7 +420,7 @@ export default function LLMDashboard() {
       if (err.status === 401) {
         errorMessage = 'You are not authenticated. Please log in again.';
         await performLogout();
-      } else if (err.status === 422) {
+      } else if (err.status === 403) {
         errorMessage = 'You do not have permission to edit this conversation.';
       } else if (err.status === 404) {
         errorMessage = 'Conversation not found.';
@@ -423,6 +450,7 @@ export default function LLMDashboard() {
       if (selectedConversation?.id === conversationId) {
         setSelectedConversation(null);
         setMessages([]);
+        setConversationDocuments([]);
       }
 
       setShowDropdownId(null);
@@ -433,7 +461,7 @@ export default function LLMDashboard() {
       if (err.status === 401) {
         errorMessage = 'You are not authenticated. Please log in again.';
         await performLogout();
-      } else if (err.status === 404) {
+      } else if (err.status === 403) {
         errorMessage = 'You do not have permission to delete this conversation.';
       } else if (err.status === 404) {
         errorMessage = 'Conversation not found.';
@@ -700,6 +728,13 @@ export default function LLMDashboard() {
               <span className="text-sm text-gray-600">
                 {selectedConversation ? selectedConversation.title || 'New Chat' : 'Fishy.ai'}
               </span>
+              {/* Documents indicator */}
+              {conversationDocuments.length > 0 && selectedConversation && (
+                <div className="flex items-center space-x-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium">
+                  <Paperclip className="w-3 h-3" />
+                  <span>{conversationDocuments.length} document{conversationDocuments.length !== 1 ? 's' : ''} loaded</span>
+                </div>
+              )}
             </div>
             {error && (
               <div className="text-red-600 text-sm bg-red-50 px-3 py-1 rounded-lg flex items-center space-x-2">
@@ -943,7 +978,6 @@ export default function LLMDashboard() {
 
 function MessageBubble({ message }) {
   const isUser = message.role === 'user';
-  const isAssistant = message.role === 'assistant';
   
   // Format the timestamp
   const formatTime = (timestamp) => {
@@ -952,7 +986,7 @@ function MessageBubble({ message }) {
         hour: '2-digit', 
         minute: '2-digit' 
       });
-    } catch (e) {
+    } catch {
       return '';
     }
   };
