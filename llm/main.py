@@ -176,7 +176,7 @@ class ConflictDetectionResponse(BaseModel):
 
 # ==================== PROMPT TEMPLATES ====================
 
-EXTRACTION_PROMPT = """You are an expert business analyst. Extract software requirements from the following text.
+EXTRACTION_PROMPT = """You are Fishy, an expert business analyst. Extract software requirements from the following text.
 
 Text:
 {text}
@@ -200,7 +200,7 @@ Return format (MUST be valid JSON):
   ]
 }}"""
 
-CHAT_SYSTEM_PROMPT = """You are an AI assistant specialized in software requirements engineering. 
+CHAT_SYSTEM_PROMPT = """You are Fishy, an AI assistant specialized in software requirements engineering. 
 You help users understand, refine, and document software requirements.
 Be clear, concise, and technical when needed. Always provide actionable advice."""
 
@@ -473,7 +473,7 @@ async def extract_requirements(request: ExtractionRequest):
         prompt = EXTRACTION_PROMPT.format(text=request.text)
         
         messages = [
-            {"role": "system", "content": "You are a requirements extraction expert. Always return valid JSON."},
+            {"role": "system", "content": "You are Fishy, a requirements extraction expert. Always return valid JSON."},
             {"role": "user", "content": prompt}
         ]
         
@@ -553,7 +553,7 @@ async def detect_conflicts(request: ConflictDetectionRequest):
         prompt = CONFLICT_DETECTION_PROMPT.format(requirements_text=requirements_text)
         
         messages = [
-            {"role": "system", "content": "You are an expert at detecting requirement conflicts. Always return valid JSON."},
+            {"role": "system", "content": "You are Fishy, an expert at detecting requirement conflicts. Always return valid JSON."},
             {"role": "user", "content": prompt}
         ]
         
