@@ -3,7 +3,6 @@ Of course! Here’s your list of models from the API response presented in a **c
 | #  | Model ID                                        | Owned By        | Max Tokens | Context Window | Active | Created (Timestamp) |
 | -- | ----------------------------------------------- | --------------- | ---------- | -------------- | ------ | ------------------- |
 | 1  | `moonshotai/kimi-k2-instruct-0905`              | Moonshot AI     | 16,384     | 262,144        | ✅      | 1757046093          |
-| 2  | `deepseek-r1-distill-llama-70b`                 | DeepSeek / Meta | 131,072    | 131,072        | ✅      | 1737924940          |
 | 3  | `meta-llama/llama-prompt-guard-2-22m`           | Meta            | 512        | 512            | ✅      | 1748632101          |
 | 4  | `playai-tts-arabic`                             | PlayAI          | 8,192      | 8,192          | ✅      | 1740682783          |
 | 5  | `whisper-large-v3`                              | OpenAI          | 448        | 448            | ✅      | 1693721698          |

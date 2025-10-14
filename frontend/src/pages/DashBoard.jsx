@@ -3,6 +3,8 @@ import { apiFetch } from '../utils/auth';
 import { useAuth, useLogout } from '../hooks/useAuth.jsx';
 import { Home, TrendingUp, Plane, ShoppingBag, Plus, Search, Grid3x3, Mic, Send, Globe, Paperclip, ChevronRight, Sparkles, MessageSquare, Loader2, MoreVertical, Edit2, Trash2, Check, X } from 'lucide-react';
 import FileUpload from '../components/FileUpload.jsx';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export default function LLMDashboard() {
   const [message, setMessage] = useState('');
@@ -998,9 +1000,33 @@ function MessageBubble({ message }) {
           ? 'bg-blue-500 text-white rounded-br-none' 
           : 'bg-gray-100 text-gray-800 rounded-bl-none border'
       }`}>
-        {/* Message content */}
-        <div className="text-sm leading-relaxed whitespace-pre-wrap break-words overflow-wrap-anywhere">
-          {message.content}
+        {/* Message content rendered as Markdown */}
+        <div className="text-sm leading-relaxed break-words">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              a: ({ href, children }) => (
+                <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                  {children}
+                </a>
+              ),
+              code({node, inline, className, children, ...props}) {
+                if (inline) {
+                  return <code className="bg-gray-200 text-sm rounded px-1 py-0.5">{children}</code>;
+                }
+                return (
+                  <pre className="bg-gray-900 text-white text-sm p-3 rounded overflow-auto">
+                    <code className={className} {...props}>{children}</code>
+                  </pre>
+                );
+              },
+              strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+              em: ({ children }) => <em className="italic">{children}</em>,
+              p: ({ children }) => <p className="mb-2">{children}</p>,
+            }}
+          >
+            {message.content || ''}
+          </ReactMarkdown>
         </div>
         
         {/* Timestamp */}
