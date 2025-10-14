@@ -8,6 +8,8 @@ use App\Http\Requests\MessageRequest;
 use App\Models\Conversation;
 use App\Services\ConversationService;
 use App\Services\LLMService;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 class ConversationController extends Controller
 {
@@ -20,10 +22,38 @@ class ConversationController extends Controller
         $this->llm_service = $llm_service;
     }
 
+    /**
+     * Get all conversations for the authenticated user (normal chat workflow)
+     * These are conversations with null project_id
+     */
+    public function getUserConversations()
+    {
+        $conversations = Conversation::where('user_id', Auth::id())
+            ->whereNull('project_id')
+            ->orderBy('updated_at', 'desc')
+            ->get();
+        return response()->json($conversations);
+    }
+
+    /**
+     * Get conversations for a specific project (project chat workflow)
+     */
+    public function getProjectConversations($projectId)
+    {
+        $conversations = Conversation::where('project_id', $projectId)
+            ->where('user_id', Auth::id())
+            ->orderBy('updated_at', 'desc')
+            ->get();
+        return response()->json($conversations);
+    }
+
+    /**
+     * @deprecated Use getUserConversations or getProjectConversations instead
+     */
     public function index($projectId)
     {
-        $conversations = Conversation::where('project_id', $projectId)->get();
-        return response()->json($conversations);
+        // Keep for backward compatibility
+        return $this->getProjectConversations($projectId);
     }
 
     /**
@@ -166,7 +196,7 @@ class ConversationController extends Controller
             ], 201);
             
         } catch (\Exception $e) {
-            \Log::error('Failed to send message: ' . $e->getMessage());
+            Log::error('Failed to send message: ' . $e->getMessage());
             
             $errorMessage = 'Failed to generate AI response';
             
@@ -192,11 +222,19 @@ class ConversationController extends Controller
      */
     public function update(ConversationRequest $request, string $id)
     {
-        $conversation = Conversation::findOrFail($id);
+        $conversation = Conversation::with('project')->findOrFail($id);
         
-        // Check if user owns this conversation (through project ownership)
-        if ($conversation->project->owner_id !== auth()->id()) {
-            return response()->json(['error' => 'Unauthorized'], 403);
+        // Check if user owns this conversation
+        // For project-based conversations, check project ownership
+        // For normal conversations, check user ownership directly
+        if ($conversation->project_id) {
+            if (!$conversation->project || $conversation->project->owner_id !== Auth::id()) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+        } else {
+            if ($conversation->user_id !== Auth::id()) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
         }
         
         // Only update the fields that are provided and validated
@@ -214,11 +252,19 @@ class ConversationController extends Controller
      */
     public function destroy(string $id)
     {
-        $conversation = Conversation::findOrFail($id);
+        $conversation = Conversation::with('project')->findOrFail($id);
         
-        // Check if user owns this conversation (through project ownership)
-        if ($conversation->project->owner_id !== auth()->id()) {
-            return response()->json(['error' => 'Unauthorized'], 403);
+        // Check if user owns this conversation
+        // For project-based conversations, check project ownership
+        // For normal conversations, check user ownership directly
+        if ($conversation->project_id) {
+            if (!$conversation->project || $conversation->project->owner_id !== Auth::id()) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+        } else {
+            if ($conversation->user_id !== Auth::id()) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
         }
         
         $conversation->delete();

@@ -50,7 +50,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Conversations API
     Route::post('/conversations', [ConversationController::class, 'store']);
-    Route::get('/projects/{project}/conversations', [ConversationController::class, 'index']);
+    // Get all user conversations (normal chat workflow - null project_id)
+    Route::get('/conversations', [ConversationController::class, 'getUserConversations']);
+    // Get conversations for a specific project (project chat workflow)
+    Route::get('/projects/{project}/conversations', [ConversationController::class, 'getProjectConversations']);
     Route::get('/conversations/{conversation}/messages', [ConversationController::class, 'show']);
     Route::post('/conversations/{conversation}/messages', [ConversationController::class, 'sendMessage']);
     Route::put('/conversations/{conversation}', [ConversationController::class, 'update']);

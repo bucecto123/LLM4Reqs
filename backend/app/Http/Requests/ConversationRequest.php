@@ -21,10 +21,12 @@ class ConversationRequest extends FormRequest
      */
     public function rules(): array
     {
-        // For creating conversations, project_id is required
+        // For creating conversations, project_id is now optional (nullable)
+        // Normal chat workflow: project_id is null
+        // Project chat workflow: project_id is provided
         if ($this->isMethod('POST')) {
             return [
-                'project_id' => 'required|integer|exists:projects,id',
+                'project_id' => 'nullable|integer|exists:projects,id',
                 'requirement_id' => 'nullable|integer|exists:requirements,id',
                 'title' => 'nullable|string|max:255',
                 'context' => 'nullable|string',

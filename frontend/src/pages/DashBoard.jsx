@@ -40,6 +40,9 @@ export default function LLMDashboard() {
 
   const fullName = user?.name;
 
+  // Chat mode state - 'normal' for regular chat, 'project' for project-based chat
+  const [chatMode, setChatMode] = useState("normal"); // 'normal' or 'project'
+
   // Chat state
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
@@ -68,21 +71,16 @@ export default function LLMDashboard() {
   // Load projects and set current project
   const loadProjects = async () => {
     try {
-      setIsInitializing(true);
       const data = await apiFetch("/api/projects");
       setProjects(Array.isArray(data) ? data : []);
 
-      if (data && data.length > 0) {
-        // Use the first available project
+      // If in project mode and we have projects, use the first one
+      if (chatMode === "project" && data && data.length > 0) {
         setCurrentProjectId(data[0].id);
-      } else {
-        // Create a default project if none exist
-        await createDefaultProject();
       }
     } catch (err) {
       console.error("Failed to load projects:", err);
-      // Try to create a default project anyway
-      await createDefaultProject();
+      setProjects([]);
     } finally {
       setIsInitializing(false);
     }
@@ -117,14 +115,20 @@ export default function LLMDashboard() {
     }
   };
 
-  // Load conversations for current project
+  // Load conversations based on chat mode
   const loadConversations = async () => {
-    if (!currentProjectId) return; // Don't try to load if no project ID
-
     try {
-      const data = await apiFetch(
-        `/api/projects/${currentProjectId}/conversations`
-      );
+      let data;
+      if (chatMode === "normal") {
+        // Normal chat workflow - fetch user's conversations (null project_id)
+        data = await apiFetch("/api/conversations");
+      } else if (chatMode === "project") {
+        // Project chat workflow - fetch conversations for current project
+        if (!currentProjectId) return; // Don't try to load if no project ID
+        data = await apiFetch(
+          `/api/projects/${currentProjectId}/conversations`
+        );
+      }
       setConversations(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to load conversations:", err);
@@ -157,17 +161,20 @@ export default function LLMDashboard() {
   // Load documents for a conversation
   const loadConversationDocuments = async (conversationId) => {
     try {
-      // Get all documents for the current project and filter by conversation_id
-      if (!currentProjectId) return;
-
-      const data = await apiFetch(
-        `/api/projects/${currentProjectId}/documents`
-      );
-      const conversationDocs =
-        data.documents?.filter(
-          (doc) => doc.conversation_id == conversationId
-        ) || [];
-      setConversationDocuments(conversationDocs);
+      // Documents are only available in project mode
+      if (chatMode === "project" && currentProjectId) {
+        const data = await apiFetch(
+          `/api/projects/${currentProjectId}/documents`
+        );
+        const conversationDocs =
+          data.documents?.filter(
+            (doc) => doc.conversation_id == conversationId
+          ) || [];
+        setConversationDocuments(conversationDocs);
+      } else {
+        // For normal chat mode, no documents are loaded currently
+        setConversationDocuments([]);
+      }
     } catch (err) {
       console.error("Failed to load conversation documents:", err);
       setConversationDocuments([]);
@@ -176,25 +183,36 @@ export default function LLMDashboard() {
 
   // Create new conversation
   const createNewConversation = async () => {
-    if (!currentProjectId) {
-      setError("No project available. Please wait for project initialization.");
+    // For project mode, ensure we have a project
+    if (chatMode === "project" && !currentProjectId) {
+      setError(
+        "No project available. Please wait for project initialization or switch to normal chat mode."
+      );
       return;
     }
 
     try {
       setError(null);
+      const requestBody = {
+        title: "New Chat",
+        context: null,
+        status: "active",
+      };
+
+      // Only include project_id if in project mode
+      if (chatMode === "project") {
+        requestBody.project_id = currentProjectId;
+      }
+
       const data = await apiFetch("/api/conversations", {
         method: "POST",
-        body: {
-          project_id: currentProjectId,
-          title: "New Chat",
-          context: null,
-          status: "active",
-        },
+        body: requestBody,
       });
       setConversations([data, ...conversations]);
       setSelectedConversation(data);
       setMessages([]);
+      setAttachedFiles([]);
+      setConversationDocuments([]);
     } catch (err) {
       console.error("Failed to create conversation:", err);
       let errorMessage = "Failed to create new conversation";
@@ -220,9 +238,10 @@ export default function LLMDashboard() {
       return;
 
     if (!selectedConversation) {
-      if (!currentProjectId) {
+      // For project mode, ensure we have a project
+      if (chatMode === "project" && !currentProjectId) {
         setError(
-          "No project available. Please wait for project initialization."
+          "No project available. Please wait for project initialization or switch to normal chat mode."
         );
         return;
       }
@@ -242,14 +261,20 @@ export default function LLMDashboard() {
             }`
           : "New Chat";
 
+        const requestBody = {
+          title: conversationTitle,
+          context: null,
+          status: "active",
+        };
+
+        // Only include project_id if in project mode
+        if (chatMode === "project") {
+          requestBody.project_id = currentProjectId;
+        }
+
         const newConversation = await apiFetch("/api/conversations", {
           method: "POST",
-          body: {
-            project_id: currentProjectId,
-            title: conversationTitle,
-            context: null,
-            status: "active",
-          },
+          body: requestBody,
         });
 
         setConversations([newConversation, ...conversations]);
@@ -592,15 +617,20 @@ export default function LLMDashboard() {
 
   // Load projects on mount
   useEffect(() => {
+    setIsInitializing(true);
     loadProjects();
   }, []);
 
-  // Load conversations when project changes
+  // Load conversations when chat mode changes or project changes
   useEffect(() => {
-    if (currentProjectId) {
+    if (chatMode === "normal") {
+      // For normal mode, load immediately (doesn't need project)
+      loadConversations();
+    } else if (chatMode === "project" && currentProjectId) {
+      // For project mode, only load if we have a project
       loadConversations();
     }
-  }, [currentProjectId]);
+  }, [chatMode, currentProjectId]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -634,7 +664,9 @@ export default function LLMDashboard() {
         <div className="p-4">
           <button
             onClick={createNewConversation}
-            disabled={isInitializing || !currentProjectId}
+            disabled={
+              isInitializing || (chatMode === "project" && !currentProjectId)
+            }
             className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ backgroundColor: "#DBE2EF", color: "#112D4E" }}
           >
@@ -978,7 +1010,7 @@ export default function LLMDashboard() {
                             isLoading ||
                             isLoadingMessages ||
                             isInitializing ||
-                            !currentProjectId
+                            (chatMode === "project" && !currentProjectId)
                           }
                           className="p-2 rounded-lg text-white transition-all duration-200 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                           style={{ backgroundColor: "#4A7BA7" }}
@@ -1125,7 +1157,7 @@ export default function LLMDashboard() {
                           isLoading ||
                           isLoadingMessages ||
                           isInitializing ||
-                          !currentProjectId
+                          (chatMode === "project" && !currentProjectId)
                         }
                         className="p-2 rounded-lg text-white transition-all duration-200 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                         style={{ backgroundColor: "#4A7BA7" }}
