@@ -26,13 +26,13 @@ The backend is already configured with enhanced JWT support. Make sure your Lara
 #### Basic Usage with Hooks
 
 ```jsx
-import { useAuth } from './hooks/useAuth';
+import { useAuth } from "./hooks/useAuth";
 
 function MyComponent() {
   const { user, isAuthenticated, login, logout, isLoading } = useAuth();
 
   if (isLoading) return <div>Loading...</div>;
-  
+
   if (!isAuthenticated) {
     return <LoginForm onLogin={login} />;
   }
@@ -49,12 +49,12 @@ function MyComponent() {
 #### Login Form Example
 
 ```jsx
-import { useLogin } from './hooks/useAuth';
+import { useLogin } from "./hooks/useAuth";
 
 function LoginForm() {
   const { login, isLoading, error } = useLogin();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -62,7 +62,7 @@ function LoginForm() {
       await login(email, password);
       // User will be automatically redirected after successful login
     } catch (err) {
-      console.error('Login failed:', err);
+      console.error("Login failed:", err);
     }
   };
 
@@ -83,7 +83,7 @@ function LoginForm() {
         required
       />
       <button type="submit" disabled={isLoading}>
-        {isLoading ? 'Logging in...' : 'Login'}
+        {isLoading ? "Logging in..." : "Login"}
       </button>
       {error && <p className="error">{error}</p>}
     </form>
@@ -94,7 +94,7 @@ function LoginForm() {
 #### Protected Routes
 
 ```jsx
-import { withAuth } from './hooks/useAuth';
+import { withAuth } from "./hooks/useAuth";
 
 const ProtectedComponent = withAuth(function Dashboard() {
   return <div>This is only visible to authenticated users</div>;
@@ -103,11 +103,11 @@ const ProtectedComponent = withAuth(function Dashboard() {
 // Or use the hook directly
 function AnotherProtectedComponent() {
   const { isAuthenticated } = useAuth();
-  
+
   if (!isAuthenticated) {
     return <div>Please log in to view this content</div>;
   }
-  
+
   return <div>Protected content</div>;
 }
 ```
@@ -115,15 +115,15 @@ function AnotherProtectedComponent() {
 #### API Calls
 
 ```jsx
-import { apiFetch } from './utils/auth';
+import { apiFetch } from "./utils/auth";
 
 async function fetchUserData() {
   try {
     // Tokens are automatically included and refreshed if needed
-    const data = await apiFetch('/api/user/profile');
+    const data = await apiFetch("/api/user/profile");
     return data;
   } catch (error) {
-    console.error('Failed to fetch user data:', error);
+    console.error("Failed to fetch user data:", error);
     throw error;
   }
 }
@@ -138,7 +138,7 @@ async function fetchUserData() {
 #### Token Management
 
 ```jsx
-import { useTokenRefresh, useAuthState } from './hooks/useAuth';
+import { useTokenRefresh, useAuthState } from "./hooks/useAuth";
 
 function TokenStatusComponent() {
   const { tokenExpiry, willExpireSoon, timeUntilExpiry } = useAuthState();
@@ -149,7 +149,7 @@ function TokenStatusComponent() {
       <p>Token expires in: {Math.floor(timeUntilExpiry / 60000)} minutes</p>
       {willExpireSoon && (
         <button onClick={refresh} disabled={isRefreshing}>
-          {isRefreshing ? 'Refreshing...' : 'Refresh Token'}
+          {isRefreshing ? "Refreshing..." : "Refresh Token"}
         </button>
       )}
     </div>
@@ -171,6 +171,7 @@ function TokenStatusComponent() {
 ### Backward Compatibility
 
 The following endpoints are maintained for backward compatibility:
+
 - `POST /api/login`
 - `POST /api/register`
 - `POST /api/logout`
@@ -185,15 +186,15 @@ You can modify these values in the backend AuthController:
 ```php
 // Create access token (expires in 1 hour)
 $accessToken = $user->createToken(
-    'access-token', 
-    ['access'], 
+    'access-token',
+    ['access'],
     now()->addHour()  // Change this for different expiry
 );
 
 // Create refresh token (expires in 7 days)
 $refreshToken = $user->createToken(
-    'refresh-token', 
-    ['refresh'], 
+    'refresh-token',
+    ['refresh'],
     now()->addDays(7)  // Change this for different expiry
 );
 ```
@@ -210,16 +211,19 @@ const REFRESH_THRESHOLD = 5 * 60 * 1000; // Change this value
 ## Security Features
 
 ### Automatic Token Refresh
+
 - Tokens are refreshed automatically before they expire
 - Failed refresh attempts trigger automatic logout
 - Concurrent refresh requests are queued to prevent race conditions
 
 ### Secure Storage
+
 - Tokens are stored in localStorage
 - Automatic cleanup on logout
 - Cross-tab synchronization via storage events
 
 ### Error Handling
+
 - Automatic retry with refreshed tokens on 401 errors
 - Graceful fallback to login screen on authentication failures
 - Comprehensive error logging for debugging
@@ -229,10 +233,12 @@ const REFRESH_THRESHOLD = 5 * 60 * 1000; // Change this value
 ### Common Issues
 
 1. **"Invalid refresh token" errors**
+
    - Check that the backend is properly configured with Sanctum
    - Ensure refresh tokens have the correct abilities (`['refresh']`)
 
 2. **Tokens not persisting across page reloads**
+
    - Verify localStorage is available in your browser
    - Check for any browser extensions blocking localStorage
 
@@ -243,8 +249,9 @@ const REFRESH_THRESHOLD = 5 * 60 * 1000; // Change this value
 ### Debug Mode
 
 To enable debug logging, open browser console and run:
+
 ```javascript
-localStorage.setItem('auth_debug', 'true');
+localStorage.setItem("auth_debug", "true");
 ```
 
 ## Migration from Old System
