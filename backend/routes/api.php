@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChatController;
-use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\ProjectController;
 
 Route::get('/health', function () {
@@ -37,16 +37,12 @@ Route::prefix('auth')->group(function () {
     Route::get('/me', [AuthController::class, 'me'])->middleware('auth:sanctum')->name('auth.me');
 });
 
-// Backward compatibility routes (keep existing login/register endpoints)
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
-
 // Protected API routes
 Route::middleware('auth:sanctum')->group(function () {
     // Projects API
     Route::apiResource('projects', ProjectController::class);
     Route::get('/projects/{project}/requirements', [ProjectController::class, 'getRequirements']);
+    Route::get('/users/{user}/projects', [ProjectController::class, 'getUserProjects']);
 
     // Conversations API
     Route::post('/conversations', [ConversationController::class, 'store']);

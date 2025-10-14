@@ -1,6 +1,6 @@
 /**
  * Enhanced JWT Authentication System with Access & Refresh Tokens
- */
+*/
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8001";
 
@@ -157,7 +157,7 @@ class AuthManager {
     try {
       const url = `${API_BASE}/api/auth/login`;
       console.log("🔐 Attempting login to:", url);
-
+      
       const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -297,7 +297,7 @@ class AuthManager {
 
     if (accessToken) {
       try {
-        await fetch(`${API_BASE}/api/logout`, {
+        await fetch(`${API_BASE}/api/auth/logout`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${accessToken}`,

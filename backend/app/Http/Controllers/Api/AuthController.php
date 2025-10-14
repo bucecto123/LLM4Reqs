@@ -11,6 +11,13 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
+    protected $authService;
+
+    public function __construct(AuthService $authService)
+    {
+        $this->authService = $authService;
+    }
+
     public function register(AuthRequest $request)
     {
         $user = User::create([
@@ -19,14 +26,16 @@ class AuthController extends Controller
             'password' => $request['password'],
         ]);
 
-        return $this->generateTokenResponse($user);
+        $tokens = $this->authService->generateTokens($user);
+        return response()->json($tokens, 201);
     }
 
-    public function login(AuthRequest $request, AuthService $auth_service)
+    public function login(AuthRequest $request, AuthService $authService)
     {
         try {
-            $user = $auth_service->login($request['email'], $request['password']);
-            return $this->generateTokenResponse($user);
+            $user = $authService->login($request['email'], $request['password']);
+            $token = $this->authService->generateTokens($user);
+            return response()->json($token);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 401);
         }
@@ -45,7 +54,8 @@ class AuthController extends Controller
             $request->user()->currentAccessToken()?->delete();
             
             // Generate new tokens
-            return $this->generateTokenResponse($user);
+            $token = $this->authService->generateTokens($user);
+            return response()->json($token);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Token refresh failed'], 401);
         }
@@ -86,41 +96,6 @@ class AuthController extends Controller
                 'expires_at' => $request->user()->currentAccessToken()->expires_at,
                 'last_used_at' => $request->user()->currentAccessToken()->last_used_at,
             ]
-        ]);
-    }
-
-    /**
-     * Generate token response with access and refresh tokens
-     */
-    private function generateTokenResponse(User $user)
-    {
-        // Get token lifetimes from environment (with defaults)
-        $accessTokenLifetime = (int) env('JWT_ACCESS_TOKEN_LIFETIME', 60); // minutes
-        $refreshTokenLifetime = (int) env('JWT_REFRESH_TOKEN_LIFETIME', 10080); // minutes (7 days)
-        
-        // Create access token with configurable expiry
-        $accessToken = $user->createToken(
-            env('SANCTUM_TOKEN_PREFIX', 'llm4reqs') . '-access-token', 
-            ['access'], 
-            now()->addMinutes($accessTokenLifetime)
-        );
-
-        // Create refresh token with configurable expiry
-        $refreshToken = $user->createToken(
-            env('SANCTUM_TOKEN_PREFIX', 'llm4reqs') . '-refresh-token', 
-            ['refresh'], 
-            now()->addMinutes($refreshTokenLifetime)
-        );
-
-        return response()->json([
-            'user' => $user->makeHidden(['password']),
-            'access_token' => $accessToken->plainTextToken,
-            'refresh_token' => $refreshToken->plainTextToken,
-            'token_type' => 'Bearer',
-            'expires_in' => $accessTokenLifetime * 60, // Convert to seconds
-            'refresh_expires_in' => $refreshTokenLifetime * 60, // Convert to seconds
-            'expires_at' => $accessToken->accessToken->expires_at->toISOString(),
-            'refresh_expires_at' => $refreshToken->accessToken->expires_at->toISOString(),
         ]);
     }
 }

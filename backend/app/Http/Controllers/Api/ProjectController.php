@@ -66,4 +66,10 @@ class ProjectController extends Controller
         $requirements = $this->project_service->getProjectRequirements($projectId);
         return response()->json($requirements);
     }
+
+    public function getUserProjects($userId)
+    {
+        $projects = Project::where('owner_id', $userId)->get();
+        return response()->json($projects);
+    }
 }
