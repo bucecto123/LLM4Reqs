@@ -2,15 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Mail, Lock, User, Eye, EyeOff, ArrowRight, Check, X } from 'lucide-react';
 import { useLogin, useRegister } from '../hooks/useAuth.jsx';
 
-// Typing animation component
-const TypingText = ({ text, speed = 100, className = '' }) => {
+// Typing animation component with smooth character-by-character animation
+const TypingText = ({ text, speed = 50, className = '' }) => {
   const [displayedText, setDisplayedText] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
+  const isTypingComplete = currentIndex >= text.length;
 
   useEffect(() => {
+    // Type out characters one by one
     if (currentIndex < text.length) {
       const timeout = setTimeout(() => {
-        setDisplayedText(prev => prev + text[currentIndex]);
+        setDisplayedText(text.substring(0, currentIndex + 1));
         setCurrentIndex(prev => prev + 1);
       }, speed);
 
@@ -19,12 +21,37 @@ const TypingText = ({ text, speed = 100, className = '' }) => {
   }, [currentIndex, text, speed]);
 
   return (
-    <span className={className}>
-      {displayedText}
-      {currentIndex < text.length && (
-        <span className="inline-block w-0.5 h-8 bg-current ml-1 animate-pulse"></span>
-      )}
-    </span>
+    <>
+      <style>{`
+        @keyframes typingBlink {
+          0%, 49% {
+            opacity: 1;
+          }
+          50%, 100% {
+            opacity: 0;
+          }
+        }
+        .typing-cursor-blink {
+          animation: typingBlink 0.8s step-start infinite;
+        }
+        @keyframes slideInLeft {
+          from {
+            opacity: 0;
+            transform: translateX(-50px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+      `}</style>
+      <span className={className}>
+        {displayedText}
+        <span 
+          className={`inline-block w-0.5 h-10 bg-current ml-1 align-middle ${isTypingComplete ? 'typing-cursor-blink' : ''}`}
+        ></span>
+      </span>
+    </>
   );
 };
 
@@ -195,7 +222,7 @@ export default function AuthPages() {
           </div>
           
           <h1 className="text-5xl font-bold mb-6 leading-tight">
-            <TypingText text="Your AI-Powered Assistant" speed={80} />
+            <TypingText text="Your AI-Powered Assistant" speed={60} />
           </h1>
           
           <p className="text-xl opacity-90 mb-8" style={{ color: '#DBE2EF' }}>
@@ -203,19 +230,19 @@ export default function AuthPages() {
           </p>
           
           <div className="space-y-4">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 animate-[slideInLeft_0.6s_ease-out_0.2s_both]">
               <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#4A7BA7' }}>
                 <span className="text-lg">✓</span>
               </div>
               <span className="text-lg">Real-time AI responses</span>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 animate-[slideInLeft_0.6s_ease-out_0.4s_both]">
               <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#4A7BA7' }}>
                 <span className="text-lg">✓</span>
               </div>
               <span className="text-lg">Advanced research capabilities</span>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 animate-[slideInLeft_0.6s_ease-out_0.6s_both]">
               <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#4A7BA7' }}>
                 <span className="text-lg">✓</span>
               </div>
@@ -436,11 +463,23 @@ export default function AuthPages() {
 
               <button
                 type="submit"
-                className="w-full py-4 rounded-lg font-semibold text-white transition-all duration-200 hover:shadow-xl hover:scale-105 flex items-center justify-center space-x-2 active:scale-100"
+                disabled={isLoading}
+                className={`w-full py-4 rounded-lg font-semibold text-white transition-all duration-200 flex items-center justify-center space-x-2 ${
+                  isLoading 
+                    ? 'opacity-80 cursor-not-allowed' 
+                    : 'hover:shadow-xl hover:scale-105 active:scale-100'
+                }`}
                 style={{ backgroundColor: '#4A7BA7' }}
               >
-                <span>{isLogin ? 'Sign In' : 'Create Account'}</span>
-                <ArrowRight size={20} />
+                <span>{isLoading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')}</span>
+                {isLoading ? (
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <ArrowRight size={20} />
+                )}
               </button>
             </form>
 
