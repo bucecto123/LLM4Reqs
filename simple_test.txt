@@ -1,8 +1,0 @@
-Simple Test Requirements
-
-1. The system must allow user registration
-2. Users should be able to log in securely  
-3. The system must support file uploads
-4. Chat functionality should work properly
-
-This is a simple ASCII test file with no special characters.
