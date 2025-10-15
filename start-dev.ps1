@@ -42,14 +42,14 @@ Write-Host "Repository root: $repoRoot"
 
 # 1) Start llm: activate venv if exists and run uvicorn main:app --reload
 $llmDir = Join-Path $repoRoot 'llm'
-$llmVenvActivate = Join-Path $llmDir '.venv\Scripts\Activate.ps1'
+$llmVenvActivate = Join-Path $llmDir 'env\Scripts\Activate.ps1'
 
 $llmCmd = @()
 if (Test-Path $llmVenvActivate) {
     $llmCmd += "& '$llmVenvActivate'"
 } else {
     # also try a common venv folder name
-    $altActivate = Join-Path $llmDir 'venv\Scripts\Activate.ps1'
+    $altActivate = Join-Path $llmDir '.venv\Scripts\Activate.ps1'
     if (Test-Path $altActivate) { $llmCmd += "& '$altActivate'" }
 }
 
