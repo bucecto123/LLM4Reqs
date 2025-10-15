@@ -95,7 +95,7 @@ Open `backend\.env` file and make sure these lines are set:
 
 ```env
 DB_CONNECTION=sqlite
-DB_DATABASE=D:\HomeWorkOrDeadline\Computing Technology Project A\LLM4Reqs\backend\database\database.sqlite
+DB_DATABASE=backend\database\database.sqlite
 ```
 
 > **Note:** Update the path to match your actual project location!
@@ -169,14 +169,14 @@ The system uses GROQ API for AI processing. You need a free API key:
 
 ```powershell
 $env:GROQ_API_KEY = "your_actual_api_key_here"
-$env:GROQ_MODEL = "gemma2-9b-it"
+$env:GROQ_MODEL = "llama-3.3-70b-versatile" (or change this to any available model on groq.com)
 ```
 
 **Option B - Permanent (create `.env` file in `llm/` folder):**
 
 ```env
 GROQ_API_KEY=your_actual_api_key_here
-GROQ_MODEL=gemma2-9b-it
+GROQ_MODEL=llama-3.3-70b-versatile (or change this to any available model on groq.com)
 ```
 
 ---
