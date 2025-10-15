@@ -1,6 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Mail, Lock, User, Eye, EyeOff, ArrowRight, Check, X } from 'lucide-react';
 import { useLogin, useRegister } from '../hooks/useAuth.jsx';
+
+// Typing animation component
+const TypingText = ({ text, speed = 100, className = '' }) => {
+  const [displayedText, setDisplayedText] = useState('');
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    if (currentIndex < text.length) {
+      const timeout = setTimeout(() => {
+        setDisplayedText(prev => prev + text[currentIndex]);
+        setCurrentIndex(prev => prev + 1);
+      }, speed);
+
+      return () => clearTimeout(timeout);
+    }
+  }, [currentIndex, text, speed]);
+
+  return (
+    <span className={className}>
+      {displayedText}
+      {currentIndex < text.length && (
+        <span className="inline-block w-0.5 h-8 bg-current ml-1 animate-pulse"></span>
+      )}
+    </span>
+  );
+};
 
 export default function AuthPages() {
   const [isLogin, setIsLogin] = useState(true);
@@ -152,13 +178,13 @@ export default function AuthPages() {
   };
 
   return (
-    <div className="min-h-screen flex" style={{ backgroundColor: '#F9FAFB' }}>
+    <div className="min-h-screen flex bg-[#F9FAFB] animate-fadein">
       {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden" style={{ backgroundColor: '#112D4E' }}>
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-[#112D4E]">
         <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-64 h-64 rounded-full" style={{ backgroundColor: '#4A7BA7' }}></div>
-          <div className="absolute bottom-20 right-20 w-96 h-96 rounded-full" style={{ backgroundColor: '#DBE2EF' }}></div>
-        </div>
+          <div className="absolute top-20 left-20 w-64 h-64 rounded-full bg-[#4A7BA7] animate-pulse-slow"></div>
+          <div className="absolute bottom-20 right-20 w-96 h-96 rounded-full bg-[#DBE2EF] animate-pulse-slow"></div>
+      </div>
         
         <div className="relative z-10 flex flex-col justify-center px-16 text-white">
           <div className="flex items-center space-x-3 mb-8">
@@ -169,7 +195,7 @@ export default function AuthPages() {
           </div>
           
           <h1 className="text-5xl font-bold mb-6 leading-tight">
-            Your AI-Powered<br />Assistant
+            <TypingText text="Your AI-Powered Assistant" speed={80} />
           </h1>
           
           <p className="text-xl opacity-90 mb-8" style={{ color: '#DBE2EF' }}>
@@ -211,20 +237,24 @@ export default function AuthPages() {
           </div>
 
           {/* Form Card */}
-          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
+          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200 animate-slideup-fadein">
             {/* Tabs */}
-            <div className="flex rounded-lg p-1 mb-8" style={{ backgroundColor: '#DBE2EF' }}>
+            <div className="flex rounded-lg p-1 mb-8 bg-[#DBE2EF] relative">
+              <span
+                className={`absolute top-1 left-0 h-[90%] w-1/2 rounded-lg bg-[#4A7BA7] transition-all duration-300 z-0 ${isLogin ? 'translate-x-0' : 'translate-x-full'} animate-tab-indicator`}
+                style={{ pointerEvents: 'none', opacity: 0.15 }}
+              ></span>
               <button
                 onClick={switchToLogin}
-                className="flex-1 py-3 rounded-lg font-semibold transition-all duration-200"
-                style={isLogin ? { backgroundColor: '#4A7BA7', color: 'white' } : { color: '#112D4E' }}
+                className={`flex-1 py-3 rounded-lg font-semibold transition-all duration-200 relative z-10 ${isLogin ? 'text-white' : 'text-[#112D4E]'}`}
+                style={isLogin ? { backgroundColor: '#4A7BA7' } : {}}
               >
                 Login
               </button>
               <button
                 onClick={switchToSignup}
-                className="flex-1 py-3 rounded-lg font-semibold transition-all duration-200"
-                style={!isLogin ? { backgroundColor: '#4A7BA7', color: 'white' } : { color: '#112D4E' }}
+                className={`flex-1 py-3 rounded-lg font-semibold transition-all duration-200 relative z-10 ${!isLogin ? 'text-white' : 'text-[#112D4E]'}`}
+                style={!isLogin ? { backgroundColor: '#4A7BA7' } : {}}
               >
                 Sign Up
               </button>
@@ -342,10 +372,10 @@ export default function AuthPages() {
 
                       const item = (ok, text) => (
                         <div className="flex items-center space-x-2 py-1">
-                          <div className={`w-5 h-5 rounded-full flex items-center justify-center ${ok ? 'bg-green-100 text-green-600' : 'bg-transparent text-gray-400'}`}>
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-all duration-300 ${ok ? 'bg-green-100 text-green-600 animate-bounce-in' : 'bg-transparent text-gray-400'}`}>
                             {ok ? <Check size={14} /> : <X size={14} />}
                           </div>
-                          <div className={`${ok ? 'text-green-600' : 'text-gray-500'} text-sm`}>{text}</div>
+                          <div className={`${ok ? 'text-green-600' : 'text-gray-500'} text-sm transition-all duration-300`}>{text}</div>
                         </div>
                       );
 
@@ -406,7 +436,7 @@ export default function AuthPages() {
 
               <button
                 type="submit"
-                className="w-full py-4 rounded-lg font-semibold text-white transition-all duration-200 hover:shadow-lg transform hover:scale-[1.02] flex items-center justify-center space-x-2"
+                className="w-full py-4 rounded-lg font-semibold text-white transition-all duration-200 hover:shadow-xl hover:scale-105 flex items-center justify-center space-x-2 active:scale-100"
                 style={{ backgroundColor: '#4A7BA7' }}
               >
                 <span>{isLogin ? 'Sign In' : 'Create Account'}</span>
