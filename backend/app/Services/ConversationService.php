@@ -4,15 +4,18 @@ namespace App\Services;
 
 use App\Models\Conversation;
 use App\Models\Message;
+use App\Utils\TextCommons;
 use Illuminate\Support\Facades\Auth;
 
 class ConversationService
 {
     protected $llmService;
+    protected $textCommons;
 
-    public function __construct(LLMService $llmService)
+    public function __construct(LLMService $llmService, TextCommons $textCommons)
     {
         $this->llmService = $llmService;
+        $this->textCommons = $textCommons;
     }
 
     public function createConversation($data)
@@ -35,7 +38,7 @@ class ConversationService
     {
         // Clean the incoming message content
         if (isset($messageData['content'])) {
-            $messageData['content'] = $this->cleanUtf8Content($messageData['content']);
+            $messageData['content'] = $this->textCommons->cleanUtf8Content($messageData['content']);
         }
 
         // Separate display message from AI context message
@@ -76,7 +79,7 @@ class ConversationService
         foreach ($recentMessages as $msg) {
             if ($msg->role && $msg->content) {
                 // Clean and truncate individual messages if they're too long
-                $content = $this->cleanUtf8Content($msg->content);
+                $content = $this->textCommons->cleanUtf8Content($msg->content);
                 if (strlen($content) > 2000) { // Limit individual messages
                     $content = mb_substr($content, 0, 2000, 'UTF-8') . '... [message truncated]';
                 }
@@ -100,7 +103,7 @@ class ConversationService
                 $content = $document->content ?? '';
                 
                 // Clean content to prevent encoding issues
-                $content = $this->cleanUtf8Content($content);
+                $content = $this->textCommons->cleanUtf8Content($content);
                 
                 // Estimate tokens (rough approximation: 1 token ≈ 0.75 words, 1 word ≈ 4 characters)
                 $headerTokens = strlen($fileHeader) / 3;
@@ -138,7 +141,7 @@ class ConversationService
 
         // Save the AI response (clean the content first)
         $aiMessage = $this->saveMessage($conversationId, [
-            'content' => $this->cleanUtf8Content($llmResponse['response']),
+            'content' => $this->textCommons->cleanUtf8Content($llmResponse['response']),
             'role' => 'assistant',
             'model_used' => $llmResponse['model'] ?? null,
             'tokens_used' => $llmResponse['tokens_used'] ?? null
@@ -162,32 +165,5 @@ class ConversationService
         ]);
 
         return $message;
-    }
-
-    /**
-     * Clean and validate UTF-8 content to prevent encoding errors
-     */
-    private function cleanUtf8Content($content)
-    {
-        if (empty($content)) {
-            return '';
-        }
-        
-        // Convert to UTF-8 if not already
-        if (!mb_check_encoding($content, 'UTF-8')) {
-            // Try to detect encoding and convert
-            $encoding = mb_detect_encoding($content, ['UTF-8', 'ISO-8859-1', 'Windows-1252', 'ASCII'], true);
-            if ($encoding) {
-                $content = mb_convert_encoding($content, 'UTF-8', $encoding);
-            }
-        }
-        
-        // Remove invalid UTF-8 sequences
-        $content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
-        
-        // Remove control characters except newlines, tabs, and carriage returns
-        $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $content);
-        
-        return $content;
     }
 }

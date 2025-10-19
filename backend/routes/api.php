@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\ProjectController;
+use App\Http\Controllers\Api\ProjectKBController;
 
 Route::get('/health', function () {
     return response()->json(['status' => 'ok', 'service' => 'backend']);
@@ -59,6 +60,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/documents', [DocumentController::class, 'upload']);
     Route::post('/documents/{id}/process', [DocumentController::class, 'processDocument']);
     Route::get('/projects/{id}/documents', [DocumentController::class, 'getProjectDocuments']);
+    Route::post('/projects/{project}/kb/build', [ProjectKBController::class, 'build']);
 
     // Personas API
     Route::get('/personas', [PersonaController::class,'index']);

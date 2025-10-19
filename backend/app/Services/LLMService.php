@@ -94,4 +94,32 @@ class LLMService
             return false;
         }
     }
+
+    /**
+     * Request a full knowledge base build from the LLM service.
+     * Expects the LLM service to accept a project_id and documents payload and return a job id or status.
+     *
+     * @param int $projectId
+     * @param array $documents
+     * @return array
+     * @throws \Exception
+     */
+    public function buildKnowledgeBase(int $projectId, array $documents): array
+    {
+        try {
+            $response = Http::timeout(120)->post("{$this->baseUrl}/api/kb/build", [
+                'project_id' => $projectId,
+                'documents' => $documents,
+            ]);
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+
+            throw new \Exception('LLM KB build failed: ' . $response->body());
+        } catch (\Exception $e) {
+            Log::error('LLM KB build failed', ['error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
 }
