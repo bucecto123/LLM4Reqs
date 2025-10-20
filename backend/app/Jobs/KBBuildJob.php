@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\KnowledgeBase;
 use App\Models\Project;
 use App\Services\LLMService;
 use Illuminate\Bus\Queueable;
@@ -12,9 +13,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 class KBBuildJob implements ShouldQueue, ShouldBeUnique
@@ -47,7 +46,7 @@ class KBBuildJob implements ShouldQueue, ShouldBeUnique
 
         $acquired = false;
         try {
-            // attempt to acquire lock without blocking
+            // Attempt to acquire lock without blocking
             $acquired = $lock->get();
             if (! $acquired) {
                 Log::warning('KBBuildJob: Another KB build is already running for project', ['project_id' => $this->projectId]);
@@ -59,51 +58,69 @@ class KBBuildJob implements ShouldQueue, ShouldBeUnique
                 throw new ModelNotFoundException("Project {$this->projectId} not found");
             }
 
+            // Get or create KB record
+            $kb = KnowledgeBase::firstOrCreate(
+                ['project_id' => $this->projectId],
+                ['status' => 'not_built']
+            );
+
             // Collect documents for this project
-            $documents = $project->documents()->get()->map(function ($doc) {
-                return [
-                    'id' => $doc->id,
-                    'filename' => $doc->filename,
-                    'content' => $doc->content,
-                    'file_type' => $doc->file_type,
-                ];
-            })->toArray();
-
-            Log::info('KBBuildJob: Starting KB build', ['project_id' => $this->projectId, 'documents' => count($documents)]);
-
-            // Call LLM service to build KB (async mode expected)
-            $result = $llmService->buildKnowledgeBase($this->projectId, $documents);
-
-            // Optionally persist KB metadata if table exists
-            if (Schema::hasTable('knowledge_bases')) {
-                try {
-                    $payload = [
-                        'llm_job_id' => $result['job_id'] ?? null,
-                        'status' => $result['status'] ?? 'queued',
-                        'updated_at' => now(),
+            $documents = $project->documents()
+                ->whereNotNull('content')
+                ->where('content', '!=', '')
+                ->get()
+                ->map(function ($doc) {
+                    return [
+                        'content' => $doc->content,
+                        'type' => $doc->type ?? 'document',
+                        'meta' => [
+                            'document_id' => $doc->id,
+                            'filename' => $doc->original_filename ?? $doc->filename,
+                            'file_type' => $doc->file_type,
+                            'uploaded_at' => $doc->created_at->toIso8601String(),
+                        ],
                     ];
+                })->toArray();
 
-                    $existing = DB::table('knowledge_bases')
-                        ->where('project_id', $this->projectId)
-                        ->exists();
-
-                    if ($existing) {
-                        DB::table('knowledge_bases')
-                            ->where('project_id', $this->projectId)
-                            ->update($payload);
-                    } else {
-                        $payload['project_id'] = $this->projectId;
-                        $payload['created_at'] = now();
-                        DB::table('knowledge_bases')->insert($payload);
-                    }
-                } catch (Throwable $e) {
-                    Log::warning('KBBuildJob: Failed to persist KB metadata', ['error' => $e->getMessage()]);
-                }
+            if (empty($documents)) {
+                Log::warning('KBBuildJob: No documents with content found for project', ['project_id' => $this->projectId]);
+                $kb->markAsFailed('No documents with content available to build knowledge base');
+                return;
             }
 
-            Log::info('KBBuildJob: KB build requested', ['project_id' => $this->projectId, 'result' => $result]);
+            Log::info('KBBuildJob: Starting KB build', [
+                'project_id' => $this->projectId,
+                'documents_count' => count($documents),
+            ]);
+
+            // Call LLM service to build KB (use sync mode in job for immediate result)
+            $result = $llmService->buildKnowledgeBase($this->projectId, $documents, 'sync');
+
+            Log::info('KBBuildJob: KB build completed', [
+                'project_id' => $this->projectId,
+                'result' => $result,
+            ]);
+
+            // Update KB status
+            if (isset($result['status']) && $result['status'] === 'completed') {
+                $kb->markAsReady($result);
+            } else {
+                $kb->markAsFailed($result['error'] ?? 'Unknown error during KB build');
+            }
+
         } catch (Throwable $e) {
-            Log::error('KBBuildJob failed', ['project_id' => $this->projectId, 'error' => $e->getMessage()]);
+            Log::error('KBBuildJob failed', [
+                'project_id' => $this->projectId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            // Mark KB as failed
+            $kb = KnowledgeBase::where('project_id', $this->projectId)->first();
+            if ($kb) {
+                $kb->markAsFailed($e->getMessage());
+            }
+
             throw $e;
         } finally {
             // Release lock if held
@@ -112,9 +129,8 @@ class KBBuildJob implements ShouldQueue, ShouldBeUnique
                     $lock->release();
                 }
             } catch (Throwable $e) {
-                // ignore
+                // Ignore lock release errors
             }
         }
     }
 }
-

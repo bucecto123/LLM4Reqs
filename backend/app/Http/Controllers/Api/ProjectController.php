@@ -63,8 +63,74 @@ class ProjectController extends Controller
 
     public function getRequirements(string $projectId)
     {
-        $requirements = $this->project_service->getProjectRequirements($projectId);
+        $project = Project::findOrFail($projectId);
+        
+        // Get requirements with pagination and filters
+        $query = $project->requirements()->with(['document']);
+        
+        // Apply filters if provided
+        if (request()->has('type')) {
+            $query->where('requirement_type', request('type'));
+        }
+        
+        if (request()->has('priority')) {
+            $query->where('priority', request('priority'));
+        }
+        
+        if (request()->has('status')) {
+            $query->where('status', request('status'));
+        }
+        
+        // Search by text
+        if (request()->has('search')) {
+            $search = request('search');
+            $query->where(function($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhere('requirement_text', 'like', "%{$search}%")
+                  ->orWhere('content', 'like', "%{$search}%");
+            });
+        }
+        
+        // Order by
+        $orderBy = request('order_by', 'created_at');
+        $orderDir = request('order_dir', 'desc');
+        $query->orderBy($orderBy, $orderDir);
+        
+        // Paginate
+        $perPage = request('per_page', 15);
+        $requirements = $query->paginate($perPage);
+        
         return response()->json($requirements);
+    }
+
+    /**
+     * Get requirement conflicts for a project.
+     * GET /api/projects/{id}/conflicts
+     */
+    public function getConflicts(string $projectId)
+    {
+        $project = Project::findOrFail($projectId);
+        
+        // Get conflicts with related requirements
+        $conflicts = $project->requirementConflicts()
+            ->with([
+                'requirement1' => function($query) {
+                    $query->select('id', 'title', 'requirement_text', 'requirement_type');
+                },
+                'requirement2' => function($query) {
+                    $query->select('id', 'title', 'requirement_text', 'requirement_type');
+                }
+            ])
+            ->when(request('severity'), function($query, $severity) {
+                return $query->where('severity', $severity);
+            })
+            ->when(request('resolution_status'), function($query, $status) {
+                return $query->where('resolution_status', $status);
+            })
+            ->orderBy('created_at', 'desc')
+            ->paginate(request('per_page', 15));
+        
+        return response()->json($conflicts);
     }
 
     public function getUserProjects($userId)

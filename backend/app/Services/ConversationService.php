@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Models\Conversation;
+use App\Models\KnowledgeBase;
 use App\Models\Message;
 use App\Utils\TextCommons;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class ConversationService
 {
@@ -93,7 +95,53 @@ class ConversationService
             
         // Build context from uploaded documents with token management
         $documentContext = '';
-        if ($conversation->documents->count() > 0) {
+        $kbContext = '';
+        
+        // NEW: Check if conversation has a project with ready KB
+        if ($conversation->project_id) {
+            $kb = KnowledgeBase::where('project_id', $conversation->project_id)->first();
+            
+            if ($kb && $kb->isReady()) {
+                try {
+                    // Query KB for relevant chunks
+                    $kbResults = $this->llmService->queryKB($conversation->project_id, $displayMessage, 5);
+                    
+                    if (!empty($kbResults['results'])) {
+                        $kbContext = "\n\n=== KNOWLEDGE BASE CONTEXT (Relevant Requirements) ===\n";
+                        
+                        foreach ($kbResults['results'] as $index => $result) {
+                            $score = $kbResults['scores'][$index] ?? 0;
+                            $kbContext .= sprintf(
+                                "\n[Relevance: %.2f] %s\n",
+                                $score,
+                                $result['content']
+                            );
+                            
+                            // Add metadata if available
+                            if (!empty($result['metadata'])) {
+                                $kbContext .= "  Type: " . ($result['metadata']['type'] ?? 'N/A') . "\n";
+                            }
+                        }
+                        
+                        $kbContext .= "\n=== END KNOWLEDGE BASE CONTEXT ===\n";
+                        
+                        Log::info('KB context added to conversation', [
+                            'conversation_id' => $conversationId,
+                            'project_id' => $conversation->project_id,
+                            'chunks_found' => count($kbResults['results']),
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Failed to query KB, falling back to document context', [
+                        'error' => $e->getMessage(),
+                        'project_id' => $conversation->project_id,
+                    ]);
+                }
+            }
+        }
+        
+        // Fallback to uploaded documents if KB context is empty
+        if (empty($kbContext) && $conversation->documents->count() > 0) {
             $documentContext = "\n\n=== UPLOADED DOCUMENTS CONTEXT ===\n";
             $totalTokens = 0;
             $maxDocumentTokens = 6000; // Reserve tokens for document context (roughly 4500 words)
@@ -128,7 +176,11 @@ class ConversationService
 
         // Enhanced context with document information
         $enhancedContext = 'You are helping with requirements engineering and software development.';
-        if (!empty($documentContext)) {
+        
+        // Prioritize KB context if available
+        if (!empty($kbContext)) {
+            $enhancedContext .= ' The following are relevant requirements from the project knowledge base. Use these to provide accurate, context-aware answers.' . $kbContext;
+        } elseif (!empty($documentContext)) {
             $enhancedContext .= ' The user has uploaded documents in this conversation. Use the document contents provided in the context to answer questions and provide relevant assistance.' . $documentContext;
         }
 

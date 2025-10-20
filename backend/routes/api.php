@@ -43,7 +43,13 @@ Route::middleware('auth:sanctum')->group(function () {
     // Projects API
     Route::apiResource('projects', ProjectController::class);
     Route::get('/projects/{project}/requirements', [ProjectController::class, 'getRequirements']);
+    Route::get('/projects/{project}/conflicts', [ProjectController::class, 'getConflicts']);
     Route::get('/users/{user}/projects', [ProjectController::class, 'getUserProjects']);
+
+    // Knowledge Base API
+    Route::get('/projects/{project}/kb/status', [ProjectKBController::class, 'getStatus']);
+    Route::post('/projects/{project}/kb/build', [ProjectKBController::class, 'build']);
+    Route::post('/projects/{project}/kb/reindex', [ProjectKBController::class, 'reindex']);
 
     // Conversations API
     Route::post('/conversations', [ConversationController::class, 'store']);
@@ -60,7 +66,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/documents', [DocumentController::class, 'upload']);
     Route::post('/documents/{id}/process', [DocumentController::class, 'processDocument']);
     Route::get('/projects/{id}/documents', [DocumentController::class, 'getProjectDocuments']);
-    Route::post('/projects/{project}/kb/build', [ProjectKBController::class, 'build']);
 
     // Personas API
     Route::get('/personas', [PersonaController::class,'index']);

@@ -10,7 +10,25 @@ class Requirement extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['project_id', 'document_id', 'title', 'requirement_text', 'requirement_type', 'priority', 'confidence_score', 'status', 'source'];
+    protected $fillable = [
+        'project_id',
+        'document_id',
+        'title',
+        'content',
+        'requirement_text',
+        'requirement_type',
+        'priority',
+        'confidence_score',
+        'status',
+        'source',
+        'source_doc',
+        'meta',
+    ];
+
+    protected $casts = [
+        'meta' => 'array',
+        'confidence_score' => 'float',
+    ];
 
     public function project()
     {
