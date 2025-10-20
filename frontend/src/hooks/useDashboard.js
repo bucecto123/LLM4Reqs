@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { apiFetch } from '../../utils/auth';
-import { useAuth, useLogout } from '../useAuth.jsx';
+import { apiFetch } from '../utils/auth';
+import { useAuth, useLogout } from './useAuth.jsx';
 
 export const useDashboard = () => {
   // Authentication
