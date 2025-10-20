@@ -187,29 +187,85 @@ const Sidebar = ({
   };
 
   return (
-    <div className={`bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20'}`}>
-      {/* Logo */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#4A7BA7' }}>
-            <span className="text-2xl">🐟</span>
+    <>
+      <style>{`
+        @keyframes swim {
+          0%, 100% {
+            transform: translateX(0) translateY(0) rotate(0deg);
+          }
+          25% {
+            transform: translateX(2px) translateY(-2px) rotate(-5deg);
+          }
+          50% {
+            transform: translateX(0) translateY(-3px) rotate(0deg);
+          }
+          75% {
+            transform: translateX(-2px) translateY(-2px) rotate(5deg);
+          }
+        }
+        
+        @keyframes float {
+          0%, 100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-4px);
+          }
+        }
+        
+        .fish-swim {
+          animation: swim 3s ease-in-out infinite;
+        }
+        
+        .fish-container:hover .fish-swim {
+          animation: swim 1.5s ease-in-out infinite, float 2s ease-in-out infinite;
+        }
+      `}</style>
+      
+      <div className={`bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20'}`}>
+        {/* Logo */}
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex items-center space-x-3">
+            <div className="fish-container w-10 h-10 rounded-lg flex items-center justify-center cursor-pointer hover:scale-110 transition-transform duration-300" style={{ backgroundColor: '#4A7BA7' }}>
+              <span className="fish-swim text-2xl">🐟</span>
+            </div>
+            {isSidebarOpen && (
+              <span className="font-semibold text-lg text-gray-800">Fishy</span>
+            )}
           </div>
-          {isSidebarOpen && (
-            <span className="font-semibold text-lg text-gray-800">Fishy</span>
-          )}
         </div>
-      </div>
 
       {/* New Chat Button */}
       <div className="p-4">
         <button 
           onClick={onCreateNewConversation}
           disabled={isInitializing || !currentProjectId}
-          className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className={`group relative w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-xl hover:scale-105 active:scale-95 disabled:hover:scale-100 disabled:hover:shadow-none overflow-hidden ${
+            !isInitializing && currentProjectId ? 'animate-[pulse_2s_ease-in-out_infinite]' : ''
+          }`}
           style={{ backgroundColor: '#DBE2EF', color: '#112D4E' }}
         >
-          {isInitializing ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
-          {isSidebarOpen && <span>{isInitializing ? 'Loading...' : 'New Chat'}</span>}
+          {/* Animated background gradient on hover */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out"></div>
+          
+          {/* Subtle glow effect when ready */}
+          {!isInitializing && currentProjectId && (
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-400/0 via-blue-400/10 to-blue-400/0 animate-[pulse_3s_ease-in-out_infinite]"></div>
+          )}
+          
+          {/* Content */}
+          <div className="relative flex items-center space-x-2">
+            {isInitializing ? (
+              <Loader2 className="animate-spin" size={20} />
+            ) : (
+              <Plus size={20} className="transition-transform duration-300 group-hover:rotate-90 group-active:rotate-180" />
+            )}
+            {isSidebarOpen && (
+              <span className="transition-all duration-300 group-hover:tracking-wide group-hover:font-semibold">
+                {isInitializing ? 'Loading...' : 'New Chat'}
+              </span>
+            )}
+          </div>
         </button>
       </div>
 
@@ -295,6 +351,7 @@ const Sidebar = ({
         </div>
       </div>
     </div>
+    </>
   );
 };
 

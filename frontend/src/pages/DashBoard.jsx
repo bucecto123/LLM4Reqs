@@ -1,8 +1,8 @@
 import React from 'react';
-import { apiFetch } from '../utils/auth';
-import { useDashboard } from '../hooks/useDashboard';
-import Sidebar from '../components/dashboard/Sidebar';
-import ChatArea from '../components/dashboard/ChatArea';
+import { apiFetch } from '../utils/auth.js';
+import { useDashboard } from '../hooks/useDashboard.js';
+import Sidebar from '../components/dashboard/Sidebar.jsx';
+import ChatArea from '../components/dashboard/ChatArea.jsx';
 import FileUpload from '../components/FileUpload.jsx';
 
 export default function LLMDashboard() {
