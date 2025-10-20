@@ -11,9 +11,11 @@
   },
   "dependencies": {
     "lucide-react": "^0.544.0",
+    "prismjs": "^1.30.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.9.4",
     "react-syntax-highlighter": "^15.6.6",
     "remark-breaks": "^3.0.0",
     "remark-gfm": "^4.0.1"
@@ -32,5 +34,8 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.14",
     "vite": "^7.1.7"
+  },
+  "overrides": {
+    "prismjs": "^1.30.0"
   }
 }

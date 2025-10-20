@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Home, 
   TrendingUp, 
@@ -15,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useLogout } from '../../hooks/useAuth.jsx';
 
-const NavItem = ({ icon, label, active, isOpen }) => {
+const NavItem = ({ icon, label, active, isOpen, onClick }) => {
   const baseClasses = "w-full flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-all duration-200";
   const activeStyle = active 
     ? { backgroundColor: '#112D4E', color: '#DBE2EF' }
@@ -23,6 +24,7 @@ const NavItem = ({ icon, label, active, isOpen }) => {
 
   return (
     <button 
+      onClick={onClick}
       className={`${baseClasses} ${!active ? 'text-gray-600 hover:bg-gray-100' : ''}`}
       style={activeStyle}
     >
@@ -164,6 +166,8 @@ const Sidebar = ({
   loadMessages
 }) => {
   const { logout: performLogout, isLoading: logoutLoading } = useLogout();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const accountRef = useRef();
 
@@ -194,13 +198,13 @@ const Sidebar = ({
             transform: translateX(0) translateY(0) rotate(0deg);
           }
           25% {
-            transform: translateX(2px) translateY(-2px) rotate(-5deg);
+            transform: translateX(3px) translateY(-2px) rotate(-8deg);
           }
           50% {
-            transform: translateX(0) translateY(-3px) rotate(0deg);
+            transform: translateX(0) translateY(-4px) rotate(0deg);
           }
           75% {
-            transform: translateX(-2px) translateY(-2px) rotate(5deg);
+            transform: translateX(-3px) translateY(-2px) rotate(8deg);
           }
         }
         
@@ -209,16 +213,40 @@ const Sidebar = ({
             transform: translateY(0px);
           }
           50% {
-            transform: translateY(-4px);
+            transform: translateY(-6px);
+          }
+        }
+        
+        @keyframes wiggle {
+          0%, 100% {
+            transform: rotate(0deg);
+          }
+          25% {
+            transform: rotate(-10deg);
+          }
+          75% {
+            transform: rotate(10deg);
           }
         }
         
         .fish-swim {
-          animation: swim 3s ease-in-out infinite;
+          animation: swim 2.5s ease-in-out infinite;
+          display: inline-block;
+          transform-origin: center;
+          will-change: transform;
         }
         
         .fish-container:hover .fish-swim {
-          animation: swim 1.5s ease-in-out infinite, float 2s ease-in-out infinite;
+          animation: swim 1s ease-in-out infinite, wiggle 0.5s ease-in-out infinite;
+        }
+        
+        .fish-container {
+          transition: all 0.3s ease;
+        }
+        
+        .fish-container:hover {
+          transform: scale(1.1);
+          box-shadow: 0 4px 12px rgba(74, 123, 167, 0.3);
         }
       `}</style>
       
@@ -238,10 +266,17 @@ const Sidebar = ({
       {/* New Chat Button */}
       <div className="p-4">
         <button 
-          onClick={onCreateNewConversation}
-          disabled={isInitializing || !currentProjectId}
+          onClick={() => {
+            // If on projects page, navigate to dashboard first
+            if (location.pathname === '/projects') {
+              navigate('/dashboard');
+            } else {
+              onCreateNewConversation();
+            }
+          }}
+          disabled={isInitializing || (location.pathname === '/dashboard' && !currentProjectId)}
           className={`group relative w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-xl hover:scale-105 active:scale-95 disabled:hover:scale-100 disabled:hover:shadow-none overflow-hidden ${
-            !isInitializing && currentProjectId ? 'animate-[pulse_2s_ease-in-out_infinite]' : ''
+            !isInitializing && currentProjectId && location.pathname === '/dashboard' ? 'animate-[pulse_2s_ease-in-out_infinite]' : ''
           }`}
           style={{ backgroundColor: '#DBE2EF', color: '#112D4E' }}
         >
@@ -271,14 +306,26 @@ const Sidebar = ({
 
       {/* Navigation */}
       <nav className="px-4 space-y-1">
-        <NavItem icon={<MessageSquare size={20} />} label="Conversations" active={true} isOpen={isSidebarOpen} />
+        <NavItem 
+          icon={<MessageSquare size={20} />} 
+          label="Conversations" 
+          active={location.pathname === '/dashboard'} 
+          isOpen={isSidebarOpen}
+          onClick={() => navigate('/dashboard')}
+        />
         <NavItem icon={<TrendingUp size={20} />} label="Analytics" isOpen={isSidebarOpen} />
-        <NavItem icon={<Plane size={20} />} label="Projects" isOpen={isSidebarOpen} />
+        <NavItem 
+          icon={<Plane size={20} />} 
+          label="Projects" 
+          active={location.pathname === '/projects'}
+          isOpen={isSidebarOpen}
+          onClick={() => navigate('/projects')}
+        />
         <NavItem icon={<ShoppingBag size={20} />} label="Documents" isOpen={isSidebarOpen} />
       </nav>
 
-      {/* Conversations List */}
-      {isSidebarOpen && (
+      {/* Conversations List - Only show on dashboard/conversations page */}
+      {isSidebarOpen && location.pathname === '/dashboard' ? (
         <div className="flex-1 px-4 mt-6 overflow-y-auto">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold text-gray-500 uppercase">Recent Chats</span>
@@ -312,6 +359,9 @@ const Sidebar = ({
             )}
           </div>
         </div>
+      ) : (
+        // Spacer to push account to bottom when not showing conversations
+        <div className="flex-1"></div>
       )}
 
       {/* Account */}

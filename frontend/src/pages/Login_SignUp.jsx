@@ -205,21 +205,70 @@ export default function AuthPages() {
   };
 
   return (
-    <div className="min-h-screen flex bg-[#F9FAFB] animate-fadein">
-      {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-[#112D4E]">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-64 h-64 rounded-full bg-[#4A7BA7] animate-pulse-slow"></div>
-          <div className="absolute bottom-20 right-20 w-96 h-96 rounded-full bg-[#DBE2EF] animate-pulse-slow"></div>
-      </div>
+    <>
+      <style>{`
+        @keyframes swim {
+          0%, 100% {
+            transform: translateX(0) translateY(0) rotate(0deg);
+          }
+          25% {
+            transform: translateX(3px) translateY(-2px) rotate(-8deg);
+          }
+          50% {
+            transform: translateX(0) translateY(-4px) rotate(0deg);
+          }
+          75% {
+            transform: translateX(-3px) translateY(-2px) rotate(8deg);
+          }
+        }
         
-        <div className="relative z-10 flex flex-col justify-center px-16 text-white">
-          <div className="flex items-center space-x-3 mb-8">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ backgroundColor: '#4A7BA7' }}>
-              <span className="text-4xl">🐟</span>
+        @keyframes wiggle {
+          0%, 100% {
+            transform: rotate(0deg);
+          }
+          25% {
+            transform: rotate(-10deg);
+          }
+          75% {
+            transform: rotate(10deg);
+          }
+        }
+        
+        .fish-swim {
+          animation: swim 2.5s ease-in-out infinite;
+          display: inline-block;
+          transform-origin: center;
+          will-change: transform;
+        }
+        
+        .fish-container:hover .fish-swim {
+          animation: swim 1s ease-in-out infinite, wiggle 0.5s ease-in-out infinite;
+        }
+        
+        .fish-container {
+          transition: all 0.3s ease;
+        }
+        
+        .fish-container:hover {
+          transform: scale(1.1);
+          box-shadow: 0 4px 12px rgba(74, 123, 167, 0.5);
+        }
+      `}</style>
+      <div className="min-h-screen flex bg-[#F9FAFB] animate-fadein">
+        {/* Left Side - Branding */}
+        <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-[#112D4E]">
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-20 left-20 w-64 h-64 rounded-full bg-[#4A7BA7] animate-pulse-slow"></div>
+            <div className="absolute bottom-20 right-20 w-96 h-96 rounded-full bg-[#DBE2EF] animate-pulse-slow"></div>
+        </div>
+          
+          <div className="relative z-10 flex flex-col justify-center px-16 text-white">
+            <div className="flex items-center space-x-3 mb-8">
+              <div className="fish-container w-16 h-16 rounded-2xl flex items-center justify-center cursor-pointer" style={{ backgroundColor: '#4A7BA7' }}>
+                <span className="fish-swim text-4xl">🐟</span>
+              </div>
+              <span className="text-4xl font-bold">Fishy</span>
             </div>
-            <span className="text-4xl font-bold">Fishy</span>
-          </div>
           
           <h1 className="text-5xl font-bold mb-6 leading-tight">
             <TypingText text="Your AI-Powered Assistant" speed={60} />
@@ -257,8 +306,8 @@ export default function AuthPages() {
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden flex items-center justify-center space-x-3 mb-8">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#4A7BA7' }}>
-              <span className="text-3xl">🐟</span>
+            <div className="fish-container w-12 h-12 rounded-xl flex items-center justify-center cursor-pointer" style={{ backgroundColor: '#4A7BA7' }}>
+              <span className="fish-swim text-3xl">🐟</span>
             </div>
             <span className="text-3xl font-bold" style={{ color: '#112D4E' }}>Fishy</span>
           </div>
@@ -532,5 +581,6 @@ export default function AuthPages() {
         </div>
       </div>
     </div>
+    </>
   );
 }

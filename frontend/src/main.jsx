@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './index.css'
 import LLMDashboard from './pages/DashBoard'
+import ProjectsPage from './pages/ProjectsPage'
 import AuthPages from './pages/Login_SignUp'
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx'
 import { isAuthenticated, getAccessToken } from './utils/auth'
@@ -32,7 +34,14 @@ function AppContent() {
     return <AuthPages />;
   }
 
-  return <LLMDashboard />;
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/projects" replace />} />
+      <Route path="/projects" element={<ProjectsPage />} />
+      <Route path="/dashboard" element={<LLMDashboard />} />
+      <Route path="*" element={<Navigate to="/projects" replace />} />
+    </Routes>
+  );
 }
 
 // App wrapper with providers
@@ -40,7 +49,9 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <AppContent />
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
       </AuthProvider>
     </ErrorBoundary>
   );
