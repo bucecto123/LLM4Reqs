@@ -9,3 +9,8 @@ numpy
 faiss-cpu
 tqdm
 sentence-transformers
+aiofiles
+python-multipart
+pytest
+pytest-asyncio
+httpx

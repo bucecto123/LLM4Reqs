@@ -1,19 +1,29 @@
 # main.py - FastAPI Entry Point with Groq
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, UploadFile, File, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi.security import APIKeyHeader
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from groq import Groq
 import os
 from dotenv import load_dotenv
 import json
 from typing import Tuple, List
+import uuid
+from datetime import datetime
+import asyncio
 
 # Lazy import of RagManager (may raise at runtime if deps missing)
 try:
-    from rag import RagManager
+    from rag import RagManager, get_project_lock
 except Exception:
     RagManager = None
+    get_project_lock = None
+
+try:
+    from build_faiss import build_index_for_project
+except Exception:
+    build_index_for_project = None
 
 load_dotenv()
 
@@ -40,6 +50,18 @@ if not GROQ_API_KEY:
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 DEFAULT_MODEL = os.getenv("GROQ_MODEL", "moonshotai/kimi-k2-instruct-0905")
+
+# API Key Authentication
+LLM_API_KEY = os.getenv("LLM_API_KEY", "dev-secret-key-12345")  # Change in production!
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+# Knowledge Base configuration
+KB_BASE_DIR = os.getenv("KB_BASE_DIR", "faiss_store")
+KB_MODEL = os.getenv("KB_MODEL", "all-MiniLM-L6-v2")
+
+# In-memory job tracking (use Redis/DB in production)
+_build_jobs: Dict[str, Dict[str, Any]] = {}
+_build_jobs_lock = asyncio.Lock()
 
 # RAG configuration (environment-controllable)
 def _clean_env(val: str):
@@ -174,6 +196,69 @@ class ConflictDetectionResponse(BaseModel):
     conflicts: List[Conflict]
     total_conflicts: int
 
+# ==================== NEW KB API MODELS ====================
+
+class DocumentChunk(BaseModel):
+    id: int
+    text: str
+    meta: Dict[str, Any] = {}
+
+class ProcessDocumentRequest(BaseModel):
+    project_id: str
+    document_content: Optional[str] = None
+    document_url: Optional[str] = None
+    document_type: Optional[str] = "requirements"
+
+class ProcessDocumentResponse(BaseModel):
+    project_id: str
+    requirements: List[Requirement]
+    chunks: List[DocumentChunk]
+    total_chunks: int
+    tokens_used: int
+
+class BuildKBRequest(BaseModel):
+    project_id: str
+    documents: List[Dict[str, Any]]  # List of {content: str, type: str, meta: dict}
+    mode: str = Field(default="async", pattern="^(async|sync)$")
+
+class BuildKBResponse(BaseModel):
+    project_id: str
+    job_id: Optional[str] = None  # Present in async mode
+    status: str  # "queued", "completed", "failed"
+    message: str
+    index_path: Optional[str] = None
+    total_chunks: Optional[int] = None
+
+class IncrementalKBRequest(BaseModel):
+    project_id: str
+    documents: List[Dict[str, Any]]
+
+class IncrementalKBResponse(BaseModel):
+    project_id: str
+    status: str
+    message: str
+    added_chunks: int
+    total_chunks: int
+
+class QueryKBRequest(BaseModel):
+    project_id: str
+    query: str
+    top_k: int = Field(default=5, ge=1, le=20)
+
+class QueryKBResponse(BaseModel):
+    project_id: str
+    query: str
+    results: List[Dict[str, Any]]
+    total_results: int
+
+class KBStatusResponse(BaseModel):
+    project_id: str
+    exists: bool
+    version: int
+    last_built_at: Optional[str]
+    total_chunks: int
+    error: Optional[str] = None
+
 # ==================== PROMPT TEMPLATES ====================
 
 EXTRACTION_PROMPT = """You are Fishy, an expert business analyst. Extract software requirements from the following text.
@@ -243,6 +328,15 @@ Return format (MUST be valid JSON):
 If no conflicts found, return: {{"conflicts": []}}"""
 
 # ==================== HELPER FUNCTIONS ====================
+
+async def verify_api_key(api_key: str = Depends(api_key_header)):
+    """Verify API key for protected endpoints."""
+    if api_key != LLM_API_KEY:
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid or missing API key"
+        )
+    return api_key
 
 def call_groq_chat(messages: List[Dict], max_tokens: int = 1000, temperature: float = 0.7) -> tuple:
     """Call Groq API and return response + token usage"""
@@ -361,6 +455,64 @@ def parse_json_response(content: str) -> Dict:
             status_code=500, 
             detail=f"Failed to parse LLM response as JSON. Response: {content[:200]}"
         )
+
+def _get_rag_manager():
+    """Get or create a RagManager instance."""
+    if RagManager is None:
+        raise HTTPException(
+            status_code=500,
+            detail="RAG dependencies not installed. Install sentence-transformers and faiss-cpu."
+        )
+    return RagManager(model_name=KB_MODEL)
+
+def _prepare_document_chunks(documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Convert documents to chunks format expected by RagManager."""
+    chunks = []
+    for idx, doc in enumerate(documents):
+        content = doc.get('content', '')
+        doc_type = doc.get('type', 'document')
+        meta = doc.get('meta', {})
+        
+        chunks.append({
+            'id': idx,
+            'text': content,
+            'meta': {
+                'type': doc_type,
+                **meta
+            }
+        })
+    return chunks
+
+async def _build_kb_async(job_id: str, project_id: str, chunks: List[Dict[str, Any]]):
+    """Background task to build knowledge base."""
+    global _build_jobs
+    
+    try:
+        # Update job status
+        async with _build_jobs_lock:
+            _build_jobs[job_id]['status'] = 'building'
+            _build_jobs[job_id]['started_at'] = datetime.utcnow().isoformat()
+        
+        # Build index
+        result = build_index_for_project(
+            project_id=project_id,
+            chunks=chunks,
+            base_dir=KB_BASE_DIR,
+            model_name=KB_MODEL
+        )
+        
+        # Update job status
+        async with _build_jobs_lock:
+            _build_jobs[job_id]['status'] = 'completed'
+            _build_jobs[job_id]['completed_at'] = datetime.utcnow().isoformat()
+            _build_jobs[job_id]['result'] = result
+            _build_jobs[job_id]['total_chunks'] = len(chunks)
+        
+    except Exception as e:
+        async with _build_jobs_lock:
+            _build_jobs[job_id]['status'] = 'failed'
+            _build_jobs[job_id]['error'] = str(e)
+            _build_jobs[job_id]['completed_at'] = datetime.utcnow().isoformat()
 
 # ==================== API ENDPOINTS ====================
 
@@ -571,6 +723,268 @@ async def detect_conflicts(request: ConflictDetectionRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==================== KNOWLEDGE BASE API ENDPOINTS ====================
+
+@app.post("/process_document", response_model=ProcessDocumentResponse)
+async def process_document(request: ProcessDocumentRequest, api_key: str = Depends(verify_api_key)):
+    """
+    Process a document and extract requirements with chunk metadata.
+    
+    Usage:
+    POST /process_document
+    Headers: X-API-Key: your-api-key
+    {
+        "project_id": "proj_123",
+        "document_content": "The system must allow users to login...",
+        "document_type": "requirements"
+    }
+    """
+    try:
+        if not request.document_content and not request.document_url:
+            raise HTTPException(status_code=400, detail="Either document_content or document_url must be provided")
+        
+        # Use document_content (document_url fetching can be added later)
+        content = request.document_content or ""
+        
+        # Extract requirements using existing extraction endpoint logic
+        extraction_req = ExtractionRequest(text=content, document_type=request.document_type)
+        prompt = EXTRACTION_PROMPT.format(text=extraction_req.text)
+        
+        messages = [
+            {"role": "system", "content": "You are Fishy, a requirements extraction expert. Always return valid JSON."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        response_text, tokens_used = call_groq_chat(messages, max_tokens=3000, temperature=0.3)
+        parsed_data = parse_json_response(response_text)
+        
+        requirements = [
+            Requirement(**req) for req in parsed_data.get("requirements", [])
+        ]
+        
+        # Create chunks from requirements
+        chunks = []
+        for idx, req in enumerate(requirements):
+            chunk_text = f"Requirement: {req.requirement_text}\nType: {req.requirement_type}\nPriority: {req.priority}"
+            chunks.append(DocumentChunk(
+                id=idx,
+                text=chunk_text,
+                meta={
+                    'requirement_type': req.requirement_type,
+                    'priority': req.priority,
+                    'confidence_score': req.confidence_score,
+                    'document_type': request.document_type
+                }
+            ))
+        
+        return ProcessDocumentResponse(
+            project_id=request.project_id,
+            requirements=requirements,
+            chunks=chunks,
+            total_chunks=len(chunks),
+            tokens_used=tokens_used
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/kb/build", response_model=BuildKBResponse)
+async def build_kb(request: BuildKBRequest, background_tasks: BackgroundTasks, 
+                  api_key: str = Depends(verify_api_key)):
+    """
+    Build knowledge base for a project. Supports async (returns job_id) and sync modes.
+    
+    Usage:
+    POST /kb/build
+    Headers: X-API-Key: your-api-key
+    {
+        "project_id": "proj_123",
+        "documents": [
+            {"content": "Requirement 1...", "type": "functional", "meta": {}},
+            {"content": "Requirement 2...", "type": "non-functional", "meta": {}}
+        ],
+        "mode": "async"
+    }
+    """
+    try:
+        if not request.documents:
+            raise HTTPException(status_code=400, detail="Documents list cannot be empty")
+        
+        # Prepare chunks
+        chunks = _prepare_document_chunks(request.documents)
+        
+        if request.mode == "async":
+            # Create job
+            job_id = f"job_{uuid.uuid4().hex[:12]}"
+            
+            async with _build_jobs_lock:
+                _build_jobs[job_id] = {
+                    'job_id': job_id,
+                    'project_id': request.project_id,
+                    'status': 'queued',
+                    'created_at': datetime.utcnow().isoformat(),
+                    'total_docs': len(request.documents)
+                }
+            
+            # Schedule background task
+            background_tasks.add_task(_build_kb_async, job_id, request.project_id, chunks)
+            
+            return BuildKBResponse(
+                project_id=request.project_id,
+                job_id=job_id,
+                status="queued",
+                message=f"Knowledge base build queued for project {request.project_id}"
+            )
+        else:
+            # Synchronous build
+            result = build_index_for_project(
+                project_id=request.project_id,
+                chunks=chunks,
+                base_dir=KB_BASE_DIR,
+                model_name=KB_MODEL
+            )
+            
+            return BuildKBResponse(
+                project_id=request.project_id,
+                job_id=None,
+                status="completed",
+                message=f"Knowledge base built successfully for project {request.project_id}",
+                index_path=result.get('index_path'),
+                total_chunks=len(chunks)
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/kb/incremental", response_model=IncrementalKBResponse)
+async def incremental_kb_update(request: IncrementalKBRequest, api_key: str = Depends(verify_api_key)):
+    """
+    Add documents incrementally to existing project knowledge base.
+    
+    Usage:
+    POST /kb/incremental
+    Headers: X-API-Key: your-api-key
+    {
+        "project_id": "proj_123",
+        "documents": [
+            {"content": "New requirement...", "type": "functional", "meta": {}}
+        ]
+    }
+    """
+    try:
+        if not request.documents:
+            raise HTTPException(status_code=400, detail="Documents list cannot be empty")
+        
+        rag = _get_rag_manager()
+        index_path, meta_path = rag.get_project_paths(KB_BASE_DIR, request.project_id)
+        
+        # Check if index exists
+        if not os.path.exists(index_path):
+            raise HTTPException(
+                status_code=404,
+                detail=f"Knowledge base not found for project {request.project_id}. Use /kb/build first."
+            )
+        
+        # Prepare new chunks
+        new_chunks = _prepare_document_chunks(request.documents)
+        
+        # Incremental add
+        index, updated_chunks = rag.incremental_add(
+            index_path=index_path,
+            meta_path=meta_path,
+            new_chunks=new_chunks,
+            project_id=request.project_id
+        )
+        
+        return IncrementalKBResponse(
+            project_id=request.project_id,
+            status="completed",
+            message=f"Added {len(new_chunks)} chunks to project {request.project_id}",
+            added_chunks=len(new_chunks),
+            total_chunks=len(updated_chunks)
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/kb/query", response_model=QueryKBResponse)
+async def query_kb(request: QueryKBRequest, api_key: str = Depends(verify_api_key)):
+    """
+    Query knowledge base for relevant chunks.
+    
+    Usage:
+    POST /kb/query
+    Headers: X-API-Key: your-api-key
+    {
+        "project_id": "proj_123",
+        "query": "What are the authentication requirements?",
+        "top_k": 5
+    }
+    """
+    try:
+        rag = _get_rag_manager()
+        index_path, meta_path = rag.get_project_paths(KB_BASE_DIR, request.project_id)
+        
+        # Check if index exists
+        if not os.path.exists(index_path):
+            raise HTTPException(
+                status_code=404,
+                detail=f"Knowledge base not found for project {request.project_id}"
+            )
+        
+        # Load index and query
+        index, chunks = rag.load_index_and_meta(index_path, meta_path)
+        results = rag.query(request.query, index, chunks, top_k=request.top_k)
+        
+        return QueryKBResponse(
+            project_id=request.project_id,
+            query=request.query,
+            results=results,
+            total_results=len(results)
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/kb/status/{project_id}", response_model=KBStatusResponse)
+async def get_kb_status(project_id: str, api_key: str = Depends(verify_api_key)):
+    """
+    Get knowledge base status for a project.
+    
+    Usage:
+    GET /kb/status/proj_123
+    Headers: X-API-Key: your-api-key
+    """
+    try:
+        rag = _get_rag_manager()
+        index_path, meta_path = rag.get_project_paths(KB_BASE_DIR, project_id)
+        
+        status = rag.get_kb_status(index_path, meta_path)
+        
+        return KBStatusResponse(
+            project_id=project_id,
+            exists=status['exists'],
+            version=status['version'],
+            last_built_at=status['last_built_at'],
+            total_chunks=status['total_chunks'],
+            error=status['error']
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/kb/job/{job_id}")
+async def get_job_status(job_id: str, api_key: str = Depends(verify_api_key)):
+    """
+    Get status of an async build job.
+    
+    Usage:
+    GET /kb/job/job_abc123
+    Headers: X-API-Key: your-api-key
+    """
+    async with _build_jobs_lock:
+        job = _build_jobs.get(job_id)
+    
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+    
+    return job
+
 # ==================== TESTING ENDPOINT ====================
 
 @app.post("/api/test")
@@ -597,6 +1011,7 @@ if __name__ == "__main__":
 
 # ==================== .env.example ====================
 """
+# Groq LLM Configuration (for requirement extraction)
 GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxxx
 GROQ_MODEL=mixtral-8x7b-32768
 
@@ -607,4 +1022,20 @@ GROQ_MODEL=mixtral-8x7b-32768
 # llama3-70b-8192             - Good balance
 # llama3-8b-8192              - Fast and efficient
 # gemma2-9b-it                - Google's model, good for instructions
+
+# Knowledge Base API Authentication (CHANGE IN PRODUCTION!)
+LLM_API_KEY=dev-secret-key-12345
+
+# Knowledge Base Configuration
+KB_BASE_DIR=faiss_store                    # Base directory for all project indexes
+KB_MODEL=all-MiniLM-L6-v2                  # SentenceTransformer model for embeddings
+
+# Legacy RAG Configuration (for existing chat endpoint)
+RAG_ENABLED=true
+RAG_INDEX_PATH=faiss_store/faiss_index.bin
+RAG_META_PATH=faiss_store/faiss_meta.pkl
+RAG_MODEL=all-MiniLM-L6-v2
+RAG_TOP_K=5
+RAG_SIM_THRESHOLD=0.35
+RAG_KEYWORDS=requirement,requirements,specification,standard,security,privacy,compliance,regulation,payment,billing
 """
