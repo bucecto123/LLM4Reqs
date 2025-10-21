@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { apiFetch } from '../utils/auth';
 import { useAuth, useLogout } from './useAuth.jsx';
 
@@ -7,10 +8,13 @@ export const useDashboard = () => {
   const { user, isAuthenticated } = useAuth();
   const { logout: performLogout } = useLogout();
   
+  // URL parameters for project selection
+  const [searchParams, setSearchParams] = useSearchParams();
+  
   // State
   const [message, setMessage] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [chatMode, setChatMode] = useState("project"); // 'normal' or 'project' - default to project for file uploads
+  const [chatMode, setChatMode] = useState("normal"); // 'normal' or 'project' - normal chat doesn't create projects
   
   // Chat state
   const [conversations, setConversations] = useState([]);
@@ -46,16 +50,36 @@ export const useDashboard = () => {
       const data = await apiFetch('/api/projects');
       setProjects(Array.isArray(data) ? data : []);
       
-      if (chatMode === "project" && data && data.length > 0) {
-        // Use the first available project
-        setCurrentProjectId(data[0].id);
+      // Check if a specific project was requested via URL parameter
+      const projectIdFromUrl = searchParams.get('project');
+      
+      if (projectIdFromUrl) {
+        // User selected a project from the projects page
+        const projectId = parseInt(projectIdFromUrl);
+        const projectExists = data?.some(p => p.id === projectId);
+        
+        if (projectExists) {
+          setChatMode('project');
+          setCurrentProjectId(projectId);
+          // Remove the query parameter after setting the project
+          setSearchParams({});
+        } else {
+          console.warn(`Project ${projectId} not found`);
+        }
       } else if (chatMode === "project") {
-        // Create a default project if none exist
-        await createDefaultProject();
+        // Only set project ID if in project mode
+        if (data && data.length > 0) {
+          // Use the first available project
+          setCurrentProjectId(data[0].id);
+        } else {
+          // Create a default project if none exist and we're in project mode
+          await createDefaultProject();
+        }
       }
+      // In normal mode, we don't need a project
     } catch (err) {
       console.error('Failed to load projects:', err);
-      // Try to create a default project anyway
+      // Try to create a default project only if in project mode
       if (chatMode === "project") {
         await createDefaultProject();
       }
@@ -147,8 +171,10 @@ export const useDashboard = () => {
 
   // Effects
   useEffect(() => {
+    // Always load projects (user might switch to project mode later)
+    // But don't create default projects unless in project mode
     loadProjects();
-  }, []);
+  }, [chatMode]); // Re-run when chat mode changes
 
   useEffect(() => {
     if (chatMode === "normal") {

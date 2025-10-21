@@ -274,9 +274,9 @@ const Sidebar = ({
               onCreateNewConversation();
             }
           }}
-          disabled={isInitializing || (location.pathname === '/dashboard' && !currentProjectId)}
+          disabled={isInitializing}
           className={`group relative w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-xl hover:scale-105 active:scale-95 disabled:hover:scale-100 disabled:hover:shadow-none overflow-hidden ${
-            !isInitializing && currentProjectId && location.pathname === '/dashboard' ? 'animate-[pulse_2s_ease-in-out_infinite]' : ''
+            !isInitializing && location.pathname === '/dashboard' ? 'animate-[pulse_2s_ease-in-out_infinite]' : ''
           }`}
           style={{ backgroundColor: '#DBE2EF', color: '#112D4E' }}
         >
@@ -284,7 +284,7 @@ const Sidebar = ({
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out"></div>
           
           {/* Subtle glow effect when ready */}
-          {!isInitializing && currentProjectId && (
+          {!isInitializing && (
             <div className="absolute inset-0 bg-gradient-to-r from-blue-400/0 via-blue-400/10 to-blue-400/0 animate-[pulse_3s_ease-in-out_infinite]"></div>
           )}
           

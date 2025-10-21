@@ -33,7 +33,7 @@ class DocumentController extends Controller
         // Validate the request
         $validator = Validator::make($request->all(), [
             'file' => 'required|file|max:10240|mimes:pdf,doc,docx,txt,md', // 10MB max
-            'project_id' => 'required|exists:projects,id',
+            'project_id' => 'nullable|exists:projects,id', // Allow null for normal chat mode
             'conversation_id' => 'nullable|exists:conversations,id'
         ]);
 

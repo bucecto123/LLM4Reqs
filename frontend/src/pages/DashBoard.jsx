@@ -54,7 +54,7 @@ export default function LLMDashboard() {
     // For project mode, ensure we have a project
     if (chatMode === "project" && !currentProjectId) {
       setError(
-        "No project available. Please wait for project initialization or switch to normal chat mode."
+        "No project available. Please wait for project initialization."
       );
       return;
     }
@@ -67,10 +67,11 @@ export default function LLMDashboard() {
         status: "active",
       };
 
-      // Only include project_id if in project mode
-      if (chatMode === "project") {
+      // Only include project_id if in project mode AND we have a project
+      if (chatMode === "project" && currentProjectId) {
         requestBody.project_id = currentProjectId;
       }
+      // In normal mode, project_id will be null (not included in requestBody)
 
       const data = await apiFetch("/api/conversations", {
         method: "POST",
@@ -104,7 +105,7 @@ export default function LLMDashboard() {
       // For project mode, ensure we have a project
       if (chatMode === "project" && !currentProjectId) {
         setError(
-          "No project available. Please wait for project initialization or switch to normal chat mode."
+          "No project available. Please wait for project initialization."
         );
         return;
       }
@@ -130,10 +131,11 @@ export default function LLMDashboard() {
           status: "active",
         };
 
-        // Only include project_id if in project mode
-        if (chatMode === "project") {
+        // Only include project_id if in project mode AND we have a project
+        if (chatMode === "project" && currentProjectId) {
           requestBody.project_id = currentProjectId;
         }
+        // In normal mode, project_id will be null (not included in requestBody)
 
         const newConversation = await apiFetch("/api/conversations", {
           method: "POST",
