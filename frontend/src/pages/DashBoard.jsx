@@ -281,9 +281,20 @@ export default function LLMDashboard() {
       }
 
       // Create enhanced message content for the AI (includes full document content)
-      // This is sent to the backend but NOT displayed in the chat
+      // First add file names to the user message (this will be saved and displayed)
+      // Then add full document contents after a separator (backend will strip this for display)
       let messageForAI = userMessage;
+      
       if (uploadedDocuments.length > 0) {
+        // Add file names to the message that will be displayed
+        const fileNames = uploadedDocuments
+          .map((doc) => doc.original_filename)
+          .join(", ");
+        messageForAI += messageForAI
+          ? `\n\n📎 Attached files: ${fileNames}`
+          : `📎 Uploaded files: ${fileNames}`;
+        
+        // Then add full document contents for AI processing (backend will strip this)
         const documentContents = uploadedDocuments
           .filter((doc) => doc.content && doc.content.trim())
           .map((doc) => {
