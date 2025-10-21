@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageSquare, Loader2, Paperclip } from 'lucide-react';
+import { MessageSquare, Loader2, Paperclip, FolderOpen, MessageCircle, X } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
 import WelcomeScreen from './WelcomeScreen';
@@ -25,17 +25,48 @@ const ChatArea = ({
   removeAttachedFile,
   // State
   isInitializing,
-  currentProjectId
+  currentProjectId,
+  // Chat mode
+  chatMode,
+  currentProject,
+  onSwitchToNormalMode
 }) => {
   return (
     <div className="flex-1 flex flex-col">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
+      <header 
+        className="border-b px-6 py-4"
+        style={{ 
+          backgroundColor: chatMode === 'project' ? '#F0F9FF' : '#FFFFFF',
+          borderColor: chatMode === 'project' ? '#BFDBFE' : '#E5E7EB'
+        }}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
+            {/* Mode Badge */}
+            {chatMode === 'project' && currentProject ? (
+              <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg border" style={{ backgroundColor: '#DBEAFE', borderColor: '#93C5FD', color: '#1E40AF' }}>
+                <FolderOpen className="w-4 h-4" />
+                <span className="text-sm font-medium">{currentProject.name}</span>
+                <button
+                  onClick={onSwitchToNormalMode}
+                  className="ml-2 hover:bg-blue-200 rounded p-0.5 transition-colors"
+                  title="Switch to Normal Chat"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg" style={{ backgroundColor: '#F3F4F6', color: '#6B7280' }}>
+                <MessageCircle className="w-4 h-4" />
+                <span className="text-sm font-medium">Normal Chat</span>
+              </div>
+            )}
+            
             <span className="text-sm text-gray-600">
               {selectedConversation ? selectedConversation.title || 'New Chat' : 'Fishy.ai'}
             </span>
+            
             {/* Documents indicator */}
             {conversationDocuments.length > 0 && selectedConversation && (
               <div className="flex items-center space-x-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium">
@@ -76,7 +107,13 @@ const ChatArea = ({
         ) : (
           <>
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-6" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+            <div 
+              className="flex-1 overflow-y-auto p-6" 
+              style={{ 
+                maxHeight: 'calc(100vh - 200px)',
+                backgroundColor: chatMode === 'project' ? '#F8FAFC' : '#FFFFFF'
+              }}
+            >
               <div className="min-h-full">
                 {messages.length === 0 && !isLoading ? (
                   <div className="flex flex-col items-center justify-center h-full text-gray-500 min-h-[400px]">

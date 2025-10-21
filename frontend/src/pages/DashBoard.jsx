@@ -14,6 +14,7 @@ export default function LLMDashboard() {
     isSidebarOpen,
     setIsSidebarOpen,
     chatMode,
+    setChatMode,
     conversations,
     setConversations,
     selectedConversation,
@@ -26,6 +27,8 @@ export default function LLMDashboard() {
     error,
     setError,
     currentProjectId,
+    setCurrentProjectId,
+    projects,
     isInitializing,
     editingConversationId,
     setEditingConversationId,
@@ -43,11 +46,27 @@ export default function LLMDashboard() {
     
     // Functions
     loadMessages,
+    loadConversations,
     loadConversationDocuments,
     performLogout
   } = useDashboard();
   
   const fullName = user?.name;
+  
+  // Get current project object
+  const currentProject = projects.find(p => p.id === currentProjectId);
+  
+  // Switch to normal chat mode
+  const switchToNormalMode = () => {
+    setChatMode('normal');
+    setCurrentProjectId(null);
+    setSelectedConversation(null);
+    setMessages([]);
+    setAttachedFiles([]);
+    setConversationDocuments([]);
+    // Reload conversations for normal mode
+    loadConversations();
+  };
 
   // Create new conversation
   const createNewConversation = async () => {
@@ -509,6 +528,9 @@ export default function LLMDashboard() {
         removeAttachedFile={removeAttachedFile}
         isInitializing={isInitializing}
         currentProjectId={currentProjectId}
+        chatMode={chatMode}
+        currentProject={currentProject}
+        onSwitchToNormalMode={switchToNormalMode}
       />
 
       {/* File Upload Modal */}
