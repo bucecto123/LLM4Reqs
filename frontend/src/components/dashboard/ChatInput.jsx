@@ -1,5 +1,5 @@
 import React from 'react';
-import { Send, Loader2, Grid3x3, Globe, Paperclip, Mic, X } from 'lucide-react';
+import { Send, Loader2, Search, Sparkles, Grid3x3, Globe, Paperclip, Mic, X } from 'lucide-react';
 
 const ActionButton = ({ icon, onClick }) => {
   return (
@@ -55,8 +55,15 @@ const ChatInput = ({
           </div>
         )}
         
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3">
+        <div className="bg-white rounded-xl shadow-sm border-2 border-gray-300 p-3">
           <div className="flex items-center space-x-3">
+            <button
+              onClick={openFileUpload}
+              disabled={isLoading || isInitializing}
+              className="p-1.5 hover:bg-gray-100 rounded-md text-gray-600 transition-all duration-200 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Paperclip size={18} />
+            </button>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
@@ -74,7 +81,11 @@ const ChatInput = ({
             <button 
               onClick={sendMessage}
               disabled={(!message.trim() && attachedFiles.length === 0) || isLoading || isInitializing || !currentProjectId}
-              className="p-2 rounded-lg text-white transition-all duration-200 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+              className={`p-2 rounded-lg text-white transition-all duration-200 flex-shrink-0 ${
+                (message.trim() || attachedFiles.length > 0) && !isLoading && !isInitializing
+                  ? 'hover:shadow-md opacity-100'
+                  : 'opacity-40 cursor-not-allowed'
+              }`}
               style={{ backgroundColor: '#4A7BA7' }}
             >
               {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
@@ -86,7 +97,6 @@ const ChatInput = ({
         <div className="flex items-center justify-center space-x-2 mt-3">
           <ActionButton icon={<Grid3x3 size={14} />} />
           <ActionButton icon={<Globe size={14} />} />
-          <ActionButton icon={<Paperclip size={14} />} onClick={openFileUpload} />
           <ActionButton icon={<Mic size={14} />} />
         </div>
       </div>

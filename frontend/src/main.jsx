@@ -36,7 +36,7 @@ function AppContent() {
 
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/projects" replace />} />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/projects" element={<ProjectsPage />} />
       <Route path="/dashboard" element={<LLMDashboard />} />
       <Route path="*" element={<Navigate to="/projects" replace />} />
