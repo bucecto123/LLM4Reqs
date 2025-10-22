@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageSquare, Loader2, Paperclip, FolderOpen, MessageCircle, X } from 'lucide-react';
+import { MessageSquare, Loader2, Paperclip, FolderOpen, MessageCircle, X, Database, Upload } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
 import WelcomeScreen from './WelcomeScreen';
@@ -29,7 +29,9 @@ const ChatArea = ({
   // Chat mode
   chatMode,
   currentProject,
-  onSwitchToNormalMode
+  onSwitchToNormalMode,
+  // KB management
+  onOpenKBUpload
 }) => {
   return (
     <div className="flex-1 flex flex-col">
@@ -75,17 +77,37 @@ const ChatArea = ({
               </div>
             )}
           </div>
-          {error && (
-            <div className="text-red-600 text-sm bg-red-50 px-3 py-1 rounded-lg flex items-center space-x-2">
-              <span>{error}</span>
-              <button 
-                onClick={() => setError(null)}
-                className="text-red-500 hover:text-red-700 ml-2"
+          
+          <div className="flex items-center space-x-3">
+            {/* Knowledge Base Upload Button (Project Mode Only) */}
+            {chatMode === 'project' && currentProjectId && (
+              <button
+                onClick={onOpenKBUpload}
+                className="flex items-center space-x-2 px-3 py-1.5 rounded-lg border transition-all hover:shadow-md"
+                style={{ 
+                  backgroundColor: '#FFFFFF',
+                  borderColor: '#3B82F6',
+                  color: '#3B82F6'
+                }}
+                title="Upload documents to Knowledge Base"
               >
-                ×
+                <Database className="w-4 h-4" />
+                <span className="text-sm font-medium">Build KB</span>
               </button>
-            </div>
-          )}
+            )}
+            
+            {error && (
+              <div className="text-red-600 text-sm bg-red-50 px-3 py-1 rounded-lg flex items-center space-x-2">
+                <span>{error}</span>
+                <button 
+                  onClick={() => setError(null)}
+                  className="text-red-500 hover:text-red-700 ml-2"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { apiFetch } from '../utils/auth.js';
 import { useDashboard } from '../hooks/useDashboard.js';
 import Sidebar from '../components/dashboard/Sidebar.jsx';
 import ChatArea from '../components/dashboard/ChatArea.jsx';
 import FileUpload from '../components/FileUpload.jsx';
+import KBUploadModal from '../components/KBUploadModal.jsx';
 
 export default function LLMDashboard() {
   const {
@@ -55,6 +56,10 @@ export default function LLMDashboard() {
   
   // Get current project object
   const currentProject = projects.find(p => p.id === currentProjectId);
+  
+  // KB Upload state
+  const [isKBUploadOpen, setIsKBUploadOpen] = useState(false);
+  const [kbUploadStatus, setKBUploadStatus] = useState(null);
   
   // Switch to normal chat mode
   const switchToNormalMode = () => {
@@ -494,6 +499,72 @@ export default function LLMDashboard() {
     setIsFileUploadOpen(false);
   };
 
+  // KB Upload handlers
+  const openKBUpload = () => {
+    setIsKBUploadOpen(true);
+    setKBUploadStatus(null);
+  };
+
+  const closeKBUpload = () => {
+    setIsKBUploadOpen(false);
+    setKBUploadStatus(null);
+  };
+
+  const handleKBUpload = async (files, onProgress) => {
+    if (!currentProjectId) {
+      throw new Error('No project selected');
+    }
+
+    let uploadedCount = 0;
+    const uploadedDocuments = [];
+
+    // Upload each file to the project
+    for (const file of files) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('project_id', currentProjectId.toString());
+        
+        // Don't attach to a specific conversation - these are project-level documents
+        const uploadData = await apiFetch('/api/documents', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (uploadData.success && uploadData.document) {
+          uploadedDocuments.push(uploadData.document);
+          uploadedCount++;
+          onProgress(uploadedCount);
+        }
+      } catch (err) {
+        console.error(`Failed to upload ${file.name}:`, err);
+        throw new Error(`Failed to upload ${file.name}: ${err.message || 'Unknown error'}`);
+      }
+    }
+
+    // After all files are uploaded, trigger KB build
+    try {
+      setKBUploadStatus('Building Knowledge Base...');
+      
+      const buildResponse = await apiFetch(`/api/projects/${currentProjectId}/kb/build`, {
+        method: 'POST',
+      });
+
+      setKBUploadStatus('Knowledge Base build started successfully!');
+      
+      // Show success message
+      setError(null);
+      setTimeout(() => {
+        setKBUploadStatus(null);
+      }, 3000);
+      
+    } catch (err) {
+      console.error('Failed to build KB:', err);
+      setError('Documents uploaded but KB build failed. Please try building manually.');
+      throw new Error('Failed to build Knowledge Base');
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
@@ -542,6 +613,7 @@ export default function LLMDashboard() {
         chatMode={chatMode}
         currentProject={currentProject}
         onSwitchToNormalMode={switchToNormalMode}
+        onOpenKBUpload={openKBUpload}
       />
 
       {/* File Upload Modal */}
@@ -551,6 +623,16 @@ export default function LLMDashboard() {
           onClose={closeFileUpload}
           maxFiles={5}
           maxSizePerFile={10}
+        />
+      )}
+      
+      {/* KB Upload Modal */}
+      {isKBUploadOpen && currentProject && (
+        <KBUploadModal
+          onClose={closeKBUpload}
+          onUpload={handleKBUpload}
+          projectId={currentProjectId}
+          projectName={currentProject.name}
         />
       )}
       
