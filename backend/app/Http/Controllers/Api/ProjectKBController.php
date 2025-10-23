@@ -33,6 +33,18 @@ class ProjectKBController extends Controller
             ['status' => 'not_built']
         );
 
+        // Check for stale builds (building for more than 10 minutes)
+        if ($kb->status === 'building') {
+            $lastUpdate = $kb->updated_at;
+            if ($lastUpdate && $lastUpdate->diffInMinutes(now()) > 10) {
+                Log::warning('KB build appears stale, marking as failed', [
+                    'project_id' => $projectId,
+                    'last_update' => $lastUpdate
+                ]);
+                $kb->markAsFailed('Build timeout - exceeded 10 minutes');
+            }
+        }
+
         // If KB is ready, get fresh status from LLM service
         if ($kb->isReady()) {
             try {
@@ -78,13 +90,30 @@ class ProjectKBController extends Controller
             ['status' => 'not_built']
         );
 
-        // Prevent rebuilding if already building
+        // Check if already building
         if ($kb->status === 'building') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Knowledge base is already building',
-                'job_id' => $kb->job_id,
-            ], 409);
+            // Check if build is stale (older than 10 minutes)
+            $lastUpdate = $kb->updated_at;
+            if ($lastUpdate && $lastUpdate->diffInMinutes(now()) > 10) {
+                Log::warning('KB build appears stale, resetting', [
+                    'project_id' => $projectId,
+                    'last_update' => $lastUpdate
+                ]);
+                // Reset the status to allow new build
+                $kb->update([
+                    'status' => 'failed',
+                    'last_error' => 'Previous build timeout',
+                    'job_id' => null
+                ]);
+            } else {
+                // Build is actively running
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Knowledge base is already building. Please wait.',
+                    'job_id' => $kb->job_id,
+                    'started_at' => $kb->updated_at?->toIso8601String(),
+                ], 409);
+            }
         }
 
         // Dispatch the job
@@ -94,6 +123,11 @@ class ProjectKBController extends Controller
 
         // Update KB status
         $kb->markAsBuilding($jobId);
+
+        Log::info('KB build queued', [
+            'project_id' => $project->id,
+            'job_id' => $jobId
+        ]);
 
         return response()->json([
             'success' => true,
@@ -164,6 +198,11 @@ class ProjectKBController extends Controller
                 'last_built_at' => now(),
             ]);
 
+            Log::info('KB reindex completed', [
+                'project_id' => $project->id,
+                'documents_count' => count($documents)
+            ]);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Documents reindexed successfully',
@@ -172,12 +211,91 @@ class ProjectKBController extends Controller
                 'new_version' => $result['new_version'] ?? $kb->version,
             ]);
         } catch (\Exception $e) {
-            Log::error('KB reindex failed', ['error' => $e->getMessage()]);
+            Log::error('KB reindex failed', [
+                'project_id' => $project->id,
+                'error' => $e->getMessage()
+            ]);
             
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to reindex documents: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Reset KB status to allow rebuilding.
+     * POST /api/projects/{id}/kb/reset
+     */
+    public function reset(int $projectId)
+    {
+        $project = Project::findOrFail($projectId);
+        
+        $kb = KnowledgeBase::where('project_id', $project->id)->first();
+        
+        if (!$kb) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No knowledge base found for this project',
+            ], 404);
+        }
+
+        // Store previous status for logging
+        $previousStatus = $kb->status;
+        
+        $kb->update([
+            'status' => 'not_built',
+            'job_id' => null,
+            'last_error' => null,
+        ]);
+
+        Log::info('KB status reset', [
+            'project_id' => $projectId,
+            'previous_status' => $previousStatus
+        ]);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'KB status reset successfully',
+            'previous_status' => $previousStatus,
+        ]);
+    }
+
+    /**
+     * Force rebuild KB (reset and rebuild in one action).
+     * POST /api/projects/{id}/kb/force-rebuild
+     */
+    public function forceRebuild(Request $request, int $projectId)
+    {
+        $project = Project::findOrFail($projectId);
+
+        // Get or create KB record
+        $kb = KnowledgeBase::firstOrCreate(
+            ['project_id' => $project->id],
+            ['status' => 'not_built']
+        );
+
+        // Force reset regardless of current status
+        $kb->update([
+            'status' => 'not_built',
+            'job_id' => null,
+            'last_error' => null,
+        ]);
+
+        Log::info('KB force rebuild initiated', ['project_id' => $projectId]);
+
+        // Now trigger build
+        $job = new KBBuildJob($project->id);
+        $pendingDispatch = dispatch($job);
+        $jobId = $pendingDispatch->id ?? $job->uniqueId();
+
+        $kb->markAsBuilding($jobId);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Knowledge base force rebuild queued',
+            'job_id' => $jobId,
+            'project_id' => $project->id,
+        ], 202);
     }
 }

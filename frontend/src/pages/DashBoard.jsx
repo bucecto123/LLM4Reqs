@@ -5,6 +5,7 @@ import Sidebar from '../components/dashboard/Sidebar.jsx';
 import ChatArea from '../components/dashboard/ChatArea.jsx';
 import FileUpload from '../components/FileUpload.jsx';
 import KBUploadModal from '../components/KBUploadModal.jsx';
+import RequirementsViewer from '../components/RequirementsViewer.jsx';
 
 export default function LLMDashboard() {
   const {
@@ -53,9 +54,11 @@ export default function LLMDashboard() {
   } = useDashboard();
   
   const fullName = user?.name;
-  
   // Get current project object
   const currentProject = projects.find(p => p.id === currentProjectId);
+
+  // RequirementsViewer state
+  const [showRequirements, setShowRequirements] = useState(false);
   
   // KB Upload state
   const [isKBUploadOpen, setIsKBUploadOpen] = useState(false);
@@ -314,12 +317,17 @@ export default function LLMDashboard() {
       }
 
       // Send message with document context to the conversation (backend only)
+      const body = {
+        content: messageForAI,
+        role: "user",
+      };
+      // Pass project_id for KB context if in project mode
+      if (chatMode === "project" && currentProjectId) {
+        body.project_id = currentProjectId;
+      }
       await apiFetch(`/api/conversations/${conversationId}/messages`, {
         method: "POST",
-        body: {
-          content: messageForAI,
-          role: "user",
-        },
+        body,
       });
 
       // Reload messages to get the full conversation including AI response
@@ -511,62 +519,71 @@ export default function LLMDashboard() {
   };
 
   const handleKBUpload = async (files, onProgress) => {
-    if (!currentProjectId) {
-      throw new Error('No project selected');
-    }
+  if (!currentProjectId) {
+    throw new Error('No project selected');
+  }
 
-    let uploadedCount = 0;
-    const uploadedDocuments = [];
+  let uploadedCount = 0;
+  const uploadedDocuments = [];
 
-    // Upload each file to the project
-    for (const file of files) {
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('project_id', currentProjectId.toString());
-        
-        // Don't attach to a specific conversation - these are project-level documents
-        const uploadData = await apiFetch('/api/documents', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (uploadData.success && uploadData.document) {
-          uploadedDocuments.push(uploadData.document);
-          uploadedCount++;
-          onProgress(uploadedCount);
-        }
-      } catch (err) {
-        console.error(`Failed to upload ${file.name}:`, err);
-        throw new Error(`Failed to upload ${file.name}: ${err.message || 'Unknown error'}`);
-      }
-    }
-
-    // After all files are uploaded, trigger KB build
+  // Upload each file to the project
+  for (const file of files) {
     try {
-      setKBUploadStatus('Building Knowledge Base...');
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('project_id', currentProjectId.toString());
       
-      const buildResponse = await apiFetch(`/api/projects/${currentProjectId}/kb/build`, {
+      const uploadData = await apiFetch('/api/documents', {
         method: 'POST',
+        body: formData,
       });
 
-      setKBUploadStatus('Knowledge Base build started successfully!');
+      if (uploadData.success && uploadData.document) {
+        uploadedDocuments.push(uploadData.document);
+        uploadedCount++;
+        onProgress(uploadedCount);
+      }
+    } catch (err) {
+      console.error(`Failed to upload ${file.name}:`, err);
+      throw new Error(`Failed to upload ${file.name}: ${err.message || 'Unknown error'}`);
+    }
+  }
+
+  // After all files are uploaded, trigger KB build
+  try {
+    setKBUploadStatus('Building Knowledge Base...');
+    
+    const buildResponse = await apiFetch(`/api/projects/${currentProjectId}/kb/build`, {
+      method: 'POST',
+    });
+
+    setKBUploadStatus('Knowledge Base build started successfully!');
+    setError(null);
+    
+    setTimeout(() => {
+      setKBUploadStatus(null);
+    }, 3000);
+    
+  } catch (err) {
+    console.error('Failed to build KB:', err);
+    
+    // Handle 409 specifically - KB already building
+    if (err.status === 409) {
+      setKBUploadStatus('Documents uploaded. Knowledge Base is already building.');
+      setError(null); // Don't show as error
       
-      // Show success message
-      setError(null);
       setTimeout(() => {
         setKBUploadStatus(null);
       }, 3000);
-      
-    } catch (err) {
-      console.error('Failed to build KB:', err);
+    } else {
       setError('Documents uploaded but KB build failed. Please try building manually.');
       throw new Error('Failed to build Knowledge Base');
     }
-  };
+  }
+};
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 relative">
       {/* Sidebar */}
       <Sidebar
         isSidebarOpen={isSidebarOpen}
@@ -614,6 +631,7 @@ export default function LLMDashboard() {
         currentProject={currentProject}
         onSwitchToNormalMode={switchToNormalMode}
         onOpenKBUpload={openKBUpload}
+        onToggleRequirements={() => setShowRequirements(v => !v)}
       />
 
       {/* File Upload Modal */}
@@ -636,6 +654,13 @@ export default function LLMDashboard() {
         />
       )}
       
+      {/* RequirementsViewer Slide-in */}
+      {showRequirements && currentProjectId && (
+        <RequirementsViewer
+          projectId={currentProjectId}
+          onClose={() => setShowRequirements(false)}
+        />
+      )}
       {/* Hidden div for scrolling */}
       <div ref={messagesEndRef} />
     </div>

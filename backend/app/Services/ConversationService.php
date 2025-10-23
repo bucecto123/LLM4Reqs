@@ -23,7 +23,7 @@ class ConversationService
     public function createConversation($data)
     {
         return Conversation::create([
-            'project_id' => $data['project_id'] ?? null, // Allow null for normal chat workflow
+            'project_id' => $data['project_id'] ?? null,
             'user_id' => Auth::id(),
             'requirement_id' => $data['requirement_id'] ?? null,
             'title' => $data['title'] ?? null,
@@ -44,23 +44,20 @@ class ConversationService
         }
 
         // Separate display message from AI context message
-        // If the message contains document contents, extract just the user's actual message for storage
         $displayMessage = $messageData['content'];
         $aiContextMessage = $messageData['content'];
 
-        // Check if message contains document contents (typical pattern)
+        // Check if message contains document contents
         if (strpos($displayMessage, "\n\nUploaded document contents:\n\n") !== false) {
-            // Extract just the user's message part (before document contents)
             $parts = explode("\n\nUploaded document contents:\n\n", $displayMessage, 2);
             $displayMessage = trim($parts[0]);
             
-            // If the user's message is empty, provide a default message
             if (empty($displayMessage)) {
                 $displayMessage = "📎 Uploaded documents for analysis";
             }
         }
 
-        // Save only the clean display message (without document contents)
+        // Save only the clean display message
         $userMessageData = $messageData;
         $userMessageData['content'] = $displayMessage;
         $userMessage = $this->saveMessage($conversationId, $userMessageData);
@@ -72,17 +69,16 @@ class ConversationService
                     ->where('content', '!=', '');
         }])->findOrFail($conversationId);
 
-        // Get conversation history for context
+        // Get conversation history
         $messages = $this->getMessages($conversationId);
             
-        // Prepare conversation history for LLM (limit to last 6 messages to save tokens)
+        // Prepare conversation history for LLM
         $history = [];
         $recentMessages = $messages->take(-6);
         foreach ($recentMessages as $msg) {
             if ($msg->role && $msg->content) {
-                // Clean and truncate individual messages if they're too long
                 $content = $this->textCommons->cleanUtf8Content($msg->content);
-                if (strlen($content) > 2000) { // Limit individual messages
+                if (strlen($content) > 2000) {
                     $content = mb_substr($content, 0, 2000, 'UTF-8') . '... [message truncated]';
                 }
                 
@@ -93,33 +89,59 @@ class ConversationService
             }
         }
             
-        // Build context from uploaded documents with token management
         $documentContext = '';
         $kbContext = '';
         
-        // NEW: Check if conversation has a project with ready KB
+        // Check if conversation has a project with ready KB
         if ($conversation->project_id) {
             $kb = KnowledgeBase::where('project_id', $conversation->project_id)->first();
             
             if ($kb && $kb->isReady()) {
                 try {
+                    Log::info('Querying KB for context', [
+                        'conversation_id' => $conversationId,
+                        'project_id' => $conversation->project_id,
+                        'query' => mb_substr($displayMessage, 0, 100)
+                    ]);
+                    
                     // Query KB for relevant chunks
                     $kbResults = $this->llmService->queryKB($conversation->project_id, $displayMessage, 5);
                     
-                    if (!empty($kbResults['results'])) {
+                    Log::info('KB query results', [
+                        'results_count' => count($kbResults['results'] ?? []),
+                        'raw_response' => $kbResults
+                    ]);
+                    
+                    if (!empty($kbResults['results']) && is_array($kbResults['results'])) {
                         $kbContext = "\n\n=== KNOWLEDGE BASE CONTEXT (Relevant Requirements) ===\n";
                         
                         foreach ($kbResults['results'] as $index => $result) {
                             $score = $kbResults['scores'][$index] ?? 0;
+                            
+                            // Handle result format - could be string or array
+                            if (is_array($result)) {
+                                $content = $result['content'] ?? $result['text'] ?? json_encode($result);
+                                $metadata = $result['metadata'] ?? $result['meta'] ?? [];
+                            } else {
+                                $content = (string)$result;
+                                $metadata = [];
+                            }
+                            
                             $kbContext .= sprintf(
-                                "\n[Relevance: %.2f] %s\n",
+                                "\n[Chunk %d - Relevance: %.2f]\n%s\n",
+                                $index + 1,
                                 $score,
-                                $result['content']
+                                $content
                             );
                             
                             // Add metadata if available
-                            if (!empty($result['metadata'])) {
-                                $kbContext .= "  Type: " . ($result['metadata']['type'] ?? 'N/A') . "\n";
+                            if (!empty($metadata)) {
+                                if (isset($metadata['filename'])) {
+                                    $kbContext .= "  Source: " . $metadata['filename'] . "\n";
+                                }
+                                if (isset($metadata['type'])) {
+                                    $kbContext .= "  Type: " . $metadata['type'] . "\n";
+                                }
                             }
                         }
                         
@@ -129,14 +151,26 @@ class ConversationService
                             'conversation_id' => $conversationId,
                             'project_id' => $conversation->project_id,
                             'chunks_found' => count($kbResults['results']),
+                            'context_length' => strlen($kbContext)
+                        ]);
+                    } else {
+                        Log::warning('KB query returned no results', [
+                            'conversation_id' => $conversationId,
+                            'project_id' => $conversation->project_id
                         ]);
                     }
                 } catch (\Exception $e) {
                     Log::warning('Failed to query KB, falling back to document context', [
                         'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
                         'project_id' => $conversation->project_id,
                     ]);
                 }
+            } else {
+                Log::info('KB not ready for project', [
+                    'project_id' => $conversation->project_id,
+                    'kb_status' => $kb ? $kb->status : 'not_found'
+                ]);
             }
         }
         
@@ -144,28 +178,25 @@ class ConversationService
         if (empty($kbContext) && $conversation->documents->count() > 0) {
             $documentContext = "\n\n=== UPLOADED DOCUMENTS CONTEXT ===\n";
             $totalTokens = 0;
-            $maxDocumentTokens = 6000; // Reserve tokens for document context (roughly 4500 words)
+            $maxDocumentTokens = 6000;
             
             foreach ($conversation->documents as $document) {
                 $fileHeader = "\n--- File: {$document->original_filename} ---\n";
                 $content = $document->content ?? '';
                 
-                // Clean content to prevent encoding issues
                 $content = $this->textCommons->cleanUtf8Content($content);
                 
-                // Estimate tokens (rough approximation: 1 token ≈ 0.75 words, 1 word ≈ 4 characters)
                 $headerTokens = strlen($fileHeader) / 3;
                 $contentTokens = strlen($content) / 3;
                 
                 if ($totalTokens + $headerTokens + $contentTokens > $maxDocumentTokens) {
-                    // Truncate content to fit within limit
                     $remainingTokens = $maxDocumentTokens - $totalTokens - $headerTokens;
-                    if ($remainingTokens > 100) { // Only add if we have reasonable space left
+                    if ($remainingTokens > 100) {
                         $truncatedLength = (int)($remainingTokens * 3);
                         $content = mb_substr($content, 0, $truncatedLength, 'UTF-8') . "\n... [Content truncated to fit token limits] ...";
                         $documentContext .= $fileHeader . $content . "\n";
                     }
-                    break; // Stop adding more documents
+                    break;
                 } else {
                     $documentContext .= $fileHeader . $content . "\n";
                     $totalTokens += $headerTokens + $contentTokens;
@@ -184,14 +215,14 @@ class ConversationService
             $enhancedContext .= ' The user has uploaded documents in this conversation. Use the document contents provided in the context to answer questions and provide relevant assistance.' . $documentContext;
         }
 
-        // Get AI response from LLM service using the full context message
+        // Get AI response from LLM service
         $llmResponse = $this->llmService->chat(
             $aiContextMessage, 
             $history,
             $enhancedContext
         );
 
-        // Save the AI response (clean the content first)
+        // Save the AI response
         $aiMessage = $this->saveMessage($conversationId, [
             'content' => $this->textCommons->cleanUtf8Content($llmResponse['response']),
             'role' => 'assistant',
