@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ProjectRequest;
 use App\Models\Project;
+use App\Models\Requirement;
 use App\Services\ProjectService;
+use Illuminate\Support\Facades\Log;
 
 class ProjectController extends Controller
 {
@@ -63,44 +65,119 @@ class ProjectController extends Controller
 
     public function getRequirements(string $projectId)
     {
-        $project = Project::findOrFail($projectId);
+        try {
+            // First verify the project exists
+            $project = Project::findOrFail($projectId);
+            
+            // Debug project and requirements existence
+            Log::info('Project and Requirements Check', [
+                'project_id' => $project->id,
+                'project_name' => $project->name,
+                'direct_requirements_count' => Requirement::where('project_id', $project->id)->count(),
+                'relationship_requirements_count' => $project->requirements()->count(),
+                'has_requirements_relation' => method_exists($project, 'requirements'),
+            ]);
+            
+            // Start building the query
+            $query = Requirement::where('project_id', $project->id)
+                              ->with('document');
+            
+            // Log the initial query state
+            Log::info('Initial Requirements Query', [
+                'sql' => $query->toSql(),
+                'bindings' => $query->getBindings(),
+                'count' => $query->count(),
+                'raw_results' => $query->get(['id', 'title', 'requirement_type'])->toArray()
+            ]);
         
-        // Get requirements with pagination and filters
-        $query = $project->requirements()->with(['document']);
-        
-        // Apply filters if provided
-        if (request()->has('type')) {
-            $query->where('requirement_type', request('type'));
+            // Apply filters if provided
+            if (request()->has('type')) {
+                $query->where('requirement_type', request('type'));
+            }
+            
+            if (request()->has('priority')) {
+                $query->where('priority', request('priority'));
+            }
+            
+            if (request()->has('status')) {
+                $query->where('status', request('status'));
+            }
+            
+            // Search by text
+            if (request()->has('search')) {
+                $search = request('search');
+                $query->where(function($q) use ($search) {
+                    $q->where('title', 'like', "%{$search}%")
+                      ->orWhere('requirement_text', 'like', "%{$search}%");
+                });
+            }
+            
+            // Debug after filters
+            Log::info('After applying filters', [
+                'sql' => $query->toSql(),
+                'bindings' => $query->getBindings(),
+                'count' => $query->count()
+            ]);
+            
+            // Order by
+            $orderBy = request('order_by', 'created_at');
+            $orderDir = request('order_dir', 'desc');
+            $query->orderBy($orderBy, $orderDir);
+
+            // Check for and include soft deleted items if requested
+            if (request('with_trashed', false)) {
+                $query->withTrashed();
+            }
+            
+            // Get paginated results
+            $perPage = request('per_page', 15);
+            $requirements = $query->paginate($perPage);
+            
+            // Get final counts for active and deleted items
+            $totalCount = $requirements->total();
+            $activeCount = $query->withoutTrashed()->count();
+            $deletedCount = $totalCount - $activeCount;
+            
+            Log::info('Final counts', [
+                'project_id' => $projectId,
+                'total_count' => $totalCount,
+                'active_count' => $activeCount,
+                'deleted_count' => $deletedCount,
+                'items_in_page' => count($requirements->items())
+            ]);
+            
+            $response = [
+                'success' => true,
+                'data' => $requirements->items(),
+                'total' => $totalCount,
+                'per_page' => $requirements->perPage(),
+                'current_page' => $requirements->currentPage(),
+                'last_page' => $requirements->lastPage(),
+                'meta' => [
+                    'active_count' => $activeCount,
+                    'deleted_count' => $deletedCount
+                ]
+            ];
+            
+            Log::info('Sending response', [
+                'data_count' => count($response['data']),
+                'total' => $response['total']
+            ]);
+            
+            return response()->json($response);
+            
+        } catch (\Exception $e) {
+            Log::error('Error in getRequirements', [
+                'project_id' => $projectId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch requirements: ' . $e->getMessage()
+            ], 500);
         }
-        
-        if (request()->has('priority')) {
-            $query->where('priority', request('priority'));
-        }
-        
-        if (request()->has('status')) {
-            $query->where('status', request('status'));
-        }
-        
-        // Search by text
-        if (request()->has('search')) {
-            $search = request('search');
-            $query->where(function($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('requirement_text', 'like', "%{$search}%")
-                  ->orWhere('content', 'like', "%{$search}%");
-            });
-        }
-        
-        // Order by
-        $orderBy = request('order_by', 'created_at');
-        $orderDir = request('order_dir', 'desc');
-        $query->orderBy($orderBy, $orderDir);
-        
-        // Paginate
-        $perPage = request('per_page', 15);
-        $requirements = $query->paginate($perPage);
-        
-        return response()->json($requirements);
     }
 
     /**

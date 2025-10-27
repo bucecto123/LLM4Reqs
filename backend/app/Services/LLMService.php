@@ -33,10 +33,12 @@ class LLMService
     public function extractRequirements(string $text, string $documentType = 'meeting_notes'): array
     {
         try {
-            $response = Http::timeout(90)->post("{$this->baseUrl}/api/extract", [
-                'text' => $text,
-                'document_type' => $documentType,
-            ]);
+            $response = Http::withHeaders($this->getHeaders())
+                ->timeout(90)
+                ->post("{$this->baseUrl}/api/extract", [
+                    'text' => $text,
+                    'document_type' => $documentType,
+                ]);
 
             if ($response->successful()) {
                 return $response->json();

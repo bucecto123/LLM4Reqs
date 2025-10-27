@@ -12,6 +12,7 @@ use App\Utils\TextCommons;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class DocumentController extends Controller
@@ -30,14 +31,23 @@ class DocumentController extends Controller
      */
     public function upload(Request $request)
     {
+        Log::info('Document upload request received', [
+            'has_file' => $request->hasFile('file'),
+            'project_id' => $request->input('project_id'),
+            'conversation_id' => $request->input('conversation_id')
+        ]);
+
         // Validate the request
         $validator = Validator::make($request->all(), [
-            'file' => 'required|file|max:10240|mimes:pdf,doc,docx,txt,md', // 10MB max
-            'project_id' => 'nullable|exists:projects,id', // Allow null for normal chat mode
+            'file' => 'required|file|max:10240|mimes:pdf,doc,docx,txt,md',
+            'project_id' => 'required|exists:projects,id',
             'conversation_id' => 'nullable|exists:conversations,id'
         ]);
 
         if ($validator->fails()) {
+            Log::error('Document upload validation failed', [
+                'errors' => $validator->errors()->toArray()
+            ]);
             return response()->json([
                 'success' => false,
                 'errors' => $validator->errors()
@@ -49,15 +59,31 @@ class DocumentController extends Controller
             $projectId = $request->input('project_id');
             $conversationId = $request->input('conversation_id');
             
-            // Generate unique filename
             $originalName = $file->getClientOriginalName();
             $filename = Str::random(40) . '.' . $file->getClientOriginalExtension();
             
-            // Store file in storage/app/documents
+            Log::info('Processing file upload', [
+                'original_name' => $originalName,
+                'generated_filename' => $filename,
+                'size' => $file->getSize(),
+                'mime_type' => $file->getClientMimeType()
+            ]);
+            
+            // Store file
             $filePath = $file->storeAs('documents', $filename);
             
-            // Extract content from file based on type
+            Log::info('File stored', ['path' => $filePath]);
+            
+            // Extract content
             $content = $this->extractContentFromFile($file);
+            
+            Log::info('Content extracted', [
+                'content_length' => mb_strlen($content, 'UTF-8'),
+                'content_preview' => mb_substr($content, 0, 200, 'UTF-8') . '...'
+            ]);
+            
+            // Validate project
+            $project = Project::findOrFail($projectId);
             
             // Create document record
             $document = Document::create([
@@ -67,19 +93,36 @@ class DocumentController extends Controller
                 'filename' => $filename,
                 'original_filename' => $originalName,
                 'file_path' => $filePath,
-                'content' => $content, // Content is already cleaned by extractContentFromFile
+                'content' => $content,
                 'file_size' => $file->getSize(),
                 'file_type' => $file->getClientMimeType(),
-                'status' => 'uploaded'
+                'status' => 'pending'
+            ]);
+
+            Log::info('Document record created', [
+                'document_id' => $document->id,
+                'project_id' => $document->project_id
+            ]);
+
+            // Dispatch processing job
+            ProcessDocumentJob::dispatch($document->id);
+            
+            Log::info('ProcessDocumentJob dispatched', [
+                'document_id' => $document->id
             ]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Document uploaded successfully',
-                'document' => $document
+                'message' => 'Document uploaded successfully and queued for processing',
+                'document' => $document->load('project')
             ], 201);
 
         } catch (\Exception $e) {
+            Log::error('Document upload failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to upload document: ' . $e->getMessage()
@@ -95,32 +138,58 @@ class DocumentController extends Controller
         $mimeType = $file->getClientMimeType();
         $tempPath = $file->getPathname();
 
+        Log::info('Extracting content from file', [
+            'mime_type' => $mimeType,
+            'original_name' => $file->getClientOriginalName()
+        ]);
+
         try {
             $content = '';
             switch ($mimeType) {
                 case 'text/plain':
                 case 'text/markdown':
                     $content = file_get_contents($tempPath);
+                    Log::info('Extracted text/markdown content', [
+                        'length' => strlen($content)
+                    ]);
                     break;
                 
                 case 'application/pdf':
                     $content = $this->extractPdfContent($tempPath);
+                    Log::info('Extracted PDF content', [
+                        'length' => strlen($content)
+                    ]);
                     break;
                 
                 case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
                 case 'application/msword':
                     $content = $this->extractDocxContent($tempPath);
+                    Log::info('Extracted DOCX content', [
+                        'length' => strlen($content)
+                    ]);
                     break;
                 
                 default:
-                    return '';
+                    Log::warning('Unsupported file type', ['mime_type' => $mimeType]);
+                    return 'Unsupported file type for content extraction: ' . $mimeType;
             }
             
             // Clean and validate UTF-8 encoding
-            return $this->textCommons->cleanUtf8Content($content);
+            $cleaned = $this->textCommons->cleanUtf8Content($content);
+            
+            Log::info('Content cleaned', [
+                'original_length' => strlen($content),
+                'cleaned_length' => strlen($cleaned)
+            ]);
+            
+            return $cleaned;
+            
         } catch (\Exception $e) {
-            // If extraction fails, return empty content
-            return '';
+            Log::error('Content extraction failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return 'Error extracting content: ' . $e->getMessage();
         }
     }
 
@@ -130,23 +199,23 @@ class DocumentController extends Controller
     private function extractPdfContent($filePath)
     {
         try {
-            // First try using smalot/pdfparser if available
             if (class_exists('Smalot\PdfParser\Parser')) {
                 $parser = new \Smalot\PdfParser\Parser();
                 $pdf = $parser->parseFile($filePath);
                 $text = $pdf->getText();
                 
-                // Clean up the extracted text
                 $text = trim($text);
-                $text = preg_replace('/\s+/', ' ', $text); // Replace multiple spaces with single space
+                $text = preg_replace('/\s+/', ' ', $text);
                 
-                return $text ?: "No readable text found in PDF file.";
+                return $text ?: "PDF processed but no readable text found.";
             }
             
-            // Fallback: Return a placeholder message indicating manual processing needed
-            return "PDF file uploaded. Text extraction requires manual processing or additional PDF parsing library. File: " . basename($filePath);
+            return "PDF file uploaded. Text extraction requires pdfparser library. Please install: composer require smalot/pdfparser";
         } catch (\Exception $e) {
-            return "Error processing PDF file: " . $e->getMessage() . ". Manual processing may be required.";
+            Log::error('PDF extraction failed', [
+                'error' => $e->getMessage()
+            ]);
+            return "Error processing PDF: " . $e->getMessage();
         }
     }
 
@@ -156,20 +225,17 @@ class DocumentController extends Controller
     private function extractDocxContent($filePath)
     {
         try {
-            // Basic DOCX content extraction using ZIP and XML parsing
             $zip = new \ZipArchive();
             if ($zip->open($filePath) === TRUE) {
                 $xml = $zip->getFromName('word/document.xml');
                 $zip->close();
                 
                 if ($xml !== false) {
-                    // Parse XML to extract text
                     $dom = new \DOMDocument();
                     libxml_use_internal_errors(true);
                     $dom->loadXML($xml);
                     libxml_clear_errors();
                     
-                    // Extract text content from w:t elements
                     $xpath = new \DOMXPath($dom);
                     $textNodes = $xpath->query('//w:t');
                     
@@ -178,12 +244,15 @@ class DocumentController extends Controller
                         $content .= $textNode->textContent . ' ';
                     }
                     
-                    return trim($content) ?: "No readable text found in DOCX file.";
+                    return trim($content) ?: "DOCX processed but no readable text found.";
                 }
             }
             
             return "Unable to extract text from DOCX file.";
         } catch (\Exception $e) {
+            Log::error('DOCX extraction failed', [
+                'error' => $e->getMessage()
+            ]);
             return "Error extracting DOCX content: " . $e->getMessage();
         }
     }
@@ -193,14 +262,23 @@ class DocumentController extends Controller
      */
     public function getProjectDocuments(Request $request, $projectId)
     {
-        // Validate project exists
         $project = Project::findOrFail($projectId);
         
         try {
             $documents = Document::where('project_id', $projectId)
-                ->with('user:id,name')
+                ->with(['user:id,name'])
                 ->orderBy('created_at', 'desc')
                 ->get();
+
+            // Add requirement counts for each document
+            $documents->each(function ($doc) {
+                $doc->requirements_count = Requirement::where('document_id', $doc->id)->count();
+            });
+
+            Log::info('Retrieved project documents', [
+                'project_id' => $projectId,
+                'count' => $documents->count()
+            ]);
 
             return response()->json([
                 'success' => true,
@@ -208,6 +286,11 @@ class DocumentController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            Log::error('Failed to retrieve documents', [
+                'project_id' => $projectId,
+                'error' => $e->getMessage()
+            ]);
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve documents: ' . $e->getMessage()
@@ -216,23 +299,34 @@ class DocumentController extends Controller
     }
 
     /**
-     * Enqueue document processing and return job id
+     * Trigger document processing manually
      */
     public function processDocument(Request $request, $documentId)
     {
         $document = Document::findOrFail($documentId);
 
+        Log::info('Manual document processing triggered', [
+            'document_id' => $documentId,
+            'current_status' => $document->status,
+            'has_content' => !empty($document->content)
+        ]);
+
         if (empty($document->content)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Document has no text content'
+                'message' => 'Document has no text content to process'
             ], 400);
         }
 
-        // Dispatch job and return a stable job id (using job uniqueId)
+        // Dispatch job
         $job = new ProcessDocumentJob($document->id);
         $jobId = $job->uniqueId();
         dispatch($job);
+
+        Log::info('Document processing job dispatched', [
+            'document_id' => $document->id,
+            'job_id' => $jobId
+        ]);
 
         return response()->json([
             'success' => true,

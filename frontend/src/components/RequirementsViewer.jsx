@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../utils/auth.js';
 
-export default function RequirementsViewer({ projectId, onClose }) {
+export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
   const [requirements, setRequirements] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -13,7 +13,7 @@ export default function RequirementsViewer({ projectId, onClose }) {
   useEffect(() => {
     fetchRequirements();
     // eslint-disable-next-line
-  }, [projectId, filters, page]);
+  }, [projectId, filters, page, refreshKey]);
 
   const fetchRequirements = async () => {
     setIsLoading(true);
@@ -26,11 +26,22 @@ export default function RequirementsViewer({ projectId, onClose }) {
         per_page: 10,
         page,
       });
-      const data = await apiFetch(`/api/projects/${projectId}/requirements?${params}`);
-      setRequirements(data.data || []);
-      setTotalPages(data.last_page || 1);
+      const response = await apiFetch(`/api/projects/${projectId}/requirements?${params}`);
+      console.log('Requirements response:', response); // Debug log
+      
+      if (!response || response.success === false) {
+        throw new Error(response?.message || 'Failed to fetch requirements');
+      }
+
+      // Ensure we're always using the data array from the response
+      const requirementsData = response.data || [];
+      console.log('Requirements data:', requirementsData); // Debug log
+      
+      setRequirements(requirementsData);
+      setTotalPages(response.last_page || 1);
     } catch (err) {
-      setError('Failed to load requirements.');
+      console.error('Failed to load requirements:', err);
+      setError(err.message || 'Failed to load requirements.');
     } finally {
       setIsLoading(false);
     }

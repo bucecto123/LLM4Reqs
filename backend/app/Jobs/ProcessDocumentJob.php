@@ -19,89 +19,104 @@ class ProcessDocumentJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /**
-     * The document ID to process.
-     */
     public int $documentId;
-
-    /**
-     * Number of attempts for the job.
-     */
     public int $tries = 3;
-
-    /**
-     * Backoff between retries in seconds.
-     * @var array<int>
-     */
     public array $backoff = [10, 30, 90];
-
-    /**
-     * Timeout for the job execution in seconds.
-     */
     public int $timeout = 180;
 
-    /**
-     * Create a new job instance.
-     */
     public function __construct(int $documentId)
     {
         $this->documentId = $documentId;
     }
 
-    /**
-     * Unique job identifier to prevent concurrent processing of the same document.
-     */
     public function uniqueId(): string
     {
         return 'process_document_' . $this->documentId;
     }
 
-    /**
-     * Execute the job.
-     */
     public function handle(LLMService $llmService, TextCommons $textCommons): void
     {
         $document = Document::find($this->documentId);
 
         if (!$document) {
             Log::warning('ProcessDocumentJob: Document not found', ['document_id' => $this->documentId]);
-            return; // Nothing to do
+            return;
         }
 
-        // Idempotency: if already processed and has extracted requirements, skip
+        Log::info('ProcessDocumentJob: Starting processing', [
+            'document_id' => $document->id,
+            'project_id' => $document->project_id,
+            'filename' => $document->original_filename,
+            'content_length' => mb_strlen($document->content ?? '', 'UTF-8')
+        ]);
+
+        // Check if already processed with requirements
         $existingCount = Requirement::where('document_id', $document->id)
             ->where('source', 'extracted')
             ->count();
+            
         if ($document->status === 'processed' && $existingCount > 0) {
-            Log::info('ProcessDocumentJob: Document already processed, skipping', ['document_id' => $document->id]);
+            Log::info('ProcessDocumentJob: Document already processed, skipping', [
+                'document_id' => $document->id,
+                'existing_requirements' => $existingCount
+            ]);
             return;
         }
 
         if (empty($document->content)) {
-            // Mark as failed due to empty content
+            Log::error('ProcessDocumentJob: Document has no content', [
+                'document_id' => $document->id,
+                'filename' => $document->original_filename
+            ]);
             $document->update(['status' => 'failed']);
-            Log::warning('ProcessDocumentJob: Document has no content', ['document_id' => $document->id]);
             return;
         }
 
         try {
-            // Pre-mark as processing
+            // Mark as processing
             $document->update(['status' => 'processing']);
 
-            // Clean and truncate content to keep request size reasonable
+            // Clean and prepare content
             $content = $textCommons->cleanUtf8Content((string)($document->content ?? ''));
-            if (mb_strlen($content, 'UTF-8') > 8000) {
-                $content = mb_substr($content, 0, 8000, 'UTF-8') . "\n... [Document truncated for processing]";
+            
+            Log::info('ProcessDocumentJob: Content prepared', [
+                'document_id' => $document->id,
+                'original_length' => mb_strlen($document->content ?? '', 'UTF-8'),
+                'cleaned_length' => mb_strlen($content, 'UTF-8')
+            ]);
+
+            // Truncate if too long (keep more content for better extraction)
+            if (mb_strlen($content, 'UTF-8') > 12000) {
+                $content = mb_substr($content, 0, 12000, 'UTF-8') . "\n... [Document truncated for processing]";
+                Log::info('ProcessDocumentJob: Content truncated', [
+                    'document_id' => $document->id,
+                    'final_length' => mb_strlen($content, 'UTF-8')
+                ]);
             }
 
-            // Call LLM service
+            // Call LLM service to extract requirements
+            Log::info('ProcessDocumentJob: Calling LLM service', [
+                'document_id' => $document->id,
+                'service_url' => config('services.llm.url')
+            ]);
+
             $result = $llmService->extractRequirements(
                 $content,
                 (string)($document->file_type ?? 'text/plain')
             );
 
-            // If we want fresh extraction on re-run, clear previous extracted requirements
+            Log::info('ProcessDocumentJob: LLM extraction complete', [
+                'document_id' => $document->id,
+                'result_keys' => array_keys($result),
+                'requirements_count' => count($result['requirements'] ?? [])
+            ]);
+
+            // Clear previous extracted requirements if re-running
             if ($existingCount > 0) {
+                Log::info('ProcessDocumentJob: Clearing previous requirements', [
+                    'document_id' => $document->id,
+                    'count' => $existingCount
+                ]);
                 Requirement::where('document_id', $document->id)
                     ->where('source', 'extracted')
                     ->delete();
@@ -110,50 +125,128 @@ class ProcessDocumentJob implements ShouldQueue, ShouldBeUnique
             // Persist requirements
             $savedCount = 0;
             if (!empty($result['requirements']) && is_array($result['requirements'])) {
-                foreach ($result['requirements'] as $req) {
-                    // Be defensive about missing fields from LLM
-                    $requirement = Requirement::create([
-                        'project_id' => $document->project_id,
-                        'document_id' => $document->id,
-                        'title' => $req['title'] ?? null,
-                        'requirement_text' => $req['requirement_text'] ?? ($req['text'] ?? ''),
-                        'requirement_type' => $req['requirement_type'] ?? 'functional',
-                        'priority' => $req['priority'] ?? 'medium',
-                        'confidence_score' => $req['confidence_score'] ?? null,
-                        'source' => 'extracted',
-                        'status' => $req['status'] ?? 'draft',
-                    ]);
-                    if ($requirement) {
-                        $savedCount++;
+                Log::info('ProcessDocumentJob: Processing requirements', [
+                    'document_id' => $document->id,
+                    'count' => count($result['requirements'])
+                ]);
+                
+                foreach ($result['requirements'] as $index => $req) {
+                    try {
+                        // Extract requirement text with fallbacks
+                        $reqText = $req['requirement_text'] ?? 
+                                   $req['text'] ?? 
+                                   $req['content'] ?? 
+                                   null;
+                        
+                        if (empty($reqText)) {
+                            Log::warning('ProcessDocumentJob: Skipping requirement with no text', [
+                                'document_id' => $document->id,
+                                'index' => $index,
+                                'req_keys' => array_keys($req)
+                            ]);
+                            continue;
+                        }
+
+                        // Clean requirement text
+                        $reqText = trim($reqText);
+                        
+                        // Generate title from requirement text if not provided
+                        $title = $req['title'] ?? null;
+                        if (empty($title)) {
+                            $title = 'REQ-' . ($index + 1) . ': ' . 
+                                    (mb_strlen($reqText, 'UTF-8') > 50 
+                                        ? mb_substr($reqText, 0, 50, 'UTF-8') . '...'
+                                        : $reqText);
+                        }
+                        
+                        // Prepare requirement data
+                        $data = [
+                            'project_id' => $document->project_id,
+                            'document_id' => $document->id,
+                            'title' => $title,
+                            'requirement_text' => $reqText,
+                            'requirement_type' => $req['requirement_type'] ?? 
+                                                 $req['type'] ?? 
+                                                 'functional',
+                            'priority' => $req['priority'] ?? 'medium',
+                            'confidence_score' => floatval($req['confidence_score'] ?? 
+                                                          $req['confidence'] ?? 
+                                                          0.8),
+                            'source' => 'extracted',
+                            'status' => $req['status'] ?? 'draft',
+                        ];
+                        
+                        Log::info('ProcessDocumentJob: Creating requirement', [
+                            'document_id' => $document->id,
+                            'index' => $index,
+                            'title' => $data['title'],
+                            'type' => $data['requirement_type'],
+                            'priority' => $data['priority']
+                        ]);
+                        
+                        $requirement = Requirement::create($data);
+                        
+                        if ($requirement) {
+                            $savedCount++;
+                            Log::info('ProcessDocumentJob: Requirement created', [
+                                'document_id' => $document->id,
+                                'requirement_id' => $requirement->id,
+                                'project_id' => $requirement->project_id
+                            ]);
+                        }
+                    } catch (\Exception $e) {
+                        Log::error('ProcessDocumentJob: Failed to create requirement', [
+                            'document_id' => $document->id,
+                            'index' => $index,
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString()
+                        ]);
+                        // Continue with next requirement
                     }
                 }
+            } else {
+                Log::warning('ProcessDocumentJob: No requirements extracted', [
+                    'document_id' => $document->id,
+                    'result' => json_encode($result)
+                ]);
             }
 
             // Update document status
             $document->update([
-                'status' => 'processed',
+                'status' => $savedCount > 0 ? 'processed' : 'failed',
                 'processed_at' => now(),
             ]);
 
-            Log::info('ProcessDocumentJob: Document processed', [
+            Log::info('ProcessDocumentJob: Processing complete', [
                 'document_id' => $document->id,
+                'status' => $savedCount > 0 ? 'processed' : 'failed',
                 'saved_requirements' => $savedCount,
-                'total_extracted' => $result['total_extracted'] ?? $savedCount,
+                'total_extracted' => count($result['requirements'] ?? [])
             ]);
+
+            // If no requirements were saved, log detailed info
+            if ($savedCount === 0) {
+                Log::error('ProcessDocumentJob: No requirements saved!', [
+                    'document_id' => $document->id,
+                    'project_id' => $document->project_id,
+                    'llm_result' => json_encode($result),
+                    'content_preview' => mb_substr($content, 0, 500, 'UTF-8')
+                ]);
+            }
+
         } catch (Throwable $e) {
-            // Mark as failed and rethrow to allow retry based on tries/backoff
             $document->update(['status' => 'failed']);
+            
             Log::error('ProcessDocumentJob failed', [
-                'document_id' => $document->id ?? $this->documentId,
+                'document_id' => $document->id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
+            
             throw $e;
         }
     }
 
-    /**
-     * Called when the job has failed permanently.
-     */
     public function failed(Throwable $exception): void
     {
         try {
@@ -162,12 +255,13 @@ class ProcessDocumentJob implements ShouldQueue, ShouldBeUnique
                 $document->update(['status' => 'failed']);
             }
         } catch (Throwable $e) {
-            // Swallow any errors here to avoid cascading failures
+            // Swallow any errors here
         }
 
         Log::error('ProcessDocumentJob permanently failed', [
             'document_id' => $this->documentId,
             'error' => $exception->getMessage(),
+            'trace' => $exception->getTraceAsString()
         ]);
     }
 }

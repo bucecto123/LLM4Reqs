@@ -1,5 +1,13 @@
 # main.py - FastAPI Entry Point with Groq
-from fastapi import FastAPI, HTTPException, Header, UploadFile, File, BackgroundTasks, Depends
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    Header,
+    UploadFile,
+    File,
+    BackgroundTasks,
+    Depends,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
@@ -30,7 +38,7 @@ load_dotenv()
 app = FastAPI(
     title="AI Requirements Generation Service",
     description="LLM-powered requirement extraction and generation using Groq",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 # CORS configuration for Laravel
@@ -46,7 +54,9 @@ app.add_middleware(
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
     # Visible runtime warning to help developers during local development
-    print("WARNING: GROQ_API_KEY is not set. Groq calls will fail until you set this in your .env file.")
+    print(
+        "WARNING: GROQ_API_KEY is not set. Groq calls will fail until you set this in your .env file."
+    )
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 DEFAULT_MODEL = os.getenv("GROQ_MODEL", "moonshotai/kimi-k2-instruct-0905")
@@ -63,6 +73,7 @@ KB_MODEL = os.getenv("KB_MODEL", "all-MiniLM-L6-v2")
 _build_jobs: Dict[str, Dict[str, Any]] = {}
 _build_jobs_lock = asyncio.Lock()
 
+
 # RAG configuration (environment-controllable)
 def _clean_env(val: str):
     """Strip surrounding whitespace and quotes, return None for empty strings."""
@@ -70,7 +81,9 @@ def _clean_env(val: str):
         return None
     v = str(val).strip()
     # remove surrounding quotes if present
-    if (v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'")):
+    if (v.startswith('"') and v.endswith('"')) or (
+        v.startswith("'") and v.endswith("'")
+    ):
         v = v[1:-1]
     v = v.strip()
     if v == "":
@@ -80,27 +93,43 @@ def _clean_env(val: str):
 
 # Read and normalize env vars
 _raw_rag_enabled = _clean_env(os.getenv("RAG_ENABLED", "true"))
-RAG_ENABLED = str(_raw_rag_enabled).lower() in ("1", "true", "yes") if _raw_rag_enabled is not None else True
+RAG_ENABLED = (
+    str(_raw_rag_enabled).lower() in ("1", "true", "yes")
+    if _raw_rag_enabled is not None
+    else True
+)
 
-_raw_rag_index = _clean_env(os.getenv("RAG_INDEX_PATH", "llm/faiss_store/faiss_index.bin"))
-RAG_INDEX_PATH = os.path.normpath(_raw_rag_index) if _raw_rag_index else os.path.normpath("llm/faiss_store/faiss_index.bin")
+_raw_rag_index = _clean_env(
+    os.getenv("RAG_INDEX_PATH", "llm/faiss_store/faiss_index.bin")
+)
+RAG_INDEX_PATH = (
+    os.path.normpath(_raw_rag_index)
+    if _raw_rag_index
+    else os.path.normpath("llm/faiss_store/faiss_index.bin")
+)
+
 
 # If the env-provided value contains control characters (dotEnv may have unescaped sequences like \f -> formfeed),
 # try to read the raw .env file and parse the value without processing escapes.
 def _contains_control_chars(s: str) -> bool:
     return any(ord(c) < 32 for c in s) if s is not None else False
 
+
 if _contains_control_chars(_raw_rag_index):
     try:
-        with open(os.path.join(os.path.dirname(__file__), '.env'), 'r', encoding='utf-8') as fh:
+        with open(
+            os.path.join(os.path.dirname(__file__), ".env"), "r", encoding="utf-8"
+        ) as fh:
             for line in fh:
-                if line.strip().startswith('RAG_INDEX_PATH'):
+                if line.strip().startswith("RAG_INDEX_PATH"):
                     # split on first '=' and preserve backslashes literally
-                    parts = line.split('=', 1)
+                    parts = line.split("=", 1)
                     if len(parts) == 2:
                         raw_val = parts[1].strip()
                         # remove surrounding quotes if present
-                        if (raw_val.startswith('"') and raw_val.endswith('"')) or (raw_val.startswith("'") and raw_val.endswith("'")):
+                        if (raw_val.startswith('"') and raw_val.endswith('"')) or (
+                            raw_val.startswith("'") and raw_val.endswith("'")
+                        ):
                             raw_val = raw_val[1:-1]
                         raw_val = raw_val.strip()
                         if raw_val:
@@ -110,17 +139,25 @@ if _contains_control_chars(_raw_rag_index):
         print(f"Failed to parse raw .env for RAG_INDEX_PATH fallback: {e}")
 
 _raw_rag_meta = _clean_env(os.getenv("RAG_META_PATH", "llm/faiss_store/faiss_meta.pkl"))
-RAG_META_PATH = os.path.normpath(_raw_rag_meta) if _raw_rag_meta else os.path.normpath("llm/faiss_store/faiss_meta.pkl")
+RAG_META_PATH = (
+    os.path.normpath(_raw_rag_meta)
+    if _raw_rag_meta
+    else os.path.normpath("llm/faiss_store/faiss_meta.pkl")
+)
 
 if _contains_control_chars(_raw_rag_meta):
     try:
-        with open(os.path.join(os.path.dirname(__file__), '.env'), 'r', encoding='utf-8') as fh:
+        with open(
+            os.path.join(os.path.dirname(__file__), ".env"), "r", encoding="utf-8"
+        ) as fh:
             for line in fh:
-                if line.strip().startswith('RAG_META_PATH'):
-                    parts = line.split('=', 1)
+                if line.strip().startswith("RAG_META_PATH"):
+                    parts = line.split("=", 1)
                     if len(parts) == 2:
                         raw_val = parts[1].strip()
-                        if (raw_val.startswith('"') and raw_val.endswith('"')) or (raw_val.startswith("'") and raw_val.endswith("'")):
+                        if (raw_val.startswith('"') and raw_val.endswith('"')) or (
+                            raw_val.startswith("'") and raw_val.endswith("'")
+                        ):
                             raw_val = raw_val[1:-1]
                         raw_val = raw_val.strip()
                         if raw_val:
@@ -134,7 +171,10 @@ RAG_MODEL = _raw_rag_model or "all-MiniLM-L6-v2"
 RAG_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
 RAG_SIM_THRESHOLD = float(os.getenv("RAG_SIM_THRESHOLD", "0.35"))
 # comma-separated keywords that strongly signal RAG is needed
-RAG_KEYWORDS = os.getenv("RAG_KEYWORDS", "requirement,requirements,specification,standard,security,privacy,compliance,regulation,payment,billing").split(",")
+RAG_KEYWORDS = os.getenv(
+    "RAG_KEYWORDS",
+    "requirement,requirements,specification,standard,security,privacy,compliance,regulation,payment,billing",
+).split(",")
 
 # internal lazy-loaded artifacts
 _rag_manager = None
@@ -144,9 +184,11 @@ _rag_available = False
 
 # ==================== REQUEST/RESPONSE MODELS ====================
 
+
 class ChatMessage(BaseModel):
     role: str  # "user" or "assistant"
     content: str
+
 
 class ChatRequest(BaseModel):
     message: str
@@ -154,37 +196,46 @@ class ChatRequest(BaseModel):
     conversation_history: Optional[List[ChatMessage]] = None
     context: Optional[str] = None
 
+
 class ChatResponse(BaseModel):
     response: str
     tokens_used: int
     model: str
 
+
 class ExtractionRequest(BaseModel):
     text: str
     document_type: Optional[str] = "meeting_notes"
 
+
 class Requirement(BaseModel):
     requirement_text: str
+    title: Optional[str] = None  # Optional title field
     requirement_type: str  # functional, non-functional, constraint, assumption
     priority: str  # high, medium, low
     confidence_score: float
+
 
 class ExtractionResponse(BaseModel):
     requirements: List[Requirement]
     total_extracted: int
     tokens_used: int
 
+
 class PersonaGenerationRequest(BaseModel):
     requirement_text: str
     persona_name: str  # Developer, Business Analyst, Manager
     persona_prompt: str
 
+
 class PersonaGenerationResponse(BaseModel):
     persona_view: str
     tokens_used: int
 
+
 class ConflictDetectionRequest(BaseModel):
     requirements: List[Dict[str, Any]]
+
 
 class Conflict(BaseModel):
     requirement_id_1: int
@@ -192,22 +243,27 @@ class Conflict(BaseModel):
     conflict_description: str
     severity: str
 
+
 class ConflictDetectionResponse(BaseModel):
     conflicts: List[Conflict]
     total_conflicts: int
 
+
 # ==================== NEW KB API MODELS ====================
+
 
 class DocumentChunk(BaseModel):
     id: int
     text: str
     meta: Dict[str, Any] = {}
 
+
 class ProcessDocumentRequest(BaseModel):
     project_id: str
     document_content: Optional[str] = None
     document_url: Optional[str] = None
     document_type: Optional[str] = "requirements"
+
 
 class ProcessDocumentResponse(BaseModel):
     project_id: str
@@ -216,10 +272,12 @@ class ProcessDocumentResponse(BaseModel):
     total_chunks: int
     tokens_used: int
 
+
 class BuildKBRequest(BaseModel):
     project_id: str
     documents: List[Dict[str, Any]]  # List of {content: str, type: str, meta: dict}
     mode: str = Field(default="async", pattern="^(async|sync)$")
+
 
 class BuildKBResponse(BaseModel):
     project_id: str
@@ -229,9 +287,11 @@ class BuildKBResponse(BaseModel):
     index_path: Optional[str] = None
     total_chunks: Optional[int] = None
 
+
 class IncrementalKBRequest(BaseModel):
     project_id: str
     documents: List[Dict[str, Any]]
+
 
 class IncrementalKBResponse(BaseModel):
     project_id: str
@@ -240,16 +300,19 @@ class IncrementalKBResponse(BaseModel):
     added_chunks: int
     total_chunks: int
 
+
 class QueryKBRequest(BaseModel):
     project_id: str
     query: str
     top_k: int = Field(default=5, ge=1, le=20)
+
 
 class QueryKBResponse(BaseModel):
     project_id: str
     query: str
     results: List[Dict[str, Any]]
     total_results: int
+
 
 class KBStatusResponse(BaseModel):
     project_id: str
@@ -258,6 +321,7 @@ class KBStatusResponse(BaseModel):
     last_built_at: Optional[str]
     total_chunks: int
     error: Optional[str] = None
+
 
 # ==================== PROMPT TEMPLATES ====================
 
@@ -278,6 +342,7 @@ Return format (MUST be valid JSON):
   "requirements": [
     {{
       "requirement_text": "The system must...",
+      "title": "Brief descriptive title",  # Optional, can be generated from text if not provided
       "requirement_type": "functional",
       "priority": "high",
       "confidence_score": 0.95
@@ -329,16 +394,17 @@ If no conflicts found, return: {{"conflicts": []}}"""
 
 # ==================== HELPER FUNCTIONS ====================
 
+
 async def verify_api_key(api_key: str = Depends(api_key_header)):
     """Verify API key for protected endpoints."""
     if api_key != LLM_API_KEY:
-        raise HTTPException(
-            status_code=403,
-            detail="Invalid or missing API key"
-        )
+        raise HTTPException(status_code=403, detail="Invalid or missing API key")
     return api_key
 
-def call_groq_chat(messages: List[Dict], max_tokens: int = 1000, temperature: float = 0.7) -> tuple:
+
+def call_groq_chat(
+    messages: List[Dict], max_tokens: int = 1000, temperature: float = 0.7
+) -> tuple:
     """Call Groq API and return response + token usage"""
     try:
         chat_completion = groq_client.chat.completions.create(
@@ -347,10 +413,10 @@ def call_groq_chat(messages: List[Dict], max_tokens: int = 1000, temperature: fl
             max_tokens=max_tokens,
             temperature=temperature,
         )
-        
+
         content = chat_completion.choices[0].message.content
         tokens_used = chat_completion.usage.total_tokens
-        
+
         return content, tokens_used
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Groq API error: {str(e)}")
@@ -372,7 +438,9 @@ def _load_rag_artifacts() -> Tuple[bool, object, list]:
 
     try:
         _rag_manager = RagManager(model_name=RAG_MODEL)
-        _rag_index, _rag_chunks = _rag_manager.load_index_and_meta(RAG_INDEX_PATH, RAG_META_PATH)
+        _rag_index, _rag_chunks = _rag_manager.load_index_and_meta(
+            RAG_INDEX_PATH, RAG_META_PATH
+        )
         _rag_available = True
         return True, _rag_index, _rag_chunks
     except Exception as e:
@@ -407,7 +475,7 @@ def needs_rag(user_query: str, use_model: bool = True) -> bool:
             # use the rag manager to query top-1 and inspect score
             results = _rag_manager.query(user_query, index, chunks, top_k=1)
             if results and len(results) > 0:
-                top_score = results[0].get('score', 0.0)
+                top_score = results[0].get("score", 0.0)
                 return float(top_score) >= float(RAG_SIM_THRESHOLD)
         except Exception as e:
             print(f"RAG classification error: {e}")
@@ -420,12 +488,17 @@ def _build_rag_context_message(retrieved: list) -> str:
     """Format retrieved chunks into a single system message string."""
     if not retrieved:
         return ""
-    lines = ["Use the following retrieved context when helpful (do not fabricate answers):\n"]
+    lines = [
+        "Use the following retrieved context when helpful (do not fabricate answers):\n"
+    ]
     for i, item in enumerate(retrieved, start=1):
         # include score for debugging usefulness
-        lines.append(f"{i}. {item.get('text', '')} (score: {item.get('score', 0.0):.4f})")
-    lines.append('\nIf the context does not contain the answer, say so explicitly.')
+        lines.append(
+            f"{i}. {item.get('text', '')} (score: {item.get('score', 0.0):.4f})"
+        )
+    lines.append("\nIf the context does not contain the answer, say so explicitly.")
     return "\n".join(lines)
+
 
 def parse_json_response(content: str) -> Dict:
     """Parse JSON from LLM response, handling markdown code blocks"""
@@ -437,84 +510,82 @@ def parse_json_response(content: str) -> Dict:
         content = content[3:]
     if content.endswith("```"):
         content = content[:-3]
-    
+
     content = content.strip()
-    
+
     try:
         return json.loads(content)
     except json.JSONDecodeError as e:
         # Try to find JSON in the response
-        start = content.find('{')
-        end = content.rfind('}') + 1
+        start = content.find("{")
+        end = content.rfind("}") + 1
         if start != -1 and end > start:
             try:
                 return json.loads(content[start:end])
             except:
                 pass
         raise HTTPException(
-            status_code=500, 
-            detail=f"Failed to parse LLM response as JSON. Response: {content[:200]}"
+            status_code=500,
+            detail=f"Failed to parse LLM response as JSON. Response: {content[:200]}",
         )
+
 
 def _get_rag_manager():
     """Get or create a RagManager instance."""
     if RagManager is None:
         raise HTTPException(
             status_code=500,
-            detail="RAG dependencies not installed. Install sentence-transformers and faiss-cpu."
+            detail="RAG dependencies not installed. Install sentence-transformers and faiss-cpu.",
         )
     return RagManager(model_name=KB_MODEL)
+
 
 def _prepare_document_chunks(documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Convert documents to chunks format expected by RagManager."""
     chunks = []
     for idx, doc in enumerate(documents):
-        content = doc.get('content', '')
-        doc_type = doc.get('type', 'document')
-        meta = doc.get('meta', {})
-        
-        chunks.append({
-            'id': idx,
-            'text': content,
-            'meta': {
-                'type': doc_type,
-                **meta
-            }
-        })
+        content = doc.get("content", "")
+        doc_type = doc.get("type", "document")
+        meta = doc.get("meta", {})
+
+        chunks.append({"id": idx, "text": content, "meta": {"type": doc_type, **meta}})
     return chunks
+
 
 async def _build_kb_async(job_id: str, project_id: str, chunks: List[Dict[str, Any]]):
     """Background task to build knowledge base."""
     global _build_jobs
-    
+
     try:
         # Update job status
         async with _build_jobs_lock:
-            _build_jobs[job_id]['status'] = 'building'
-            _build_jobs[job_id]['started_at'] = datetime.utcnow().isoformat()
-        
+            _build_jobs[job_id]["status"] = "building"
+            _build_jobs[job_id]["started_at"] = datetime.utcnow().isoformat()
+
         # Build index
         result = build_index_for_project(
             project_id=project_id,
             chunks=chunks,
             base_dir=KB_BASE_DIR,
-            model_name=KB_MODEL
+            model_name=KB_MODEL,
         )
-        
+
         # Update job status
         async with _build_jobs_lock:
-            _build_jobs[job_id]['status'] = 'completed'
-            _build_jobs[job_id]['completed_at'] = datetime.utcnow().isoformat()
-            _build_jobs[job_id]['result'] = result
-            _build_jobs[job_id]['total_chunks'] = len(chunks)
-        
+            _build_jobs[job_id]["status"] = "completed"
+            _build_jobs[job_id]["completed_at"] = datetime.utcnow().isoformat()
+            _build_jobs[job_id]["result"] = result
+            _build_jobs[job_id]["total_chunks"] = len(chunks)
+
     except Exception as e:
         async with _build_jobs_lock:
-            _build_jobs[job_id]['status'] = 'failed'
-            _build_jobs[job_id]['error'] = str(e)
-            _build_jobs[job_id]['completed_at'] = datetime.utcnow().isoformat()
+            _build_jobs[job_id]["status"] = "failed"
+            _build_jobs[job_id]["error"] = str(e)
+            _build_jobs[job_id]["completed_at"] = datetime.utcnow().isoformat()
+
 
 # ==================== API ENDPOINTS ====================
+
 
 @app.get("/")
 def read_root():
@@ -522,23 +593,25 @@ def read_root():
         "service": "AI Requirements Generation Service (Groq)",
         "status": "running",
         "version": "1.0.0",
-        "model": DEFAULT_MODEL
+        "model": DEFAULT_MODEL,
     }
+
 
 @app.get("/health")
 def health_check():
     """Health check endpoint"""
     return {
-        "status": "healthy", 
+        "status": "healthy",
         "groq_configured": bool(os.getenv("GROQ_API_KEY")),
-        "model": DEFAULT_MODEL
+        "model": DEFAULT_MODEL,
     }
+
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """
     Chat endpoint for conversational AI
-    
+
     Usage:
     POST /api/chat
     {
@@ -552,14 +625,13 @@ async def chat(request: ChatRequest):
     """
     try:
         messages = [{"role": "system", "content": CHAT_SYSTEM_PROMPT}]
-        
+
         # Add context if provided
         if request.context:
-            messages.append({
-                "role": "system",
-                "content": f"Project Context: {request.context}"
-            })
-        
+            messages.append(
+                {"role": "system", "content": f"Project Context: {request.context}"}
+            )
+
         # Normalize conversation history (avoid None) and limit to last 10 messages to save tokens
         history = request.conversation_history or []
         for msg in history[-10:]:
@@ -573,7 +645,7 @@ async def chat(request: ChatRequest):
 
             if role and content:
                 messages.append({"role": role, "content": content})
-        
+
         # Add current message
         messages.append({"role": "user", "content": request.message})
 
@@ -589,7 +661,9 @@ async def chat(request: ChatRequest):
             avail, index, chunks = _load_rag_artifacts()
             if avail and _rag_manager is not None:
                 try:
-                    retrieved = _rag_manager.query(request.message, index, chunks, top_k=RAG_TOP_K)
+                    retrieved = _rag_manager.query(
+                        request.message, index, chunks, top_k=RAG_TOP_K
+                    )
                     rag_system = _build_rag_context_message(retrieved)
                     if rag_system:
                         # Prepend retrieved context as a system instruction to guide the model
@@ -599,21 +673,22 @@ async def chat(request: ChatRequest):
                     # continue without RAG
 
         # Call Groq
-        response_text, tokens_used = call_groq_chat(messages, max_tokens=2000, temperature=0.7)
-        
+        response_text, tokens_used = call_groq_chat(
+            messages, max_tokens=2000, temperature=0.7
+        )
+
         return ChatResponse(
-            response=response_text,
-            tokens_used=tokens_used,
-            model=DEFAULT_MODEL
+            response=response_text, tokens_used=tokens_used, model=DEFAULT_MODEL
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/api/extract", response_model=ExtractionResponse)
 async def extract_requirements(request: ExtractionRequest):
     """
     Extract requirements from text
-    
+
     Usage:
     POST /api/extract
     {
@@ -623,33 +698,39 @@ async def extract_requirements(request: ExtractionRequest):
     """
     try:
         prompt = EXTRACTION_PROMPT.format(text=request.text)
-        
+
         messages = [
-            {"role": "system", "content": "You are Fishy, a requirements extraction expert. Always return valid JSON."},
-            {"role": "user", "content": prompt}
+            {
+                "role": "system",
+                "content": "You are Fishy, a requirements extraction expert. Always return valid JSON.",
+            },
+            {"role": "user", "content": prompt},
         ]
-        
+
         # Use lower temperature for more consistent JSON output
-        response_text, tokens_used = call_groq_chat(messages, max_tokens=3000, temperature=0.3)
+        response_text, tokens_used = call_groq_chat(
+            messages, max_tokens=3000, temperature=0.3
+        )
         parsed_data = parse_json_response(response_text)
-        
+
         requirements = [
             Requirement(**req) for req in parsed_data.get("requirements", [])
         ]
-        
+
         return ExtractionResponse(
             requirements=requirements,
             total_extracted=len(requirements),
-            tokens_used=tokens_used
+            tokens_used=tokens_used,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/api/persona/generate", response_model=PersonaGenerationResponse)
 async def generate_persona_view(request: PersonaGenerationRequest):
     """
     Generate persona-specific view of a requirement
-    
+
     Usage:
     POST /api/persona/generate
     {
@@ -660,32 +741,33 @@ async def generate_persona_view(request: PersonaGenerationRequest):
     """
     try:
         prompt = PERSONA_PROMPT_TEMPLATE.format(
-            persona_name=request.persona_name,
-            requirement_text=request.requirement_text
+            persona_name=request.persona_name, requirement_text=request.requirement_text
         )
-        
+
         # Add persona-specific guidance
         system_prompt = f"You are a {request.persona_name} analyzing requirements. {request.persona_prompt}"
-        
+
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": prompt},
         ]
-        
-        response_text, tokens_used = call_groq_chat(messages, max_tokens=2000, temperature=0.7)
-        
+
+        response_text, tokens_used = call_groq_chat(
+            messages, max_tokens=2000, temperature=0.7
+        )
+
         return PersonaGenerationResponse(
-            persona_view=response_text,
-            tokens_used=tokens_used
+            persona_view=response_text, tokens_used=tokens_used
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/api/conflicts/detect", response_model=ConflictDetectionResponse)
 async def detect_conflicts(request: ConflictDetectionRequest):
     """
     Detect conflicts between requirements
-    
+
     Usage:
     POST /api/conflicts/detect
     {
@@ -697,39 +779,46 @@ async def detect_conflicts(request: ConflictDetectionRequest):
     """
     try:
         # Format requirements for prompt (use .get to be resilient to missing keys)
-        requirements_text = "\n".join([
-            f"ID {req.get('id')}: {req.get('text')}"
-            for req in request.requirements
-        ])
-        
+        requirements_text = "\n".join(
+            [f"ID {req.get('id')}: {req.get('text')}" for req in request.requirements]
+        )
+
         prompt = CONFLICT_DETECTION_PROMPT.format(requirements_text=requirements_text)
-        
+
         messages = [
-            {"role": "system", "content": "You are Fishy, an expert at detecting requirement conflicts. Always return valid JSON."},
-            {"role": "user", "content": prompt}
+            {
+                "role": "system",
+                "content": "You are Fishy, an expert at detecting requirement conflicts. Always return valid JSON.",
+            },
+            {"role": "user", "content": prompt},
         ]
-        
-        response_text, tokens_used = call_groq_chat(messages, max_tokens=2000, temperature=0.3)
+
+        response_text, tokens_used = call_groq_chat(
+            messages, max_tokens=2000, temperature=0.3
+        )
         parsed_data = parse_json_response(response_text)
-        
+
         conflicts = [
             Conflict(**conflict) for conflict in parsed_data.get("conflicts", [])
         ]
-        
+
         return ConflictDetectionResponse(
-            conflicts=conflicts,
-            total_conflicts=len(conflicts)
+            conflicts=conflicts, total_conflicts=len(conflicts)
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # ==================== KNOWLEDGE BASE API ENDPOINTS ====================
 
+
 @app.post("/process_document", response_model=ProcessDocumentResponse)
-async def process_document(request: ProcessDocumentRequest, api_key: str = Depends(verify_api_key)):
+async def process_document(
+    request: ProcessDocumentRequest, api_key: str = Depends(verify_api_key)
+):
     """
     Process a document and extract requirements with chunk metadata.
-    
+
     Usage:
     POST /process_document
     Headers: X-API-Key: your-api-key
@@ -741,58 +830,74 @@ async def process_document(request: ProcessDocumentRequest, api_key: str = Depen
     """
     try:
         if not request.document_content and not request.document_url:
-            raise HTTPException(status_code=400, detail="Either document_content or document_url must be provided")
-        
+            raise HTTPException(
+                status_code=400,
+                detail="Either document_content or document_url must be provided",
+            )
+
         # Use document_content (document_url fetching can be added later)
         content = request.document_content or ""
-        
+
         # Extract requirements using existing extraction endpoint logic
-        extraction_req = ExtractionRequest(text=content, document_type=request.document_type)
+        extraction_req = ExtractionRequest(
+            text=content, document_type=request.document_type
+        )
         prompt = EXTRACTION_PROMPT.format(text=extraction_req.text)
-        
+
         messages = [
-            {"role": "system", "content": "You are Fishy, a requirements extraction expert. Always return valid JSON."},
-            {"role": "user", "content": prompt}
+            {
+                "role": "system",
+                "content": "You are Fishy, a requirements extraction expert. Always return valid JSON.",
+            },
+            {"role": "user", "content": prompt},
         ]
-        
-        response_text, tokens_used = call_groq_chat(messages, max_tokens=3000, temperature=0.3)
+
+        response_text, tokens_used = call_groq_chat(
+            messages, max_tokens=3000, temperature=0.3
+        )
         parsed_data = parse_json_response(response_text)
-        
+
         requirements = [
             Requirement(**req) for req in parsed_data.get("requirements", [])
         ]
-        
+
         # Create chunks from requirements
         chunks = []
         for idx, req in enumerate(requirements):
             chunk_text = f"Requirement: {req.requirement_text}\nType: {req.requirement_type}\nPriority: {req.priority}"
-            chunks.append(DocumentChunk(
-                id=idx,
-                text=chunk_text,
-                meta={
-                    'requirement_type': req.requirement_type,
-                    'priority': req.priority,
-                    'confidence_score': req.confidence_score,
-                    'document_type': request.document_type
-                }
-            ))
-        
+            chunks.append(
+                DocumentChunk(
+                    id=idx,
+                    text=chunk_text,
+                    meta={
+                        "requirement_type": req.requirement_type,
+                        "priority": req.priority,
+                        "confidence_score": req.confidence_score,
+                        "document_type": request.document_type,
+                    },
+                )
+            )
+
         return ProcessDocumentResponse(
             project_id=request.project_id,
             requirements=requirements,
             chunks=chunks,
             total_chunks=len(chunks),
-            tokens_used=tokens_used
+            tokens_used=tokens_used,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/kb/build", response_model=BuildKBResponse)
-async def build_kb(request: BuildKBRequest, background_tasks: BackgroundTasks, 
-                  api_key: str = Depends(verify_api_key)):
+async def build_kb(
+    request: BuildKBRequest,
+    background_tasks: BackgroundTasks,
+    api_key: str = Depends(verify_api_key),
+):
     """
     Build knowledge base for a project. Supports async (returns job_id) and sync modes.
-    
+
     Usage:
     POST /kb/build
     Headers: X-API-Key: your-api-key
@@ -807,32 +912,36 @@ async def build_kb(request: BuildKBRequest, background_tasks: BackgroundTasks,
     """
     try:
         if not request.documents:
-            raise HTTPException(status_code=400, detail="Documents list cannot be empty")
-        
+            raise HTTPException(
+                status_code=400, detail="Documents list cannot be empty"
+            )
+
         # Prepare chunks
         chunks = _prepare_document_chunks(request.documents)
-        
+
         if request.mode == "async":
             # Create job
             job_id = f"job_{uuid.uuid4().hex[:12]}"
-            
+
             async with _build_jobs_lock:
                 _build_jobs[job_id] = {
-                    'job_id': job_id,
-                    'project_id': request.project_id,
-                    'status': 'queued',
-                    'created_at': datetime.utcnow().isoformat(),
-                    'total_docs': len(request.documents)
+                    "job_id": job_id,
+                    "project_id": request.project_id,
+                    "status": "queued",
+                    "created_at": datetime.utcnow().isoformat(),
+                    "total_docs": len(request.documents),
                 }
-            
+
             # Schedule background task
-            background_tasks.add_task(_build_kb_async, job_id, request.project_id, chunks)
-            
+            background_tasks.add_task(
+                _build_kb_async, job_id, request.project_id, chunks
+            )
+
             return BuildKBResponse(
                 project_id=request.project_id,
                 job_id=job_id,
                 status="queued",
-                message=f"Knowledge base build queued for project {request.project_id}"
+                message=f"Knowledge base build queued for project {request.project_id}",
             )
         else:
             # Synchronous build
@@ -840,25 +949,28 @@ async def build_kb(request: BuildKBRequest, background_tasks: BackgroundTasks,
                 project_id=request.project_id,
                 chunks=chunks,
                 base_dir=KB_BASE_DIR,
-                model_name=KB_MODEL
+                model_name=KB_MODEL,
             )
-            
+
             return BuildKBResponse(
                 project_id=request.project_id,
                 job_id=None,
                 status="completed",
                 message=f"Knowledge base built successfully for project {request.project_id}",
-                index_path=result.get('index_path'),
-                total_chunks=len(chunks)
+                index_path=result.get("index_path"),
+                total_chunks=len(chunks),
             )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/kb/incremental", response_model=IncrementalKBResponse)
-async def incremental_kb_update(request: IncrementalKBRequest, api_key: str = Depends(verify_api_key)):
+async def incremental_kb_update(
+    request: IncrementalKBRequest, api_key: str = Depends(verify_api_key)
+):
     """
     Add documents incrementally to existing project knowledge base.
-    
+
     Usage:
     POST /kb/incremental
     Headers: X-API-Key: your-api-key
@@ -871,44 +983,47 @@ async def incremental_kb_update(request: IncrementalKBRequest, api_key: str = De
     """
     try:
         if not request.documents:
-            raise HTTPException(status_code=400, detail="Documents list cannot be empty")
-        
+            raise HTTPException(
+                status_code=400, detail="Documents list cannot be empty"
+            )
+
         rag = _get_rag_manager()
         index_path, meta_path = rag.get_project_paths(KB_BASE_DIR, request.project_id)
-        
+
         # Check if index exists
         if not os.path.exists(index_path):
             raise HTTPException(
                 status_code=404,
-                detail=f"Knowledge base not found for project {request.project_id}. Use /kb/build first."
+                detail=f"Knowledge base not found for project {request.project_id}. Use /kb/build first.",
             )
-        
+
         # Prepare new chunks
         new_chunks = _prepare_document_chunks(request.documents)
-        
+
         # Incremental add
         index, updated_chunks = rag.incremental_add(
             index_path=index_path,
             meta_path=meta_path,
             new_chunks=new_chunks,
-            project_id=request.project_id
+            project_id=request.project_id,
         )
-        
+
         return IncrementalKBResponse(
             project_id=request.project_id,
             status="completed",
             message=f"Added {len(new_chunks)} chunks to project {request.project_id}",
             added_chunks=len(new_chunks),
-            total_chunks=len(updated_chunks)
+            total_chunks=len(updated_chunks),
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/kb/query", response_model=QueryKBResponse)
 async def query_kb(request: QueryKBRequest, api_key: str = Depends(verify_api_key)):
     """
     Query knowledge base for relevant chunks.
-    
+
     Usage:
     POST /kb/query
     Headers: X-API-Key: your-api-key
@@ -921,32 +1036,33 @@ async def query_kb(request: QueryKBRequest, api_key: str = Depends(verify_api_ke
     try:
         rag = _get_rag_manager()
         index_path, meta_path = rag.get_project_paths(KB_BASE_DIR, request.project_id)
-        
+
         # Check if index exists
         if not os.path.exists(index_path):
             raise HTTPException(
                 status_code=404,
-                detail=f"Knowledge base not found for project {request.project_id}"
+                detail=f"Knowledge base not found for project {request.project_id}",
             )
-        
+
         # Load index and query
         index, chunks = rag.load_index_and_meta(index_path, meta_path)
         results = rag.query(request.query, index, chunks, top_k=request.top_k)
-        
+
         return QueryKBResponse(
             project_id=request.project_id,
             query=request.query,
             results=results,
-            total_results=len(results)
+            total_results=len(results),
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/kb/status/{project_id}", response_model=KBStatusResponse)
 async def get_kb_status(project_id: str, api_key: str = Depends(verify_api_key)):
     """
     Get knowledge base status for a project.
-    
+
     Usage:
     GET /kb/status/proj_123
     Headers: X-API-Key: your-api-key
@@ -954,38 +1070,41 @@ async def get_kb_status(project_id: str, api_key: str = Depends(verify_api_key))
     try:
         rag = _get_rag_manager()
         index_path, meta_path = rag.get_project_paths(KB_BASE_DIR, project_id)
-        
+
         status = rag.get_kb_status(index_path, meta_path)
-        
+
         return KBStatusResponse(
             project_id=project_id,
-            exists=status['exists'],
-            version=status['version'],
-            last_built_at=status['last_built_at'],
-            total_chunks=status['total_chunks'],
-            error=status['error']
+            exists=status["exists"],
+            version=status["version"],
+            last_built_at=status["last_built_at"],
+            total_chunks=status["total_chunks"],
+            error=status["error"],
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/kb/job/{job_id}")
 async def get_job_status(job_id: str, api_key: str = Depends(verify_api_key)):
     """
     Get status of an async build job.
-    
+
     Usage:
     GET /kb/job/job_abc123
     Headers: X-API-Key: your-api-key
     """
     async with _build_jobs_lock:
         job = _build_jobs.get(job_id)
-    
+
     if not job:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
-    
+
     return job
 
+
 # ==================== TESTING ENDPOINT ====================
+
 
 @app.post("/api/test")
 async def test_groq():
@@ -994,19 +1113,21 @@ async def test_groq():
         chat_completion = groq_client.chat.completions.create(
             messages=[{"role": "user", "content": "Say 'Hello, FastAPI with Groq!'"}],
             model=DEFAULT_MODEL,
-            max_tokens=50
+            max_tokens=50,
         )
         return {
             "success": True,
             "response": chat_completion.choices[0].message.content,
             "model": DEFAULT_MODEL,
-            "tokens_used": chat_completion.usage.total_tokens
+            "tokens_used": chat_completion.usage.total_tokens,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
 # ==================== .env.example ====================

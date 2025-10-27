@@ -59,6 +59,7 @@ export default function LLMDashboard() {
 
   // RequirementsViewer state
   const [showRequirements, setShowRequirements] = useState(false);
+  const [kbRefreshKey, setKBRefreshKey] = useState(0);
   
   // KB Upload state
   const [isKBUploadOpen, setIsKBUploadOpen] = useState(false);
@@ -560,6 +561,27 @@ export default function LLMDashboard() {
     setKBUploadStatus('Knowledge Base build started successfully!');
     setError(null);
     
+    // Poll KB status in background and refresh requirements when ready
+    (async () => {
+      const start = Date.now();
+      const timeoutMs = 2 * 60 * 1000; // 2 minutes timeout
+      try {
+        while (Date.now() - start < timeoutMs) {
+          await new Promise(r => setTimeout(r, 1500)); // Poll every 1.5 seconds
+          const statusResp = await apiFetch(`/api/projects/${currentProjectId}/kb/status`);
+          if (statusResp?.kb?.status === 'ready' || statusResp?.kb?.is_ready) {
+            // Force RequirementsViewer to reload
+            setKBRefreshKey(prev => prev + 1);
+            // Show requirements panel
+            setShowRequirements(true);
+            break;
+          }
+        }
+      } catch (pollErr) {
+        console.error('KB polling failed:', pollErr);
+      }
+    })();
+    
     setTimeout(() => {
       setKBUploadStatus(null);
     }, 3000);
@@ -683,6 +705,7 @@ export default function LLMDashboard() {
         <RequirementsViewer
           projectId={currentProjectId}
           onClose={() => setShowRequirements(false)}
+          refreshKey={kbRefreshKey}
         />
       )}
       {/* Hidden div for scrolling */}
