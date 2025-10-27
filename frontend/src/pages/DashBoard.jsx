@@ -567,14 +567,38 @@ export default function LLMDashboard() {
   } catch (err) {
     console.error('Failed to build KB:', err);
     
-    // Handle 409 specifically - KB already building
+    // Handle 409 - KB already building, try to reset and rebuild
     if (err.status === 409) {
-      setKBUploadStatus('Documents uploaded. Knowledge Base is already building.');
-      setError(null); // Don't show as error
-      
-      setTimeout(() => {
-        setKBUploadStatus(null);
-      }, 3000);
+      try {
+        console.log('KB is stuck in building state, attempting to reset...');
+        
+        // Reset the KB status
+        await apiFetch(`/api/projects/${currentProjectId}/kb/reset`, {
+          method: 'POST',
+        });
+        
+        console.log('KB reset successful, attempting to build again...');
+        
+        // Wait a moment for the reset to take effect
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Now try building again
+        const retryBuildResponse = await apiFetch(`/api/projects/${currentProjectId}/kb/build`, {
+          method: 'POST',
+        });
+        
+        setKBUploadStatus('Knowledge Base build started successfully!');
+        setError(null);
+        
+        setTimeout(() => {
+          setKBUploadStatus(null);
+        }, 3000);
+        
+      } catch (resetErr) {
+        console.error('Failed to reset and rebuild KB:', resetErr);
+        setError('Documents uploaded but KB is stuck. Please refresh the page and try again.');
+        throw new Error('Failed to build Knowledge Base after reset');
+      }
     } else {
       setError('Documents uploaded but KB build failed. Please try building manually.');
       throw new Error('Failed to build Knowledge Base');
