@@ -154,6 +154,7 @@ const Sidebar = ({
   isInitializing,
   currentProjectId,
   fullName,
+  hasEmptyConversation,
   onCreateNewConversation,
   onSelectConversation,
   onStartEditingConversation,
@@ -274,17 +275,18 @@ const Sidebar = ({
               onCreateNewConversation();
             }
           }}
-          disabled={isInitializing}
+          disabled={isInitializing || hasEmptyConversation}
           className={`group relative w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-xl hover:scale-105 active:scale-95 disabled:hover:scale-100 disabled:hover:shadow-none overflow-hidden ${
-            !isInitializing && location.pathname === '/dashboard' ? 'animate-[pulse_2s_ease-in-out_infinite]' : ''
+            !isInitializing && !hasEmptyConversation && location.pathname === '/dashboard' ? 'animate-[pulse_2s_ease-in-out_infinite]' : ''
           }`}
           style={{ backgroundColor: '#DBE2EF', color: '#112D4E' }}
+          title={hasEmptyConversation ? "Please send a message in the current chat first" : "Create new chat"}
         >
           {/* Animated background gradient on hover */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out"></div>
           
           {/* Subtle glow effect when ready */}
-          {!isInitializing && (
+          {!isInitializing && !hasEmptyConversation && (
             <div className="absolute inset-0 bg-gradient-to-r from-blue-400/0 via-blue-400/10 to-blue-400/0 animate-[pulse_3s_ease-in-out_infinite]"></div>
           )}
           
@@ -293,15 +295,22 @@ const Sidebar = ({
             {isInitializing ? (
               <Loader2 className="animate-spin" size={20} />
             ) : (
-              <Plus size={20} className="transition-transform duration-300 group-hover:rotate-90 group-active:rotate-180" />
+              <Plus size={20} className={`transition-transform duration-300 ${!hasEmptyConversation ? 'group-hover:rotate-90 group-active:rotate-180' : ''}`} />
             )}
             {isSidebarOpen && (
-              <span className="transition-all duration-300 group-hover:tracking-wide group-hover:font-semibold">
+              <span className={`transition-all duration-300 ${!hasEmptyConversation ? 'group-hover:tracking-wide group-hover:font-semibold' : ''}`}>
                 {isInitializing ? 'Loading...' : 'New Chat'}
               </span>
             )}
           </div>
         </button>
+        
+        {/* Helper text when button is disabled */}
+        {hasEmptyConversation && isSidebarOpen && (
+          <p className="text-xs text-gray-500 mt-2 text-center px-2">
+            Send a message first before creating a new chat
+          </p>
+        )}
       </div>
 
       {/* Navigation */}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { apiFetch } from '../utils/auth.js';
 import { useDashboard } from '../hooks/useDashboard.js';
 import Sidebar from '../components/dashboard/Sidebar.jsx';
@@ -9,7 +9,6 @@ import RequirementsViewer from '../components/RequirementsViewer.jsx';
 
 export default function LLMDashboard() {
   const {
-    // State
     user,
     message,
     setMessage,
@@ -45,27 +44,39 @@ export default function LLMDashboard() {
     conversationDocuments,
     setConversationDocuments,
     messagesEndRef,
-    
-    // Functions
     loadMessages,
     loadConversations,
     loadConversationDocuments,
     performLogout
   } = useDashboard();
   
-  const fullName = user?.name;
-  // Get current project object
-  const currentProject = projects.find(p => p.id === currentProjectId);
+  // Streaming state - simpler approach
+  const [streamingMessageId, setStreamingMessageId] = useState(null);
+  const streamingTimeoutRef = useRef(null);
 
-  // RequirementsViewer state
+  const fullName = user?.name;
+  const currentProject = projects.find(p => p.id === currentProjectId);
+  const [isNewChatMode, setIsNewChatMode] = useState(false);
   const [showRequirements, setShowRequirements] = useState(false);
   const [kbRefreshKey, setKBRefreshKey] = useState(0);
-  
-  // KB Upload state
   const [isKBUploadOpen, setIsKBUploadOpen] = useState(false);
   const [kbUploadStatus, setKBUploadStatus] = useState(null);
+
+  // Auto-scroll effect - scroll when messages change or streaming
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, streamingMessageId]);
+
+  useEffect(() => {
+    return () => {
+      if (streamingTimeoutRef.current) {
+        clearTimeout(streamingTimeoutRef.current);
+      }
+    };
+  }, []);
   
-  // Switch to normal chat mode
   const switchToNormalMode = () => {
     setChatMode('normal');
     setCurrentProjectId(null);
@@ -73,84 +84,91 @@ export default function LLMDashboard() {
     setMessages([]);
     setAttachedFiles([]);
     setConversationDocuments([]);
-    // Reload conversations for normal mode
+    setIsNewChatMode(false);
     loadConversations();
   };
 
-  // Create new conversation
   const createNewConversation = async () => {
-    // For project mode, ensure we have a project
-    if (chatMode === "project" && !currentProjectId) {
-      setError(
-        "No project available. Please wait for project initialization."
-      );
-      return;
-    }
-
-    try {
-      setError(null);
-      const requestBody = {
-        title: "New Chat",
-        context: null,
-        status: "active",
-      };
-
-      // Only include project_id if in project mode AND we have a project
-      if (chatMode === "project" && currentProjectId) {
-        requestBody.project_id = currentProjectId;
-      }
-      // In normal mode, project_id will be null (not included in requestBody)
-
-      const data = await apiFetch("/api/conversations", {
-        method: "POST",
-        body: requestBody,
-      });
-      setConversations([data, ...conversations]);
-      setSelectedConversation(data);
-      setMessages([]);
-      setAttachedFiles([]);
-      setConversationDocuments([]);
-    } catch (err) {
-      console.error("Failed to create conversation:", err);
-      let errorMessage = "Failed to create new conversation";
-
-      if (err.status === 401) {
-        errorMessage = "You are not authenticated. Please log in again.";
-        await performLogout();
-      } else if (err.status === 422) {
-        errorMessage = "Invalid conversation data. Please try again.";
-      }
-
-      setError(errorMessage);
-    }
+    setIsNewChatMode(true);
+    setSelectedConversation(null);
+    setMessages([]);
+    setAttachedFiles([]);
+    setConversationDocuments([]);
+    setError(null);
   };
 
-  // Handle sending message (creates new conversation if needed)
+  // Simulate Claude-like streaming: reveal text character by character
+  const simulateStreaming = (messageId, fullText, realMessage) => {
+    console.log('🎬 Starting Claude-style streaming for:', messageId);
+    
+    // Clear any existing timeout
+    if (streamingTimeoutRef.current) {
+      clearTimeout(streamingTimeoutRef.current);
+    }
+
+    setStreamingMessageId(messageId);
+    
+    let currentIndex = 0;
+    const totalLength = fullText.length;
+    
+    // Faster, smoother streaming - like Claude
+    const streamNextChunk = () => {
+      if (currentIndex < totalLength) {
+        // Stream 3-5 characters at a time for smooth, fast feel
+        const chunkSize = Math.floor(Math.random() * 3) + 3; // 3-5 chars
+        currentIndex = Math.min(currentIndex + chunkSize, totalLength);
+        
+        const streamedText = fullText.slice(0, currentIndex);
+        
+        // Update the message content in real-time
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId
+              ? { ...msg, content: streamedText, isStreaming: true }
+              : msg
+          )
+        );
+        
+        // Continue streaming with varying speed for natural feel
+        const delay = Math.floor(Math.random() * 20) + 10; // 10-30ms
+        streamingTimeoutRef.current = setTimeout(streamNextChunk, delay);
+      } else {
+        // Streaming complete
+        console.log('✅ Streaming complete');
+        setStreamingMessageId(null);
+        
+        // Replace with final real message
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId
+              ? { ...realMessage, isStreaming: false }
+              : msg
+          )
+        );
+      }
+    };
+    
+    // Start streaming
+    streamNextChunk();
+  };
+
   const handleSendMessage = async () => {
     if ((!message.trim() && attachedFiles.length === 0) || isLoading || isLoadingMessages) return;
 
-    if (!selectedConversation) {
-      // For project mode, ensure we have a project
+    if (isNewChatMode || !selectedConversation) {
       if (chatMode === "project" && !currentProjectId) {
-        setError(
-          "No project available. Please wait for project initialization."
-        );
+        setError("No project available. Please wait for project initialization.");
         return;
       }
 
-      // Create new conversation first, then send message
       try {
         setError(null);
         setIsLoading(true);
 
         const conversationTitle = message.trim()
-          ? message.slice(0, 50) // Use first 50 chars of message as title
+          ? message.slice(0, 50)
           : attachedFiles.length > 0
-          ? `Files: ${attachedFiles[0].name}${
-              attachedFiles.length > 1
-                ? ` +${attachedFiles.length - 1} more`
-                : ""
-            }`
+          ? `Files: ${attachedFiles[0].name}${attachedFiles.length > 1 ? ` +${attachedFiles.length - 1} more` : ""}`
           : "New Chat";
 
         const requestBody = {
@@ -159,11 +177,9 @@ export default function LLMDashboard() {
           status: "active",
         };
 
-        // Only include project_id if in project mode AND we have a project
         if (chatMode === "project" && currentProjectId) {
           requestBody.project_id = currentProjectId;
         }
-        // In normal mode, project_id will be null (not included in requestBody)
 
         const newConversation = await apiFetch("/api/conversations", {
           method: "POST",
@@ -173,39 +189,26 @@ export default function LLMDashboard() {
         setConversations([newConversation, ...conversations]);
         setSelectedConversation(newConversation);
         setMessages([]);
+        setIsNewChatMode(false);
 
-        // Now send the message to the new conversation
         const messageToSend = message.trim() || "Here are the uploaded files:";
         await sendMessageToConversation(newConversation.id, messageToSend);
       } catch (err) {
         console.error("Failed to create conversation:", err);
-        let errorMessage = "Failed to create new conversation";
-
-        if (err.status === 401) {
-          errorMessage = "You are not authenticated. Please log in again.";
-          await performLogout();
-        } else if (err.status === 422) {
-          errorMessage = "Invalid conversation data. Please try again.";
-        }
-
-        setError(errorMessage);
+        setError("Failed to create new conversation");
         setIsLoading(false);
       }
     } else {
-      // Send message to existing conversation
       await sendMessage();
     }
   };
 
-  // Helper function to send message to a specific conversation
   const sendMessageToConversation = async (conversationId, messageContent) => {
     const userMessage = messageContent.trim();
-    const filesToUpload = [...attachedFiles]; // Copy attached files
+    const filesToUpload = [...attachedFiles];
     setMessage("");
-    setAttachedFiles([]); // Clear attached files
-    setIsLoading(true); // Set loading at the start
+    setAttachedFiles([]);
 
-    // Create message content with file info for display (no file contents)
     let displayMessageContent = userMessage;
     if (filesToUpload.length > 0) {
       const fileNames = filesToUpload.map((file) => file.name).join(", ");
@@ -214,29 +217,26 @@ export default function LLMDashboard() {
         : `📎 Uploaded files: ${fileNames}`;
     }
 
-    // Add user message to UI immediately (only shows message + file names)
+    // Add user message
     const newUserMessage = {
-      id: `temp-${Date.now()}`,
+      id: `temp-user-${Date.now()}`,
       role: "user",
       content: displayMessageContent,
       created_at: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, newUserMessage]);
     setError(null);
+    setIsLoading(true);
 
     try {
-      // First, upload any attached files
+      // Upload files
       const uploadedDocuments = [];
       for (const file of filesToUpload) {
         try {
           const formData = new FormData();
           formData.append("file", file);
           
-          // For project mode, ensure we have a project_id
-          if (chatMode === "project") {
-            if (!currentProjectId) {
-              throw new Error("No project available for file upload. Please wait for project initialization.");
-            }
+          if (chatMode === "project" && currentProjectId) {
             formData.append("project_id", currentProjectId.toString());
           }
           formData.append("conversation_id", conversationId.toString());
@@ -248,68 +248,21 @@ export default function LLMDashboard() {
 
           if (uploadData.success && uploadData.document) {
             uploadedDocuments.push(uploadData.document);
-
-            // Process the document to extract requirements (optional)
-            try {
-              await apiFetch(
-                `/api/documents/${uploadData.document.id}/process`,
-                {
-                  method: "POST",
-                }
-              );
-              console.log(
-                `Document ${uploadData.document.original_filename} processed successfully`
-              );
-            } catch (processErr) {
-              console.warn(
-                `Failed to process document ${uploadData.document.original_filename}:`,
-                processErr
-              );
-              // Continue anyway - the document is uploaded and can still be used in chat
-            }
-          } else {
-            console.warn(
-              `Failed to upload file ${file.name}: Invalid response format`
-            );
           }
         } catch (uploadErr) {
-          console.error(`Error uploading file ${file.name}:`, uploadErr);
-          
-          // Show user-friendly error messages
-          let errorMsg = `Failed to upload ${file.name}`;
-          if (uploadErr.status === 422) {
-            errorMsg += ": Validation failed. Please ensure you have a project selected.";
-          } else if (uploadErr.status === 413) {
-            errorMsg += ": File too large. Maximum size is 10MB.";
-          } else if (uploadErr.message) {
-            errorMsg += `: ${uploadErr.message}`;
-          }
-          
-          setError(errorMsg);
+          console.error(`Error uploading file:`, uploadErr);
         }
       }
 
-      // Create enhanced message content for the AI (includes full document content)
-      // First add file names to the user message (this will be saved and displayed)
-      // Then add full document contents after a separator (backend will strip this for display)
+      // Create message for AI
       let messageForAI = userMessage;
-      
       if (uploadedDocuments.length > 0) {
-        // Add file names to the message that will be displayed
-        const fileNames = uploadedDocuments
-          .map((doc) => doc.original_filename)
-          .join(", ");
-        messageForAI += messageForAI
-          ? `\n\n📎 Attached files: ${fileNames}`
-          : `📎 Uploaded files: ${fileNames}`;
+        const fileNames = uploadedDocuments.map((doc) => doc.original_filename).join(", ");
+        messageForAI += `\n\n📎 Attached files: ${fileNames}`;
         
-        // Then add full document contents for AI processing (backend will strip this)
         const documentContents = uploadedDocuments
-          .filter((doc) => doc.content && doc.content.trim())
-          .map((doc) => {
-            // Don't truncate for AI - it needs the full content
-            return `File: ${doc.original_filename}\n${doc.content}`;
-          })
+          .filter((doc) => doc.content?.trim())
+          .map((doc) => `File: ${doc.original_filename}\n${doc.content}`)
           .join("\n\n---\n\n");
 
         if (documentContents) {
@@ -317,58 +270,98 @@ export default function LLMDashboard() {
         }
       }
 
-      // Send message with document context to the conversation (backend only)
+      // Send message
       const body = {
         content: messageForAI,
         role: "user",
       };
-      // Pass project_id for KB context if in project mode
       if (chatMode === "project" && currentProjectId) {
         body.project_id = currentProjectId;
       }
+      
+      console.log("📤 Sending message...");
       await apiFetch(`/api/conversations/${conversationId}/messages`, {
         method: "POST",
         body,
       });
 
-      // Reload messages to get the full conversation including AI response
-      await loadMessages(conversationId);
+      // Create empty assistant message immediately
+      const streamingMessageId = `streaming-${Date.now()}`;
+      const streamingMessage = {
+        id: streamingMessageId,
+        role: "assistant",
+        content: "",
+        created_at: new Date().toISOString(),
+        isStreaming: true,
+      };
 
-      // Reload conversation documents to reflect newly uploaded files
-      await loadConversationDocuments(conversationId);
+      setMessages((prev) => [...prev, streamingMessage]);
+      setIsLoading(false);
+
+      // Wait a moment then fetch and stream
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      console.log("📥 Fetching response...");
+      const messagesData = await apiFetch(`/api/conversations/${conversationId}/messages`);
+      
+      if (messagesData?.messages && Array.isArray(messagesData.messages)) {
+        const assistantMessages = messagesData.messages.filter(m => m.role === 'assistant');
+        const latestAiMessage = assistantMessages[assistantMessages.length - 1];
+
+        if (latestAiMessage?.content) {
+          console.log("🤖 Starting Claude-style streaming...");
+          simulateStreaming(streamingMessageId, latestAiMessage.content, latestAiMessage);
+        } else {
+          console.warn("⚠️ No AI response");
+          setIsLoading(false);
+          await loadMessages(conversationId);
+        }
+      } else {
+        console.warn("⚠️ Invalid response");
+        setIsLoading(false);
+        await loadMessages(conversationId);
+      }
+
+      try {
+        await loadConversationDocuments(conversationId);
+      } catch (docErr) {
+        console.error("Failed to load documents:", docErr);
+      }
+
     } catch (err) {
-      console.error("Failed to send message:", err);
+      console.error("❌ Failed to send message:", err);
+      
+      if (streamingTimeoutRef.current) {
+        clearTimeout(streamingTimeoutRef.current);
+      }
+      setStreamingMessageId(null);
+      
       let errorMessage = "Failed to send message. Please try again.";
-
       if (err.status === 401) {
         errorMessage = "You are not authenticated. Please log in again.";
         await performLogout();
-      } else if (err.status === 404) {
-        errorMessage = "Conversation not found. Please select a different conversation.";
-      } else if (err.status === 422) {
-        errorMessage = "Invalid message format. Please check your input.";
-      } else if (err.message && err.message.includes("Request too large")) {
-        errorMessage = "Your message is too long. Try shortening it or uploading smaller files.";
-      } else if (err.message && err.message.includes("rate_limit_exceeded")) {
-        errorMessage = "Message too large for AI processing. Please try with smaller files or shorter messages.";
       }
 
       setError(errorMessage);
-      // Remove the temporary user message on error
       setMessages((prev) => prev.filter((msg) => msg.id !== newUserMessage.id));
-    } finally {
       setIsLoading(false);
+      
+      try {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await loadMessages(conversationId);
+        setError(null);
+      } catch (reloadErr) {
+        console.error("Failed to reload:", reloadErr);
+      }
     }
   };
 
-  // Send message
   const sendMessage = async () => {
     if ((!message.trim() && attachedFiles.length === 0) || !selectedConversation || isLoading || isLoadingMessages) return;
     const messageToSend = message.trim() || "Here are the uploaded files:";
     await sendMessageToConversation(selectedConversation.id, messageToSend);
   };
 
-  // Handle Enter key press
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !isLoading && !isLoadingMessages) {
       e.preventDefault();
@@ -378,20 +371,17 @@ export default function LLMDashboard() {
     }
   };
 
-  // Start editing conversation title
   const startEditingConversation = (conversation) => {
     setEditingConversationId(conversation.id);
     setEditingTitle(conversation.title || 'New Chat');
     setShowDropdownId(null);
   };
 
-  // Cancel editing
   const cancelEditing = () => {
     setEditingConversationId(null);
     setEditingTitle('');
   };
 
-  // Save conversation title
   const saveConversationTitle = async (conversationId) => {
     if (!editingTitle.trim()) {
       cancelEditing();
@@ -401,21 +391,15 @@ export default function LLMDashboard() {
     try {
       await apiFetch(`/api/conversations/${conversationId}`, {
         method: 'PUT',
-        body: {
-          title: editingTitle.trim()
-        }
+        body: { title: editingTitle.trim() }
       });
 
-      // Update the conversation in the list
       setConversations(prev => 
         prev.map(conv => 
-          conv.id === conversationId 
-            ? { ...conv, title: editingTitle.trim() }
-            : conv
+          conv.id === conversationId ? { ...conv, title: editingTitle.trim() } : conv
         )
       );
 
-      // Update selected conversation if it's the one being edited
       if (selectedConversation?.id === conversationId) {
         setSelectedConversation(prev => ({ ...prev, title: editingTitle.trim() }));
       }
@@ -423,64 +407,31 @@ export default function LLMDashboard() {
       setEditingConversationId(null);
       setEditingTitle('');
     } catch (err) {
-      console.error('Failed to update conversation title:', err);
-      let errorMessage = 'Failed to update conversation title';
-      
-      if (err.status === 401) {
-        errorMessage = 'You are not authenticated. Please log in again.';
-        await performLogout();
-      } else if (err.status === 403) {
-        errorMessage = 'You do not have permission to edit this conversation.';
-      } else if (err.status === 404) {
-        errorMessage = 'Conversation not found.';
-      } else if (err.status === 422) {
-        errorMessage = 'Invalid title. Please check your input.';
-      }
-      
-      setError(errorMessage);
+      console.error('Failed to update title:', err);
+      setError('Failed to update conversation title');
     }
   };
 
-  // Delete conversation
   const deleteConversation = async (conversationId) => {
-    if (!confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
-      return;
-    }
+    if (!confirm('Are you sure?')) return;
 
     try {
-      await apiFetch(`/api/conversations/${conversationId}`, {
-        method: 'DELETE'
-      });
-
-      // Remove from conversations list
+      await apiFetch(`/api/conversations/${conversationId}`, { method: 'DELETE' });
       setConversations(prev => prev.filter(conv => conv.id !== conversationId));
 
-      // If this was the selected conversation, clear it
       if (selectedConversation?.id === conversationId) {
         setSelectedConversation(null);
         setMessages([]);
         setConversationDocuments([]);
+        setIsNewChatMode(false);
       }
-
       setShowDropdownId(null);
     } catch (err) {
-      console.error('Failed to delete conversation:', err);
-      let errorMessage = 'Failed to delete conversation';
-      
-      if (err.status === 401) {
-        errorMessage = 'You are not authenticated. Please log in again.';
-        await performLogout();
-      } else if (err.status === 403) {
-        errorMessage = 'You do not have permission to delete this conversation.';
-      } else if (err.status === 404) {
-        errorMessage = 'Conversation not found.';
-      }
-      
-      setError(errorMessage);
+      console.error('Failed to delete:', err);
+      setError('Failed to delete conversation');
     }
   };
 
-  // Handle Enter key for editing title
   const handleEditKeyPress = (e, conversationId) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -490,7 +441,6 @@ export default function LLMDashboard() {
     }
   };
 
-  // File upload handlers
   const handleFileUpload = (files) => {
     setAttachedFiles(prev => [...prev, ...files]);
     setIsFileUploadOpen(false);
@@ -500,15 +450,9 @@ export default function LLMDashboard() {
     setAttachedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const openFileUpload = () => {
-    setIsFileUploadOpen(true);
-  };
+  const openFileUpload = () => setIsFileUploadOpen(true);
+  const closeFileUpload = () => setIsFileUploadOpen(false);
 
-  const closeFileUpload = () => {
-    setIsFileUploadOpen(false);
-  };
-
-  // KB Upload handlers
   const openKBUpload = () => {
     setIsKBUploadOpen(true);
     setKBUploadStatus(null);
@@ -520,117 +464,43 @@ export default function LLMDashboard() {
   };
 
   const handleKBUpload = async (files, onProgress) => {
-  if (!currentProjectId) {
-    throw new Error('No project selected');
-  }
+    if (!currentProjectId) throw new Error('No project selected');
 
-  let uploadedCount = 0;
-  const uploadedDocuments = [];
-
-  // Upload each file to the project
-  for (const file of files) {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('project_id', currentProjectId.toString());
-      
-      const uploadData = await apiFetch('/api/documents', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (uploadData.success && uploadData.document) {
-        uploadedDocuments.push(uploadData.document);
-        uploadedCount++;
-        onProgress(uploadedCount);
-      }
-    } catch (err) {
-      console.error(`Failed to upload ${file.name}:`, err);
-      throw new Error(`Failed to upload ${file.name}: ${err.message || 'Unknown error'}`);
-    }
-  }
-
-  // After all files are uploaded, trigger KB build
-  try {
-    setKBUploadStatus('Building Knowledge Base...');
-    
-    const buildResponse = await apiFetch(`/api/projects/${currentProjectId}/kb/build`, {
-      method: 'POST',
-    });
-
-    setKBUploadStatus('Knowledge Base build started successfully!');
-    setError(null);
-    
-    // Poll KB status in background and refresh requirements when ready
-    (async () => {
-      const start = Date.now();
-      const timeoutMs = 2 * 60 * 1000; // 2 minutes timeout
+    let uploadedCount = 0;
+    for (const file of files) {
       try {
-        while (Date.now() - start < timeoutMs) {
-          await new Promise(r => setTimeout(r, 1500)); // Poll every 1.5 seconds
-          const statusResp = await apiFetch(`/api/projects/${currentProjectId}/kb/status`);
-          if (statusResp?.kb?.status === 'ready' || statusResp?.kb?.is_ready) {
-            // Force RequirementsViewer to reload
-            setKBRefreshKey(prev => prev + 1);
-            // Show requirements panel
-            setShowRequirements(true);
-            break;
-          }
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('project_id', currentProjectId.toString());
+        
+        const uploadData = await apiFetch('/api/documents', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (uploadData.success) {
+          uploadedCount++;
+          onProgress(uploadedCount);
         }
-      } catch (pollErr) {
-        console.error('KB polling failed:', pollErr);
+      } catch (err) {
+        console.error(`Failed to upload ${file.name}:`, err);
+        throw new Error(`Failed to upload ${file.name}`);
       }
-    })();
-    
-    setTimeout(() => {
-      setKBUploadStatus(null);
-    }, 3000);
-    
-  } catch (err) {
-    console.error('Failed to build KB:', err);
-    
-    // Handle 409 - KB already building, try to reset and rebuild
-    if (err.status === 409) {
-      try {
-        console.log('KB is stuck in building state, attempting to reset...');
-        
-        // Reset the KB status
-        await apiFetch(`/api/projects/${currentProjectId}/kb/reset`, {
-          method: 'POST',
-        });
-        
-        console.log('KB reset successful, attempting to build again...');
-        
-        // Wait a moment for the reset to take effect
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Now try building again
-        const retryBuildResponse = await apiFetch(`/api/projects/${currentProjectId}/kb/build`, {
-          method: 'POST',
-        });
-        
-        setKBUploadStatus('Knowledge Base build started successfully!');
-        setError(null);
-        
-        setTimeout(() => {
-          setKBUploadStatus(null);
-        }, 3000);
-        
-      } catch (resetErr) {
-        console.error('Failed to reset and rebuild KB:', resetErr);
-        setError('Documents uploaded but KB is stuck. Please refresh the page and try again.');
-        throw new Error('Failed to build Knowledge Base after reset');
-      }
-    } else {
-      setError('Documents uploaded but KB build failed. Please try building manually.');
-      throw new Error('Failed to build Knowledge Base');
     }
-  }
-};
+
+    try {
+      setKBUploadStatus('Building Knowledge Base...');
+      await apiFetch(`/api/projects/${currentProjectId}/kb/build`, { method: 'POST' });
+      setKBUploadStatus('Build started!');
+      setTimeout(() => setKBUploadStatus(null), 3000);
+    } catch (err) {
+      setError('KB build failed');
+      throw new Error('Failed to build KB');
+    }
+  };
 
   return (
     <div className="flex h-screen bg-gray-50 relative">
-      {/* Sidebar */}
       <Sidebar
         isSidebarOpen={isSidebarOpen}
         conversations={conversations}
@@ -642,7 +512,10 @@ export default function LLMDashboard() {
         currentProjectId={currentProjectId}
         fullName={fullName}
         onCreateNewConversation={createNewConversation}
-        onSelectConversation={setSelectedConversation}
+        onSelectConversation={(conv) => {
+          setSelectedConversation(conv);
+          setIsNewChatMode(false);
+        }}
         onStartEditingConversation={startEditingConversation}
         onCancelEditing={cancelEditing}
         onSaveConversationTitle={saveConversationTitle}
@@ -650,10 +523,12 @@ export default function LLMDashboard() {
         onEditTitleChange={setEditingTitle}
         onToggleDropdown={setShowDropdownId}
         onEditKeyPress={handleEditKeyPress}
-        loadMessages={loadMessages}
+        loadMessages={(convId) => {
+          loadMessages(convId);
+          setIsNewChatMode(false);
+        }}
       />
 
-      {/* Main Chat Area */}
       <ChatArea
         selectedConversation={selectedConversation}
         messages={messages}
@@ -678,9 +553,11 @@ export default function LLMDashboard() {
         onSwitchToNormalMode={switchToNormalMode}
         onOpenKBUpload={openKBUpload}
         onToggleRequirements={() => setShowRequirements(v => !v)}
+        isNewChatMode={isNewChatMode}
+        streamingMessageId={streamingMessageId}
+        messagesEndRef={messagesEndRef}
       />
 
-      {/* File Upload Modal */}
       {isFileUploadOpen && (
         <FileUpload
           onFilesSelected={handleFileUpload}
@@ -690,7 +567,6 @@ export default function LLMDashboard() {
         />
       )}
       
-      {/* KB Upload Modal */}
       {isKBUploadOpen && currentProject && (
         <KBUploadModal
           onClose={closeKBUpload}
@@ -700,7 +576,6 @@ export default function LLMDashboard() {
         />
       )}
       
-      {/* RequirementsViewer Slide-in */}
       {showRequirements && currentProjectId && (
         <RequirementsViewer
           projectId={currentProjectId}
@@ -708,8 +583,6 @@ export default function LLMDashboard() {
           refreshKey={kbRefreshKey}
         />
       )}
-      {/* Hidden div for scrolling */}
-      <div ref={messagesEndRef} />
     </div>
   );
 }

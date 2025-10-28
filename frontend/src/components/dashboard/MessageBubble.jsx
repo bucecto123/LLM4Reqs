@@ -4,10 +4,14 @@ import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
-const MessageBubble = ({ message }) => {
+const MessageBubble = ({ message, streamingMessageId }) => {
   const isUser = message.role === 'user';
   
-  // Format the timestamp
+  // Check if this message is currently streaming
+  const isStreaming = message.id === streamingMessageId || message.isStreaming === true;
+  
+  const content = message.content || '';
+  
   const formatTime = (timestamp) => {
     try {
       return new Date(timestamp).toLocaleTimeString([], { 
@@ -26,77 +30,100 @@ const MessageBubble = ({ message }) => {
           ? 'bg-blue-500 text-white rounded-br-none' 
           : 'bg-gray-100 text-gray-800 rounded-bl-none border'
       }`}>
-        {/* Message content */}
-        <div className="text-sm leading-relaxed overflow-wrap-anywhere">
+        <div className="text-sm leading-relaxed">
           {isUser ? (
             <div className="whitespace-pre-wrap break-words">
-              {message.content}
+              {content}
             </div>
           ) : (
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                table: ({ children }) => (
-                  <div className="overflow-x-auto my-4">
-                    <table className="min-w-full border-collapse border border-gray-300">
-                      {children}
-                    </table>
-                  </div>
-                ),
-                thead: ({ children }) => (
-                  <thead className="bg-gray-50">
-                    {children}
-                  </thead>
-                ),
-                tbody: ({ children }) => (
-                  <tbody>{children}</tbody>
-                ),
-                tr: ({ children }) => (
-                  <tr className="border-b border-gray-200">{children}</tr>
-                ),
-                th: ({ children }) => (
-                  <th className="border border-gray-300 px-4 py-2 text-left font-semibold text-gray-900 bg-gray-100">
-                    {children}
-                  </th>
-                ),
-                td: ({ children }) => (
-                  <td className="border border-gray-300 px-4 py-2 text-gray-700">
-                    {children}
-                  </td>
-                ),
-                code({ inline, className, children, ...props }) {
-                  const match = /language-(\w+)/.exec(className || '');
-                  return !inline && match ? (
-                    <SyntaxHighlighter
-                      style={tomorrow}
-                      language={match[1]}
-                      PreTag="div"
-                      className="rounded-md text-sm"
-                      {...props}
-                    >
-                      {String(children).replace(/\n$/, '')}
-                    </SyntaxHighlighter>
-                  ) : (
-                    <code className="bg-gray-200 text-gray-800 px-1 py-0.5 rounded text-sm font-mono" {...props}>
-                      {children}
-                    </code>
-                  );
-                },
-              }}
-            >
-              {message.content}
-            </ReactMarkdown>
+            <div className="relative">
+              <div className="prose prose-sm max-w-none">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    p: ({ children }) => (
+                      <p className="mb-2 last:mb-0">{children}</p>
+                    ),
+                    ul: ({ children }) => (
+                      <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>
+                    ),
+                    ol: ({ children }) => (
+                      <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>
+                    ),
+                    li: ({ children }) => (
+                      <li className="mb-1">{children}</li>
+                    ),
+                    strong: ({ children }) => (
+                      <strong className="font-semibold">{children}</strong>
+                    ),
+                    em: ({ children }) => (
+                      <em className="italic">{children}</em>
+                    ),
+                    code({ inline, className, children, ...props }) {
+                      const match = /language-(\w+)/.exec(className || '');
+                      return !inline && match ? (
+                        <SyntaxHighlighter
+                          style={tomorrow}
+                          language={match[1]}
+                          PreTag="div"
+                          className="rounded-md text-sm my-2"
+                          {...props}
+                        >
+                          {String(children).replace(/\n$/, '')}
+                        </SyntaxHighlighter>
+                      ) : (
+                        <code className="bg-gray-200 text-gray-800 px-1.5 py-0.5 rounded text-xs font-mono" {...props}>
+                          {children}
+                        </code>
+                      );
+                    },
+                  }}
+                >
+                  {content}
+                </ReactMarkdown>
+              </div>
+              
+              {/* Fish cursor - only show when streaming */}
+              {isStreaming && (
+                <span 
+                  className="inline-block ml-1 fish-cursor-animate"
+                  style={{ 
+                    fontSize: '1.2em',
+                    verticalAlign: 'middle',
+                    display: 'inline-block',
+                    lineHeight: 1,
+                    transform: 'scaleX(-1)'
+                  }}
+                >
+                  🐟
+                </span>
+              )}
+            </div>
           )}
         </div>
         
-        {/* Timestamp */}
         <div className={`text-xs mt-2 ${isUser ? 'text-blue-100' : 'text-gray-500'}`}>
           {formatTime(message.created_at)}
           {message.model_used && !isUser && (
-            <span className="ml-2 opacity-75">via {message.model_used}</span>
+            <span className="ml-2 opacity-75">• {message.model_used}</span>
           )}
         </div>
       </div>
+      
+      <style>{`
+        @keyframes fishBlink {
+          0%, 100% { 
+            opacity: 1;
+          }
+          50% { 
+            opacity: 0.2;
+          }
+        }
+        
+        .fish-cursor-animate {
+          animation: fishBlink 0.8s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 };

@@ -33,8 +33,16 @@ const ChatArea = ({
   // KB management
   onOpenKBUpload,
   // Requirements viewer
-  onToggleRequirements  // ADD THIS LINE
+  onToggleRequirements,
+  // Streaming props
+  streamingMessageId,
+  isNewChatMode,
+  // Scroll ref
+  messagesEndRef
 }) => {
+  // Show WelcomeScreen if no conversation is selected OR if conversation has no messages
+  const showWelcome = !selectedConversation || (messages.length === 0 && !isLoading);
+
   return (
     <div className="flex-1 flex flex-col">
       {/* Header */}
@@ -135,7 +143,7 @@ const ChatArea = ({
 
       {/* Chat Content */}
       <div className="flex-1 flex flex-col">
-        {!selectedConversation ? (
+        {showWelcome ? (
           <WelcomeScreen
             message={message}
             setMessage={setMessage}
@@ -159,37 +167,26 @@ const ChatArea = ({
               }}
             >
               <div className="min-h-full">
-                {messages.length === 0 && !isLoading ? (
-                  <div className="flex flex-col items-center justify-center h-full text-gray-500 min-h-[400px]">
-                    <MessageSquare size={48} className="mb-4 opacity-50" />
-                    <p className="text-lg font-medium">No messages yet</p>
-                    <p className="text-sm">Start the conversation by typing a message below</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4 pb-4">
-                    {messages.map((msg) => (
-                      <MessageBubble key={msg.id} message={msg} />
-                    ))}
-                    {isLoading && (
-                      <div className="flex justify-start">
-                        <div className="bg-gray-100 rounded-lg p-4 max-w-xs border rounded-bl-none">
-                          <div className="flex items-center space-x-2">
-                            <Loader2 className="animate-spin h-4 w-4 text-gray-500" />
-                            <span className="text-gray-500 text-sm">AI is thinking...</span>
-                          </div>
-                        </div>
+                <div className="space-y-4 pb-4">
+                  {messages.map((msg) => (
+                    <MessageBubble 
+                      key={msg.id} 
+                      message={msg}
+                      streamingMessageId={streamingMessageId}
+                    />
+                  ))}
+                  {/* Removed the "AI is thinking..." indicator */}
+                  {isLoadingMessages && (
+                    <div className="flex justify-center py-4">
+                      <div className="flex items-center space-x-2 text-gray-500">
+                        <Loader2 className="animate-spin h-4 w-4" />
+                        <span className="text-sm">Loading messages...</span>
                       </div>
-                    )}
-                    {isLoadingMessages && (
-                      <div className="flex justify-center py-4">
-                        <div className="flex items-center space-x-2 text-gray-500">
-                          <Loader2 className="animate-spin h-4 w-4" />
-                          <span className="text-sm">Loading messages...</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                    </div>
+                  )}
+                  {/* Scroll anchor */}
+                  <div ref={messagesEndRef} />
+                </div>
               </div>
             </div>
 
