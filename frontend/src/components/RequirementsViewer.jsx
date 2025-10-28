@@ -26,10 +26,23 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
         per_page: 10,
         page,
       });
+      console.log('Fetching requirements with params:', {
+        projectId,
+        filters,
+        page,
+        params: params.toString()
+      });
+      
       const response = await apiFetch(`/api/projects/${projectId}/requirements?${params}`);
-      console.log('Requirements response:', response); // Debug log
+      console.log('Requirements API Response:', {
+        success: response?.success,
+        total: response?.total,
+        dataLength: response?.data?.length,
+        fullResponse: response
+      });
       
       if (!response || response.success === false) {
+        console.error('API Error Response:', response);
         throw new Error(response?.message || 'Failed to fetch requirements');
       }
 

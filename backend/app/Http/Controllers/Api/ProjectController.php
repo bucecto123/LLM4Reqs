@@ -18,45 +18,30 @@ class ProjectController extends Controller
         $this->project_service = $project_service;
     }
 
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
         $projects = Project::all();
         return response()->json($projects);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(ProjectRequest $request)
     {
         $new_user = $this->project_service->createProject($request->validated());
         return response()->json($new_user, 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(string $id)
     {
         $project = Project::findOrFail($id);
         return response()->json($project);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(ProjectRequest $request, string $id)
     {
         $project = $this->project_service->updateProject($id, $request->validated());
         return response()->json($project, 200);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(string $id)
     {
         $this->project_service->deleteProject($id);
@@ -66,44 +51,39 @@ class ProjectController extends Controller
     public function getRequirements(string $projectId)
     {
         try {
-            // First verify the project exists
+            // Find the project
             $project = Project::findOrFail($projectId);
-            
-            // Debug project and requirements existence
-            Log::info('Project and Requirements Check', [
+
+            // Log project information
+            Log::info('Project Information', [
                 'project_id' => $project->id,
-                'project_name' => $project->name,
-                'direct_requirements_count' => Requirement::where('project_id', $project->id)->count(),
-                'relationship_requirements_count' => $project->requirements()->count(),
-                'has_requirements_relation' => method_exists($project, 'requirements'),
+                'project_name' => $project->name
             ]);
+
+            // Build the base query
+            $query = Requirement::where('project_id', $project->id)->with('document');
             
-            // Start building the query
-            $query = Requirement::where('project_id', $project->id)
-                              ->with('document');
-            
-            // Log the initial query state
-            Log::info('Initial Requirements Query', [
-                'sql' => $query->toSql(),
+            // Debug query
+            Log::info('SQL Query Debug', [
+                'raw_sql' => $query->toSql(),
                 'bindings' => $query->getBindings(),
-                'count' => $query->count(),
-                'raw_results' => $query->get(['id', 'title', 'requirement_type'])->toArray()
+                'project_id' => $project->id,
+                'all_requirements' => Requirement::count(),
+                'project_requirements' => Requirement::where('project_id', $project->id)->count()
             ]);
-        
-            // Apply filters if provided
-            if (request()->has('type')) {
+
+            // Apply filters only if they have non-empty values
+            if (request()->filled('type')) {
                 $query->where('requirement_type', request('type'));
             }
             
-            if (request()->has('priority')) {
+            if (request()->filled('priority')) {
                 $query->where('priority', request('priority'));
             }
             
-            if (request()->has('status')) {
+            if (request()->filled('status')) {
                 $query->where('status', request('status'));
-            }
-            
-            // Search by text
+            }            // Apply search
             if (request()->has('search')) {
                 $search = request('search');
                 $query->where(function($q) use ($search) {
@@ -111,41 +91,36 @@ class ProjectController extends Controller
                       ->orWhere('requirement_text', 'like', "%{$search}%");
                 });
             }
-            
-            // Debug after filters
-            Log::info('After applying filters', [
-                'sql' => $query->toSql(),
-                'bindings' => $query->getBindings(),
-                'count' => $query->count()
-            ]);
-            
-            // Order by
+
+            // Add withTrashed if requested
+            if (request('with_trashed', false)) {
+                $query->withTrashed();
+            }
+
+            // Sorting
             $orderBy = request('order_by', 'created_at');
             $orderDir = request('order_dir', 'desc');
             $query->orderBy($orderBy, $orderDir);
 
-            // Check for and include soft deleted items if requested
-            if (request('with_trashed', false)) {
-                $query->withTrashed();
-            }
-            
             // Get paginated results
             $perPage = request('per_page', 15);
             $requirements = $query->paginate($perPage);
-            
-            // Get final counts for active and deleted items
+
+            // Get counts
             $totalCount = $requirements->total();
             $activeCount = $query->withoutTrashed()->count();
             $deletedCount = $totalCount - $activeCount;
-            
-            Log::info('Final counts', [
-                'project_id' => $projectId,
+
+            // Log the results
+            Log::info('Requirements Query Results', [
                 'total_count' => $totalCount,
                 'active_count' => $activeCount,
                 'deleted_count' => $deletedCount,
-                'items_in_page' => count($requirements->items())
+                'current_page' => $requirements->currentPage(),
+                'per_page' => $requirements->perPage()
             ]);
-            
+
+            // Prepare response
             $response = [
                 'success' => true,
                 'data' => $requirements->items(),
@@ -158,21 +133,16 @@ class ProjectController extends Controller
                     'deleted_count' => $deletedCount
                 ]
             ];
-            
-            Log::info('Sending response', [
-                'data_count' => count($response['data']),
-                'total' => $response['total']
-            ]);
-            
+
             return response()->json($response);
-            
+
         } catch (\Exception $e) {
             Log::error('Error in getRequirements', [
                 'project_id' => $projectId,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch requirements: ' . $e->getMessage()
@@ -180,15 +150,10 @@ class ProjectController extends Controller
         }
     }
 
-    /**
-     * Get requirement conflicts for a project.
-     * GET /api/projects/{id}/conflicts
-     */
     public function getConflicts(string $projectId)
     {
         $project = Project::findOrFail($projectId);
         
-        // Get conflicts with related requirements
         $conflicts = $project->requirementConflicts()
             ->with([
                 'requirement1' => function($query) {
