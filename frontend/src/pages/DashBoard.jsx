@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Menu } from 'lucide-react';
 import { apiFetch } from '../utils/auth.js';
 import { useDashboard } from '../hooks/useDashboard.js';
 import Sidebar from '../components/dashboard/Sidebar.jsx';
@@ -44,12 +45,17 @@ export default function LLMDashboard() {
     conversationDocuments,
     setConversationDocuments,
     messagesEndRef,
+    isMobile,
     loadMessages,
     loadConversations,
     loadConversationDocuments,
     performLogout
   } = useDashboard();
   
+
+  const toggleSidebar = () => {
+  setIsSidebarOpen(!isSidebarOpen);
+  };
   // Streaming state - simpler approach
   const [streamingMessageId, setStreamingMessageId] = useState(null);
   const streamingTimeoutRef = useRef(null);
@@ -502,6 +508,8 @@ export default function LLMDashboard() {
   return (
     <div className="flex h-screen bg-gray-50 relative">
       <Sidebar
+        isMobile={isMobile}
+        onToggleSidebar={toggleSidebar}
         isSidebarOpen={isSidebarOpen}
         conversations={conversations}
         selectedConversation={selectedConversation}
@@ -513,8 +521,8 @@ export default function LLMDashboard() {
         fullName={fullName}
         onCreateNewConversation={createNewConversation}
         onSelectConversation={(conv) => {
-          setSelectedConversation(conv);
-          setIsNewChatMode(false);
+        setSelectedConversation(conv);
+        setIsNewChatMode(false);
         }}
         onStartEditingConversation={startEditingConversation}
         onCancelEditing={cancelEditing}
@@ -556,6 +564,8 @@ export default function LLMDashboard() {
         isNewChatMode={isNewChatMode}
         streamingMessageId={streamingMessageId}
         messagesEndRef={messagesEndRef}
+        isMobile={isMobile}
+        isSidebarOpen={isSidebarOpen}
       />
 
       {isFileUploadOpen && (

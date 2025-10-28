@@ -4,17 +4,40 @@ import { apiFetch } from '../utils/auth';
 import { useAuth, useLogout } from './useAuth.jsx';
 
 export const useDashboard = () => {
-  // Authentication
+   // Authentication
   const { user, isAuthenticated } = useAuth();
   const { logout: performLogout } = useLogout();
+  
+  // Mobile responsiveness and sidebar state
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 768);
+  
+  // Handle mobile detection and sidebar state
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      // Only auto-adjust sidebar when switching between mobile and desktop
+      if (mobile !== (window.innerWidth < 768)) {
+        setIsSidebarOpen(!mobile);
+      }
+    };
+    
+    // Initial check
+    checkMobile();
+    
+    // Add resize listener
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   // URL parameters for project selection
   const [searchParams, setSearchParams] = useSearchParams();
   
   // State
   const [message, setMessage] = useState('');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [chatMode, setChatMode] = useState("normal"); // 'normal' or 'project' - normal chat doesn't create projects
+  const [chatMode, setChatMode] = useState("normal");
   
   // Chat state
   const [conversations, setConversations] = useState([]);
@@ -50,36 +73,28 @@ export const useDashboard = () => {
       const data = await apiFetch('/api/projects');
       setProjects(Array.isArray(data) ? data : []);
       
-      // Check if a specific project was requested via URL parameter
       const projectIdFromUrl = searchParams.get('project');
       
       if (projectIdFromUrl) {
-        // User selected a project from the projects page
         const projectId = parseInt(projectIdFromUrl);
         const projectExists = data?.some(p => p.id === projectId);
         
         if (projectExists) {
           setChatMode('project');
           setCurrentProjectId(projectId);
-          // Remove the query parameter after setting the project
           setSearchParams({});
         } else {
           console.warn(`Project ${projectId} not found`);
         }
       } else if (chatMode === "project") {
-        // Only set project ID if in project mode
         if (data && data.length > 0) {
-          // Use the first available project
           setCurrentProjectId(data[0].id);
         } else {
-          // Create a default project if none exist and we're in project mode
           await createDefaultProject();
         }
       }
-      // In normal mode, we don't need a project
     } catch (err) {
       console.error('Failed to load projects:', err);
-      // Try to create a default project only if in project mode
       if (chatMode === "project") {
         await createDefaultProject();
       }
@@ -125,7 +140,7 @@ export const useDashboard = () => {
       } else if (chatMode === "project" && currentProjectId) {
         data = await apiFetch(`/api/projects/${currentProjectId}/conversations`);
       } else {
-        return; // Don't try to load if no project ID in project mode
+        return;
       }
       setConversations(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -140,7 +155,10 @@ export const useDashboard = () => {
     try {
       setIsLoadingMessages(true);
       const data = await apiFetch(`/api/conversations/${conversationId}/messages`);
-      setMessages(Array.isArray(data) ? data : []);
+      
+      // FIX: Handle the wrapped response format { messages: [...] }
+      const messagesList = data.messages || data;
+      setMessages(Array.isArray(messagesList) ? messagesList : []);
       setError(null);
       
       // Also load documents for this conversation
@@ -157,7 +175,6 @@ export const useDashboard = () => {
   // Load documents for a conversation
   const loadConversationDocuments = async (conversationId) => {
     try {
-      // Get all documents for the current project and filter by conversation_id
       if (chatMode === "project" && currentProjectId) {
         const data = await apiFetch(`/api/projects/${currentProjectId}/documents`);
         const conversationDocs = data.documents?.filter(doc => doc.conversation_id == conversationId) || [];
@@ -171,10 +188,8 @@ export const useDashboard = () => {
 
   // Effects
   useEffect(() => {
-    // Always load projects (user might switch to project mode later)
-    // But don't create default projects unless in project mode
     loadProjects();
-  }, [chatMode]); // Re-run when chat mode changes
+  }, [chatMode]);
 
   useEffect(() => {
     if (chatMode === "normal") {
@@ -183,6 +198,14 @@ export const useDashboard = () => {
       loadConversations();
     }
   }, [chatMode, currentProjectId]);
+
+  // FIX: Auto-load messages when conversation is selected
+  useEffect(() => {
+    if (selectedConversation?.id) {
+      console.log('Loading messages for conversation:', selectedConversation.id);
+      loadMessages(selectedConversation.id);
+    }
+  }, [selectedConversation?.id]);
 
   useEffect(() => {
     scrollToBottom();
@@ -229,6 +252,7 @@ export const useDashboard = () => {
     conversationDocuments,
     setConversationDocuments,
     messagesEndRef,
+    isMobile, // ADD THIS LINE
     
     // Functions
     loadProjects,
