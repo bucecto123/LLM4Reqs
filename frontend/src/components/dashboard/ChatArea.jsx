@@ -1,7 +1,7 @@
-// ChatArea.jsx - FIXED VERSION WITHOUT MENU BUTTON
+// ChatArea.jsx - CLEAN VERSION WITHOUT MOBILE TOGGLE (moved to sidebar)
 
 import React from 'react';
-import { MessageSquare, Loader2, Paperclip, FolderOpen, MessageCircle, X, Database, Menu } from 'lucide-react';
+import { MessageSquare, Loader2, Paperclip, FolderOpen, MessageCircle, X, Database } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
 import WelcomeScreen from './WelcomeScreen';
@@ -41,7 +41,7 @@ const ChatArea = ({
   isNewChatMode,
   // Scroll ref
   messagesEndRef,
-  // Sidebar props - not used anymore
+  // Sidebar props
   isMobile,
   isSidebarOpen,
   onToggleSidebar
@@ -50,27 +50,21 @@ const ChatArea = ({
   const showWelcome = !selectedConversation || (messages.length === 0 && !isLoading);
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
       <header 
-        className="border-b px-4 md:px-6 py-4"
+        className={`border-b py-4 ${
+          isMobile && !isSidebarOpen ? 'pl-14 pr-4' : 'px-4 md:px-6'
+        }`}
         style={{ 
-          backgroundColor: chatMode === 'project' ? '#F0F9FF' : '#FFFFFF',
-          borderColor: chatMode === 'project' ? '#BFDBFE' : '#E5E7EB'
+          background: chatMode === 'project' 
+            ? 'linear-gradient(to right, #EFF6FF, #DBEAFE)' 
+            : 'linear-gradient(to right, #F8FAFC, #F1F5F9)',
+          borderColor: chatMode === 'project' ? '#BFDBFE' : '#E2E8F0'
         }}
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 md:space-x-4">
-            {/* Sidebar Toggle Button */}
-            <button
-              onClick={onToggleSidebar}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-              title={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
-              aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
-            >
-              <Menu size={20} style={{ color: '#112D4E' }} />
-            </button>
-
             {/* Mode Badge */}
             {chatMode === 'project' && currentProject ? (
               <div className="flex items-center space-x-2 px-2 md:px-3 py-1.5 rounded-lg border text-xs md:text-sm" style={{ backgroundColor: '#DBEAFE', borderColor: '#93C5FD', color: '#1E40AF' }}>
@@ -85,7 +79,7 @@ const ChatArea = ({
                 </button>
               </div>
             ) : (
-              <div className="flex items-center space-x-2 px-2 md:px-3 py-1.5 rounded-lg text-xs md:text-sm" style={{ backgroundColor: '#F3F4F6', color: '#6B7280' }}>
+              <div className="flex items-center space-x-2 px-2 md:px-3 py-1.5 rounded-lg text-xs md:text-sm ml-2" style={{ backgroundColor: '#DBE2EF', color: '#112D4E' }}>
                 <MessageCircle className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0" />
                 <span className="font-medium">Normal Chat</span>
               </div>
@@ -160,7 +154,7 @@ const ChatArea = ({
       </header>
 
       {/* Chat Content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {showWelcome ? (
           <WelcomeScreen
             message={message}
@@ -180,30 +174,28 @@ const ChatArea = ({
             <div 
               className="flex-1 overflow-y-auto p-4 md:p-6" 
               style={{ 
-                maxHeight: 'calc(100vh - 200px)',
-                backgroundColor: chatMode === 'project' ? '#F8FAFC' : '#FFFFFF'
+                backgroundColor: chatMode === 'project' ? '#F8FAFC' : '#FFFFFF',
+                overscrollBehavior: 'contain'
               }}
             >
-              <div className="min-h-full">
-                <div className="space-y-4 pb-4">
-                  {messages.map((msg) => (
-                    <MessageBubble 
-                      key={msg.id} 
-                      message={msg}
-                      streamingMessageId={streamingMessageId}
-                    />
-                  ))}
-                  {isLoadingMessages && (
-                    <div className="flex justify-center py-4">
-                      <div className="flex items-center space-x-2 text-gray-500">
-                        <Loader2 className="animate-spin h-4 w-4" />
-                        <span className="text-sm">Loading messages...</span>
-                      </div>
+              <div className="space-y-4 pb-4">
+                {messages.map((msg) => (
+                  <MessageBubble 
+                    key={msg.id} 
+                    message={msg}
+                    streamingMessageId={streamingMessageId}
+                  />
+                ))}
+                {isLoadingMessages && (
+                  <div className="flex justify-center py-4">
+                    <div className="flex items-center space-x-2 text-gray-500">
+                      <Loader2 className="animate-spin h-4 w-4" />
+                      <span className="text-sm">Loading messages...</span>
                     </div>
-                  )}
-                  {/* Scroll anchor */}
-                  <div ref={messagesEndRef} />
-                </div>
+                  </div>
+                )}
+                {/* Scroll anchor */}
+                <div ref={messagesEndRef} />
               </div>
             </div>
 

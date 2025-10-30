@@ -16,11 +16,29 @@ export default function ProjectsPage() {
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDescription, setNewProjectDescription] = useState('');
   const [error, setError] = useState(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  
+  // Mobile and sidebar state
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 768);
   
   // Sidebar states (minimal since we're not showing conversations on projects page)
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
+
+  // Handle mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile !== (window.innerWidth < 768)) {
+        setIsSidebarOpen(!mobile);
+      }
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     loadProjects();
@@ -87,14 +105,16 @@ export default function ProjectsPage() {
       {/* Sidebar */}
       <Sidebar
         isSidebarOpen={isSidebarOpen}
+        isMobile={isMobile}
         conversations={conversations}
         selectedConversation={selectedConversation}
         editingConversationId={null}
         editingTitle=""
         showDropdownId={null}
         isInitializing={false}
-        currentProjectId={null}
         fullName={user?.name}
+        hasEmptyConversation={false}
+        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         onCreateNewConversation={() => navigate('/dashboard')}
         onSelectConversation={() => {}}
         onStartEditingConversation={() => {}}
@@ -110,14 +130,12 @@ export default function ProjectsPage() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="border-b bg-white px-6 py-4 flex items-center justify-between">
+        <header 
+          className={`border-b bg-white py-4 flex items-center justify-between ${
+            isMobile && !isSidebarOpen ? 'pl-14 pr-6' : 'px-6'
+          }`}
+        >
           <div className="flex items-center space-x-4">
-            <button
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              <Menu size={20} style={{ color: '#112D4E' }} />
-            </button>
             <h1 className="text-2xl font-bold" style={{ color: '#112D4E' }}>Projects</h1>
           </div>
           

@@ -566,6 +566,7 @@ export default function LLMDashboard() {
         messagesEndRef={messagesEndRef}
         isMobile={isMobile}
         isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={toggleSidebar}
       />
 
       {isFileUploadOpen && (

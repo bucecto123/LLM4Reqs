@@ -37,94 +37,96 @@ const MessageBubble = ({ message, streamingMessageId }) => {
             </div>
           ) : (
             <div className="relative">
-              <div className="prose prose-sm max-w-none text-gray-800" style={{ display: 'inline' }}>
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    p: ({ children }) => (
-                      <p className="mb-2 last:mb-0" style={{ display: 'inline' }}>{children}</p>
-                    ),
-                    ul: ({ children }) => (
-                      <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>
-                    ),
-                    ol: ({ children }) => (
-                      <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>
-                    ),
-                    li: ({ children }) => (
-                      <li className="mb-1">{children}</li>
-                    ),
-                    strong: ({ children }) => (
-                      <strong className="font-semibold">{children}</strong>
-                    ),
-                    em: ({ children }) => (
-                      <em className="italic">{children}</em>
-                    ),
-                    table: ({ children }) => (
-                    <div className="overflow-x-auto my-4">
-                      <table className="min-w-full divide-y divide-gray-500 border border-gray-600 bg-gray-100">
-                        {children}
-                      </table>
-                    </div>
-                  ),
-                  thead: ({ children }) => (
-                    <thead className="bg-gray-700 text-gray-100">{children}</thead>
-                  ),
-                  tbody: ({ children }) => (
-                    <tbody className="divide-y divide-gray-400 bg-gray-200">{children}</tbody>
-                  ),
-                  tr: ({ children }) => (
-                    <tr className="hover:bg-gray-300 transition-colors duration-150">{children}</tr>
-                  ),
-                  th: ({ children }) => (
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-100 border-r border-gray-600 last:border-r-0">
-                      {children}
-                    </th>
-                  ),
-                  td: ({ children }) => (
-                    <td className="px-3 py-2 text-sm text-gray-800 border-r border-gray-500 last:border-r-0">
-                      {children}
-                    </td>
-                  ),
-                    code({ inline, className, children, ...props }) {
-                      const match = /language-(\w+)/.exec(className || '');
-                      return !inline && match ? (
-                        <SyntaxHighlighter
-                          style={tomorrow}
-                          language={match[1]}
-                          PreTag="div"
-                          className="rounded-md text-sm my-2"
-                          {...props}
-                        >
-                          {String(children).replace(/\n$/, '')}
-                        </SyntaxHighlighter>
-                      ) : (
-                        <code className="bg-gray-200 text-gray-800 px-1.5 py-0.5 rounded text-xs font-mono" {...props}>
+              {/* Wrapper for markdown + cursor */}
+              <span className="inline-block w-full">
+                <div className="prose prose-sm max-w-none text-gray-800" style={{ display: 'inline' }}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      p: ({ children }) => (
+                        <span className="inline">{children}</span>
+                      ),
+                      ul: ({ children }) => (
+                        <ul className="list-disc list-inside my-2 space-y-1 block">{children}</ul>
+                      ),
+                      ol: ({ children }) => (
+                        <ol className="list-decimal list-inside my-2 space-y-1 block">{children}</ol>
+                      ),
+                      li: ({ children }) => (
+                        <li className="mb-1">{children}</li>
+                      ),
+                      strong: ({ children }) => (
+                        <strong className="font-semibold">{children}</strong>
+                      ),
+                      em: ({ children }) => (
+                        <em className="italic">{children}</em>
+                      ),
+                      table: ({ children }) => (
+                        <div className="overflow-x-auto my-4 block">
+                          <table className="min-w-full divide-y divide-gray-500 border border-gray-600 bg-gray-100">
+                            {children}
+                          </table>
+                        </div>
+                      ),
+                      thead: ({ children }) => (
+                        <thead className="bg-gray-700 text-gray-100">{children}</thead>
+                      ),
+                      tbody: ({ children }) => (
+                        <tbody className="divide-y divide-gray-400 bg-gray-200">{children}</tbody>
+                      ),
+                      tr: ({ children }) => (
+                        <tr className="hover:bg-gray-300 transition-colors duration-150">{children}</tr>
+                      ),
+                      th: ({ children }) => (
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-100 border-r border-gray-600 last:border-r-0">
                           {children}
-                        </code>
-                      );
-                    },
-                  }}
-                >
-                  {content}
-                </ReactMarkdown>
+                        </th>
+                      ),
+                      td: ({ children }) => (
+                        <td className="px-3 py-2 text-sm text-gray-800 border-r border-gray-500 last:border-r-0">
+                          {children}
+                        </td>
+                      ),
+                      code({ inline, className, children, ...props }) {
+                        const match = /language-(\w+)/.exec(className || '');
+                        return !inline && match ? (
+                          <SyntaxHighlighter
+                            style={tomorrow}
+                            language={match[1]}
+                            PreTag="div"
+                            className="rounded-md text-sm my-2 block"
+                            {...props}
+                          >
+                            {String(children).replace(/\n$/, '')}
+                          </SyntaxHighlighter>
+                        ) : (
+                          <code className="bg-gray-200 text-gray-800 px-1.5 py-0.5 rounded text-xs font-mono" {...props}>
+                            {children}
+                          </code>
+                        );
+                      },
+                    }}
+                  >
+                    {content}
+                  </ReactMarkdown>
+                </div>
                 
-                {/* Fish cursor - inline with text when streaming */}
+                {/* Fish cursor - inline with last character */}
                 {isStreaming && (
                   <span 
                     className="fish-cursor-animate"
                     style={{ 
-                      fontSize: '1.2em',
-                      verticalAlign: 'middle',
+                      fontSize: '1em',
                       display: 'inline',
-                      lineHeight: 1,
+                      marginLeft: '1px',
                       transform: 'scaleX(-1)',
-                      marginLeft: '2px'
+                      verticalAlign: 'baseline'
                     }}
                   >
                     🐟
                   </span>
                 )}
-              </div>
+              </span>
             </div>
           )}
         </div>
@@ -142,7 +144,7 @@ const MessageBubble = ({ message, streamingMessageId }) => {
             opacity: 1;
           }
           50% { 
-            opacity: 0.2;
+            opacity: 0.3;
           }
         }
         
