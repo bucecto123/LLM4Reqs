@@ -34,7 +34,11 @@ class DocumentController extends Controller
         Log::info('Document upload request received', [
             'has_file' => $request->hasFile('file'),
             'project_id' => $request->input('project_id'),
-            'conversation_id' => $request->input('conversation_id')
+            'conversation_id' => $request->input('conversation_id'),
+            'all_inputs' => $request->all(),
+            'files' => $request->allFiles(),
+            'content_type' => $request->header('Content-Type'),
+            'method' => $request->method()
         ]);
 
         // Validate the request

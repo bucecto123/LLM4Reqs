@@ -63,9 +63,9 @@ $frontendDir = Join-Path $repoRoot 'frontend'
 $frontendScript = "cd '$frontendDir' ; npm run dev"
 Start-WindowedProcess -Title 'Frontend (npm run dev)' -ScriptBlock $frontendScript
 
-# 3) Start backend: php artisan serve
+# 3) Start backend: php artisan serve with increased upload limits
 $backendDir = Join-Path $repoRoot 'backend'
-$backendScript = "cd '$backendDir' ; php artisan serve --port=8001"
+$backendScript = "cd '$backendDir' ; php -d upload_max_filesize=20M -d post_max_size=25M artisan serve --port=8001"
 Start-WindowedProcess -Title 'Backend (php artisan)' -ScriptBlock $backendScript
 
 Write-Host "Started dev services. Use the opened windows to view logs."
