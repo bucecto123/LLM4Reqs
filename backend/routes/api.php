@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\PersonaController;
+use App\Http\Controllers\Api\ConflictController;
 use App\Models\Persona;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -66,6 +67,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/documents', [DocumentController::class, 'upload']);
     Route::post('/documents/{id}/process', [DocumentController::class, 'processDocument']);
     Route::get('/projects/{id}/documents', [DocumentController::class, 'getProjectDocuments']);
+
+    // Conflict Detection API
+    Route::post('/projects/{project}/conflicts/detect', [ConflictController::class, 'detectConflicts']);
+    Route::get('/conflicts/status/{jobId}', [ConflictController::class, 'getJobStatus']);
+    Route::post('/conflicts/process/{jobId}', [ConflictController::class, 'processJob']);
+    Route::get('/projects/{project}/conflicts', [ConflictController::class, 'getProjectConflicts']);
+    Route::put('/conflicts/{conflict}/resolve', [ConflictController::class, 'resolveConflict']);
+    Route::delete('/conflicts/{conflict}', [ConflictController::class, 'deleteConflict']);
 
     // Personas API
     Route::get('/personas', [PersonaController::class,'index']);

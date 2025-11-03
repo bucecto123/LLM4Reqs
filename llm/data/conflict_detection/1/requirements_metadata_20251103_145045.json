@@ -1,0 +1,128 @@
+[
+  {
+    "req_id": "1",
+    "text": "The system must provide human-AI tutoring to improve student learning outcomes.",
+    "cluster_id": 1,
+    "tags": []
+  },
+  {
+    "req_id": "2",
+    "text": "The system must integrate with existing educational platforms such as i-Ready.",
+    "cluster_id": 3,
+    "tags": []
+  },
+  {
+    "req_id": "3",
+    "text": "The system must ensure personalized instructional approaches for students.",
+    "cluster_id": 1,
+    "tags": []
+  },
+  {
+    "req_id": "4",
+    "text": "The system must be cost-effective and scalable for widespread adoption.",
+    "cluster_id": -1,
+    "tags": []
+  },
+  {
+    "req_id": "5",
+    "text": "The system must ensure data privacy and security for student information.",
+    "cluster_id": 1,
+    "tags": []
+  },
+  {
+    "req_id": "6",
+    "text": "The system will be used in a socioeconomically diverse student population.",
+    "cluster_id": -1,
+    "tags": []
+  },
+  {
+    "req_id": "7",
+    "text": "The system must be compatible with existing educational infrastructure and technology.",
+    "cluster_id": 3,
+    "tags": []
+  },
+  {
+    "req_id": "8",
+    "text": "The AI tutor system must provide personalized assistance to students.",
+    "cluster_id": 1,
+    "tags": []
+  },
+  {
+    "req_id": "9",
+    "text": "The AI tutor system must adapt to individual learning styles.",
+    "cluster_id": 1,
+    "tags": []
+  },
+  {
+    "req_id": "10",
+    "text": "The AI tutor system must provide immediate feedback to students.",
+    "cluster_id": 1,
+    "tags": []
+  },
+  {
+    "req_id": "11",
+    "text": "The AI tutor system must ensure effective implementation and integration into educational systems.",
+    "cluster_id": 1,
+    "tags": []
+  },
+  {
+    "req_id": "12",
+    "text": "The AI tutor system must address concerns about privacy and data security.",
+    "cluster_id": 1,
+    "tags": []
+  },
+  {
+    "req_id": "13",
+    "text": "The AI tutor system must minimize potential biases in AI algorithms.",
+    "cluster_id": 1,
+    "tags": []
+  },
+  {
+    "req_id": "14",
+    "text": "The AI tutor system will be used in programming education.",
+    "cluster_id": 1,
+    "tags": []
+  },
+  {
+    "req_id": "15",
+    "text": "Students will have prior knowledge and experience with AI technologies.",
+    "cluster_id": 1,
+    "tags": []
+  },
+  {
+    "req_id": "16",
+    "text": "The system must provide instant feedback to students on their pronunciation skills",
+    "cluster_id": 0,
+    "tags": []
+  },
+  {
+    "req_id": "17",
+    "text": "The system must be able to recognize and correct English pronunciation errors",
+    "cluster_id": 0,
+    "tags": []
+  },
+  {
+    "req_id": "18",
+    "text": "The system must support both British and American English accents",
+    "cluster_id": 0,
+    "tags": []
+  },
+  {
+    "req_id": "19",
+    "text": "The system must be user-friendly and easy to use for students and teachers",
+    "cluster_id": 2,
+    "tags": []
+  },
+  {
+    "req_id": "20",
+    "text": "The system must be integrated with existing Learning Management Systems (LMS)",
+    "cluster_id": -1,
+    "tags": []
+  },
+  {
+    "req_id": "21",
+    "text": "Students and teachers will have access to the necessary technology and internet connectivity to use the system",
+    "cluster_id": 2,
+    "tags": []
+  }
+]

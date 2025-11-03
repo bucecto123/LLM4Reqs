@@ -5,3 +5,17 @@ __pycache__/
 *.pyc
 env/
 *.sqlite*
+
+# LLM Model files - DO NOT COMMIT
+llm/models/
+llm/faiss_store/
+*.safetensors
+*.pt
+*.pth
+*.bin
+checkpoint-*/
+runs/
+
+# Data files
+llm/data/*.csv
+llm/data/*.json

@@ -33,6 +33,13 @@ try:
 except Exception:
     build_index_for_project = None
 
+# Import conflict detection router
+try:
+    from conflict_detection_api import router as conflict_router
+except Exception as e:
+    print(f"Warning: Conflict detection API not available: {e}")
+    conflict_router = None
+
 load_dotenv()
 
 app = FastAPI(
@@ -40,6 +47,10 @@ app = FastAPI(
     description="LLM-powered requirement extraction and generation using Groq",
     version="1.0.0",
 )
+
+# Register conflict detection router
+if conflict_router:
+    app.include_router(conflict_router)
 
 # CORS configuration for Laravel
 app.add_middleware(
