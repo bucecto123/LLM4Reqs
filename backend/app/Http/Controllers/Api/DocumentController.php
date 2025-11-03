@@ -200,22 +200,72 @@ class DocumentController extends Controller
     {
         try {
             if (class_exists('Smalot\PdfParser\Parser')) {
-                $parser = new \Smalot\PdfParser\Parser();
-                $pdf = $parser->parseFile($filePath);
-                $text = $pdf->getText();
+                // Try parsing with lenient configuration first
+                try {
+                    // Check if Config class exists (it may not in older versions)
+                    if (class_exists('Smalot\PdfParser\Config')) {
+                        $config = new \Smalot\PdfParser\Config();
+                        $config->setRetainImageContent(false); // Don't extract images
+                        $parser = new \Smalot\PdfParser\Parser([], $config);
+                    } else {
+                        $parser = new \Smalot\PdfParser\Parser();
+                    }
+                    
+                    $pdf = $parser->parseFile($filePath);
+                    $text = $pdf->getText();
+                } catch (\Exception $parseError) {
+                    Log::warning('PDF parsing error, attempting fallback', [
+                        'error' => $parseError->getMessage()
+                    ]);
+                    
+                    // Try with default config as fallback
+                    $parser = new \Smalot\PdfParser\Parser();
+                    $pdf = $parser->parseFile($filePath);
+                    $text = $pdf->getText();
+                }
                 
+                // Clean up the text
                 $text = trim($text);
-                $text = preg_replace('/\s+/', ' ', $text);
                 
-                return $text ?: "PDF processed but no readable text found.";
+                // Normalize whitespace but preserve paragraph breaks
+                $text = preg_replace('/[ \t]+/', ' ', $text);
+                $text = preg_replace('/\n{3,}/', "\n\n", $text);
+                
+                // Check if we got meaningful content
+                $text = trim($text);
+                if (empty($text)) {
+                    Log::warning('PDF parsed but no text extracted', [
+                        'file_path' => $filePath
+                    ]);
+                    return "PDF processed but no readable text found. The PDF may contain only images or scanned content.";
+                }
+                
+                // Log extraction success
+                Log::info('PDF text extracted successfully', [
+                    'text_length' => strlen($text),
+                    'has_content' => !empty($text)
+                ]);
+                
+                return $text;
             }
             
             return "PDF file uploaded. Text extraction requires pdfparser library. Please install: composer require smalot/pdfparser";
         } catch (\Exception $e) {
             Log::error('PDF extraction failed', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'file_path' => $filePath,
+                'trace' => $e->getTraceAsString()
             ]);
-            return "Error processing PDF: " . $e->getMessage();
+            
+            // Return a more informative error message
+            $errorMsg = $e->getMessage();
+            if (str_contains($errorMsg, 'Unable to find object')) {
+                return "Error processing PDF: The PDF file may be corrupted or use an unsupported format. Try re-saving the PDF or converting it to a standard PDF format.";
+            } elseif (str_contains($errorMsg, 'Encoding')) {
+                return "Error processing PDF: The PDF uses an encoding that is not currently supported. Text content may not be extractable from this file.";
+            }
+            
+            return "Error processing PDF: " . $errorMsg;
         }
     }
 

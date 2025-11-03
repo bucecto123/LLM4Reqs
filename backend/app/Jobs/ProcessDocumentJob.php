@@ -86,8 +86,11 @@ class ProcessDocumentJob implements ShouldQueue, ShouldBeUnique
             ]);
 
             // Truncate if too long (keep more content for better extraction)
-            if (mb_strlen($content, 'UTF-8') > 12000) {
-                $content = mb_substr($content, 0, 12000, 'UTF-8') . "\n... [Document truncated for processing]";
+            // Adjust based on content complexity
+            $maxLength = 10000; // Reduced to ensure LLM response fits within token limits
+            
+            if (mb_strlen($content, 'UTF-8') > $maxLength) {
+                $content = mb_substr($content, 0, $maxLength, 'UTF-8') . "\n... [Document truncated for processing]";
                 Log::info('ProcessDocumentJob: Content truncated', [
                     'document_id' => $document->id,
                     'final_length' => mb_strlen($content, 'UTF-8')
@@ -97,13 +100,52 @@ class ProcessDocumentJob implements ShouldQueue, ShouldBeUnique
             // Call LLM service to extract requirements
             Log::info('ProcessDocumentJob: Calling LLM service', [
                 'document_id' => $document->id,
-                'service_url' => config('services.llm.url')
+                'service_url' => config('services.llm.url'),
+                'content_length' => mb_strlen($content, 'UTF-8')
             ]);
 
-            $result = $llmService->extractRequirements(
-                $content,
-                (string)($document->file_type ?? 'text/plain')
-            );
+            try {
+                $result = $llmService->extractRequirements(
+                    $content,
+                    (string)($document->file_type ?? 'text/plain')
+                );
+            } catch (\Exception $llmError) {
+                Log::error('ProcessDocumentJob: LLM service error', [
+                    'document_id' => $document->id,
+                    'error' => $llmError->getMessage()
+                ]);
+                
+                // Check if it's a parsing error - might indicate content was too long
+                if (str_contains($llmError->getMessage(), 'Failed to parse')) {
+                    Log::warning('ProcessDocumentJob: Retrying with shorter content', [
+                        'document_id' => $document->id,
+                        'original_length' => mb_strlen($content, 'UTF-8')
+                    ]);
+                    
+                    // Retry with significantly shorter content
+                    $shorterContent = mb_substr($content, 0, 6000, 'UTF-8') . "\n... [Document further truncated due to processing constraints]";
+                    
+                    try {
+                        $result = $llmService->extractRequirements(
+                            $shorterContent,
+                            (string)($document->file_type ?? 'text/plain')
+                        );
+                        
+                        Log::info('ProcessDocumentJob: Retry successful with shorter content', [
+                            'document_id' => $document->id,
+                            'shorter_length' => mb_strlen($shorterContent, 'UTF-8')
+                        ]);
+                    } catch (\Exception $retryError) {
+                        Log::error('ProcessDocumentJob: Retry also failed', [
+                            'document_id' => $document->id,
+                            'error' => $retryError->getMessage()
+                        ]);
+                        throw $retryError;
+                    }
+                } else {
+                    throw $llmError;
+                }
+            }
 
             Log::info('ProcessDocumentJob: LLM extraction complete', [
                 'document_id' => $document->id,

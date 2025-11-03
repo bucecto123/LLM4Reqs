@@ -530,6 +530,71 @@ def parse_json_response(content: str) -> Dict:
         )
 
 
+def _attempt_json_recovery(content: str) -> Dict:
+    """
+    Attempt to recover incomplete/truncated JSON from LLM response.
+    This handles cases where the response was cut off due to max_tokens limit.
+    """
+    content = content.strip()
+    
+    # Remove markdown code blocks
+    if content.startswith("```json"):
+        content = content[7:]
+    if content.startswith("```"):
+        content = content[3:]
+    if content.endswith("```"):
+        content = content[:-3]
+    content = content.strip()
+    
+    # Find the start of JSON
+    start = content.find("{")
+    if start == -1:
+        return None
+    
+    # Try to find the requirements array
+    req_start = content.find('"requirements"')
+    if req_start == -1:
+        return None
+    
+    # Find the array start
+    array_start = content.find("[", req_start)
+    if array_start == -1:
+        return None
+    
+    # Try to salvage complete requirement objects
+    requirements = []
+    current_pos = array_start + 1
+    brace_count = 0
+    obj_start = -1
+    
+    for i in range(current_pos, len(content)):
+        char = content[i]
+        
+        if char == '{':
+            if brace_count == 0:
+                obj_start = i
+            brace_count += 1
+        elif char == '}':
+            brace_count -= 1
+            if brace_count == 0 and obj_start != -1:
+                # We have a complete object
+                try:
+                    obj_str = content[obj_start:i+1]
+                    req_obj = json.loads(obj_str)
+                    # Validate it has required fields
+                    if "requirement_text" in req_obj:
+                        requirements.append(req_obj)
+                except:
+                    pass
+                obj_start = -1
+    
+    if requirements:
+        print(f"JSON recovery successful: salvaged {len(requirements)} requirements")
+        return {"requirements": requirements}
+    
+    return None
+
+
 def _get_rag_manager():
     """Get or create a RagManager instance."""
     if RagManager is None:
@@ -702,16 +767,33 @@ async def extract_requirements(request: ExtractionRequest):
         messages = [
             {
                 "role": "system",
-                "content": "You are Fishy, a requirements extraction expert. Always return valid JSON.",
+                "content": "You are Fishy, a requirements extraction expert. Always return valid JSON. If the text is long, prioritize extracting the most important requirements within your response limit.",
             },
             {"role": "user", "content": prompt},
         ]
 
+        # Increase max_tokens significantly to handle large PDFs
+        # Most models can handle 4000-8000 tokens in responses
+        max_tokens_to_use = 6000
+        
         # Use lower temperature for more consistent JSON output
         response_text, tokens_used = call_groq_chat(
-            messages, max_tokens=3000, temperature=0.3
+            messages, max_tokens=max_tokens_to_use, temperature=0.3
         )
-        parsed_data = parse_json_response(response_text)
+        
+        # Try to parse the response
+        try:
+            parsed_data = parse_json_response(response_text)
+        except HTTPException as parse_error:
+            # If JSON parsing failed due to truncation, try to salvage what we can
+            print(f"Initial JSON parsing failed, attempting recovery: {parse_error.detail}")
+            
+            # Try to extract and fix incomplete JSON
+            parsed_data = _attempt_json_recovery(response_text)
+            
+            if not parsed_data or "requirements" not in parsed_data:
+                # If recovery failed, raise the original error
+                raise parse_error
 
         requirements = [
             Requirement(**req) for req in parsed_data.get("requirements", [])
