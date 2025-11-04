@@ -5,6 +5,8 @@ namespace App\Jobs;
 use App\Models\KnowledgeBase;
 use App\Models\Project;
 use App\Services\LLMService;
+use App\Services\ConflictDetectionService;
+use App\Jobs\ProcessConflictDetectionJob;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -38,7 +40,7 @@ class KBBuildJob implements ShouldQueue, ShouldBeUnique
         return 'kb_build_' . $this->projectId;
     }
 
-    public function handle(LLMService $llmService): void
+    public function handle(LLMService $llmService, ConflictDetectionService $conflictService): void
     {
         // Acquire a cache lock per project to prevent concurrent KB builds
         $lockKey = "kb_build_lock_{$this->projectId}";
@@ -93,6 +95,9 @@ class KBBuildJob implements ShouldQueue, ShouldBeUnique
                 'documents_count' => count($documents),
             ]);
 
+            // Update progress: Starting KB build (0-50%)
+            $kb->updateProgress(10, 'building_index');
+
             // Call LLM service to build KB (use sync mode in job for immediate result)
             $result = $llmService->buildKnowledgeBase($this->projectId, $documents, 'sync');
 
@@ -101,9 +106,47 @@ class KBBuildJob implements ShouldQueue, ShouldBeUnique
                 'result' => $result,
             ]);
 
+            // Update progress: KB build complete, starting conflict detection (50%)
+            $kb->updateProgress(50, 'detecting_conflicts');
+
             // Update KB status
             if (isset($result['status']) && $result['status'] === 'completed') {
-                $kb->markAsReady($result);
+                
+                // ✨ NEW: Automatically trigger conflict detection after KB is built
+                Log::info('KBBuildJob: Triggering conflict detection', [
+                    'project_id' => $this->projectId
+                ]);
+                
+                try {
+                    $conflictResult = $conflictService->detectConflictsForProject($this->projectId);
+                    
+                    if (isset($conflictResult['job_id'])) {
+                        Log::info('KBBuildJob: Conflict detection initiated, dispatching processor', [
+                            'project_id' => $this->projectId,
+                            'job_id' => $conflictResult['job_id']
+                        ]);
+                        
+                        // Update progress: Conflict detection started (60%)
+                        $kb->updateProgress(60, 'processing_conflicts');
+                        
+                        // Dispatch background job to poll for results
+                        ProcessConflictDetectionJob::dispatch(
+                            $conflictResult['job_id'],
+                            $this->projectId
+                        )->delay(now()->addSeconds(5)); // Start checking after 5 seconds
+                    } else {
+                        // No conflicts to detect, mark as complete
+                        $kb->markAsReady($result);
+                    }
+                } catch (\Exception $e) {
+                    // Don't fail KB build if conflict detection fails
+                    Log::warning('KBBuildJob: Conflict detection failed, but KB build succeeded', [
+                        'project_id' => $this->projectId,
+                        'error' => $e->getMessage()
+                    ]);
+                    // Still mark KB as ready since the build itself succeeded
+                    $kb->markAsReady($result);
+                }
             } else {
                 $kb->markAsFailed($result['error'] ?? 'Unknown error during KB build');
             }

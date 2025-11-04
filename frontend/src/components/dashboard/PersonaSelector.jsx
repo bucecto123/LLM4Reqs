@@ -7,9 +7,7 @@ import {
   Sparkles,
   AlertCircle,
 } from "lucide-react";
-import axios from "axios";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8001/api";
+import { apiFetch } from "../../utils/auth";
 
 const PersonaSelector = ({
   selectedPersonaId,
@@ -31,20 +29,14 @@ const PersonaSelector = ({
       setLoading(true);
       setError(null);
 
-      const token = localStorage.getItem("token");
-      const response = await axios.get(`${API_URL}/personas`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      });
+      const response = await apiFetch("/api/personas");
 
-      if (response.data.success) {
-        setPersonas(response.data.data);
+      if (response.success) {
+        setPersonas(response.data);
       }
     } catch (err) {
       console.error("Error loading personas:", err);
-      setError(err.response?.data?.message || "Failed to load personas");
+      setError(err.message || "Failed to load personas");
     } finally {
       setLoading(false);
     }

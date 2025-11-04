@@ -1,0 +1,62 @@
+[
+  {
+    "req_id": "21",
+    "text": "The system shall allow users to transfer funds between accounts in real time",
+    "cluster_id": 0,
+    "tags": []
+  },
+  {
+    "req_id": "22",
+    "text": "The system shall send an SMS confirmation after each successful transfer",
+    "cluster_id": 0,
+    "tags": []
+  },
+  {
+    "req_id": "23",
+    "text": "The system shall support transfers up to $10,000 per transaction",
+    "cluster_id": 0,
+    "tags": []
+  },
+  {
+    "req_id": "24",
+    "text": "The system shall support unlimited transaction amounts for verified business users",
+    "cluster_id": 0,
+    "tags": []
+  },
+  {
+    "req_id": "25",
+    "text": "The system shall automatically log users out after 5 minutes of inactivity",
+    "cluster_id": 1,
+    "tags": []
+  },
+  {
+    "req_id": "26",
+    "text": "The system shall maintain user sessions for up to 15 minutes for convenience",
+    "cluster_id": 1,
+    "tags": []
+  },
+  {
+    "req_id": "27",
+    "text": "The system shall use AES-256 encryption for all stored financial data",
+    "cluster_id": -1,
+    "tags": []
+  },
+  {
+    "req_id": "28",
+    "text": "The system shall comply with PCI-DSS security standards",
+    "cluster_id": -1,
+    "tags": []
+  },
+  {
+    "req_id": "29",
+    "text": "The system shall display a summary of recent transactions on the dashboard",
+    "cluster_id": -1,
+    "tags": []
+  },
+  {
+    "req_id": "30",
+    "text": "The system shall require two-factor authentication before any transaction above $1,000",
+    "cluster_id": 0,
+    "tags": []
+  }
+]

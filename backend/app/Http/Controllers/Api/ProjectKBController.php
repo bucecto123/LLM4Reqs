@@ -72,6 +72,8 @@ class ProjectKBController extends Controller
                 'last_built_at' => $kb->last_built_at?->toIso8601String(),
                 'last_error' => $kb->last_error,
                 'is_ready' => $kb->isReady(),
+                'build_progress' => $kb->build_progress ?? 0,
+                'build_stage' => $kb->build_stage ?? 'not_started',
             ],
         ]);
     }

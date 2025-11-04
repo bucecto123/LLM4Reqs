@@ -1,12 +1,19 @@
-import React, { useState } from 'react';
-import { X, Upload, FileText, Loader2, Check, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { X, Upload, FileText, Loader2, Check, AlertCircle } from "lucide-react";
+import { apiFetch } from "../utils/auth";
 
 const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState({ completed: 0, total: 0 });
+  const [uploadProgress, setUploadProgress] = useState({
+    completed: 0,
+    total: 0,
+  });
   const [error, setError] = useState(null);
+  const [buildProgress, setBuildProgress] = useState(0);
+  const [buildStage, setBuildStage] = useState("");
+  const [isPolling, setIsPolling] = useState(false);
 
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
@@ -14,18 +21,18 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
   };
 
   const addFiles = (files) => {
-    const validFiles = files.filter(file => {
-      const isValidType = ['pdf', 'doc', 'docx', 'txt', 'md'].some(ext => 
+    const validFiles = files.filter((file) => {
+      const isValidType = ["pdf", "doc", "docx", "txt", "md"].some((ext) =>
         file.name.toLowerCase().endsWith(`.${ext}`)
       );
       const isValidSize = file.size <= 10 * 1024 * 1024; // 10MB
       return isValidType && isValidSize;
     });
-    setSelectedFiles(prev => [...prev, ...validFiles]);
+    setSelectedFiles((prev) => [...prev, ...validFiles]);
   };
 
   const removeFile = (index) => {
-    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleDragOver = (e) => {
@@ -45,6 +52,44 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
     addFiles(files);
   };
 
+  // Poll KB build progress
+  useEffect(() => {
+    if (!isPolling || !projectId) return;
+
+    const pollProgress = async () => {
+      try {
+        const response = await apiFetch(`/api/projects/${projectId}/kb/status`);
+        if (response.success && response.kb) {
+          const { build_progress, build_stage, status } = response.kb;
+          setBuildProgress(build_progress || 0);
+          setBuildStage(build_stage || "");
+
+          // Stop polling when complete or failed
+          if (status === "ready" || status === "failed") {
+            setIsPolling(false);
+            setIsUploading(false);
+
+            if (status === "ready") {
+              setTimeout(() => {
+                onClose();
+              }, 1500);
+            } else if (status === "failed") {
+              setError(response.kb.last_error || "KB build failed");
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to poll KB status:", err);
+      }
+    };
+
+    // Poll every 2 seconds
+    const interval = setInterval(pollProgress, 2000);
+    pollProgress(); // Initial poll
+
+    return () => clearInterval(interval);
+  }, [isPolling, projectId, onClose]);
+
   const handleUpload = async () => {
     if (selectedFiles.length === 0) return;
 
@@ -56,24 +101,37 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
       await onUpload(selectedFiles, (completed) => {
         setUploadProgress({ completed, total: selectedFiles.length });
       });
-      
-      // Success - close modal after a brief delay
-      setTimeout(() => {
-        onClose();
-      }, 1000);
+
+      // Start polling for build progress
+      setIsPolling(true);
+      setBuildProgress(0);
+      setBuildStage("building_index");
     } catch (err) {
-      console.error('KB upload failed:', err);
-      setError(err.message || 'Failed to upload documents. Please try again.');
+      console.error("KB upload failed:", err);
+      setError(err.message || "Failed to upload documents. Please try again.");
       setIsUploading(false);
     }
   };
 
   const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return "0 Bytes";
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB'];
+    const sizes = ["Bytes", "KB", "MB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
+  };
+
+  const getBuildStageText = (stage) => {
+    const stageTexts = {
+      initializing: "Initializing build...",
+      building_index: "Building Knowledge Base",
+      detecting_conflicts: "Initializing Conflict Detection",
+      processing_conflicts: "Detecting Conflicts",
+      saving_conflicts: "Saving Results",
+      completed: "Build Complete!",
+      failed: "Build Failed",
+    };
+    return stageTexts[stage] || "Processing...";
   };
 
   return (
@@ -82,11 +140,12 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
         {/* Header */}
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold" style={{ color: '#112D4E' }}>
+            <h2 className="text-xl font-bold" style={{ color: "#112D4E" }}>
               Build Knowledge Base
             </h2>
             <p className="text-sm text-gray-600 mt-1">
-              Upload documents for <span className="font-semibold">{projectName}</span>
+              Upload documents for{" "}
+              <span className="font-semibold">{projectName}</span>
             </p>
           </div>
           <button
@@ -106,14 +165,21 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+              isDragging
+                ? "border-blue-500 bg-blue-50"
+                : "border-gray-300 hover:border-gray-400"
             }`}
           >
-            <Upload 
-              size={48} 
-              className={`mx-auto mb-4 ${isDragging ? 'text-blue-500' : 'text-gray-400'}`}
+            <Upload
+              size={48}
+              className={`mx-auto mb-4 ${
+                isDragging ? "text-blue-500" : "text-gray-400"
+              }`}
             />
-            <p className="text-lg font-medium mb-2" style={{ color: '#112D4E' }}>
+            <p
+              className="text-lg font-medium mb-2"
+              style={{ color: "#112D4E" }}
+            >
               Drop documents here or click to browse
             </p>
             <p className="text-sm text-gray-500 mb-4">
@@ -131,11 +197,11 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
             <label
               htmlFor="kb-file-input"
               className={`inline-block px-6 py-2 rounded-lg font-medium cursor-pointer transition-all ${
-                isUploading 
-                  ? 'opacity-50 cursor-not-allowed' 
-                  : 'hover:shadow-md'
+                isUploading
+                  ? "opacity-50 cursor-not-allowed"
+                  : "hover:shadow-md"
               }`}
-              style={{ backgroundColor: '#4A7BA7', color: '#FFFFFF' }}
+              style={{ backgroundColor: "#4A7BA7", color: "#FFFFFF" }}
             >
               Select Files
             </label>
@@ -145,7 +211,7 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
           {selectedFiles.length > 0 && (
             <div className="mt-6">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold" style={{ color: '#112D4E' }}>
+                <h3 className="font-semibold" style={{ color: "#112D4E" }}>
                   Selected Files ({selectedFiles.length})
                 </h3>
                 {!isUploading && (
@@ -164,9 +230,15 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
                   >
                     <div className="flex items-center space-x-3 flex-1 min-w-0">
-                      <FileText size={20} className="text-gray-500 flex-shrink-0" />
+                      <FileText
+                        size={20}
+                        className="text-gray-500 flex-shrink-0"
+                      />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate" style={{ color: '#112D4E' }}>
+                        <p
+                          className="text-sm font-medium truncate"
+                          style={{ color: "#112D4E" }}
+                        >
                           {file.name}
                         </p>
                         <p className="text-xs text-gray-500">
@@ -184,7 +256,10 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
                     ) : index < uploadProgress.completed ? (
                       <Check size={20} className="text-green-600 ml-2" />
                     ) : (
-                      <Loader2 size={20} className="text-blue-600 animate-spin ml-2" />
+                      <Loader2
+                        size={20}
+                        className="text-blue-600 animate-spin ml-2"
+                      />
                     )}
                   </div>
                 ))}
@@ -193,10 +268,13 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
           )}
 
           {/* Upload Progress */}
-          {isUploading && (
+          {isUploading && !isPolling && (
             <div className="mt-6 p-4 bg-blue-50 rounded-lg">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium" style={{ color: '#112D4E' }}>
+                <span
+                  className="text-sm font-medium"
+                  style={{ color: "#112D4E" }}
+                >
                   Uploading documents...
                 </span>
                 <span className="text-sm text-gray-600">
@@ -207,10 +285,82 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
                 <div
                   className="h-2 rounded-full transition-all duration-300"
                   style={{
-                    width: `${(uploadProgress.completed / uploadProgress.total) * 100}%`,
-                    backgroundColor: '#4A7BA7'
+                    width: `${
+                      (uploadProgress.completed / uploadProgress.total) * 100
+                    }%`,
+                    backgroundColor: "#4A7BA7",
                   }}
                 />
+              </div>
+            </div>
+          )}
+
+          {/* KB Build Progress */}
+          {isPolling && (
+            <div className="mt-6 p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
+              <div className="flex items-center justify-between mb-2">
+                <span
+                  className="text-sm font-medium"
+                  style={{ color: "#112D4E" }}
+                >
+                  {getBuildStageText(buildStage)}
+                </span>
+                <span
+                  className="text-sm font-semibold"
+                  style={{ color: "#4A7BA7" }}
+                >
+                  {buildProgress}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div
+                  className="h-3 rounded-full transition-all duration-300 flex items-center justify-end pr-2"
+                  style={{
+                    width: `${buildProgress}%`,
+                    background:
+                      "linear-gradient(90deg, #9333ea 0%, #7c3aed 50%, #6366f1 100%)",
+                  }}
+                >
+                  {buildProgress > 10 && (
+                    <Loader2 size={12} className="text-white animate-spin" />
+                  )}
+                </div>
+              </div>
+              <div className="mt-2 flex items-center space-x-2 text-xs text-gray-600">
+                {buildStage === "building_index" && (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>
+                      Processing documents and building knowledge base...
+                    </span>
+                  </>
+                )}
+                {buildStage === "detecting_conflicts" && (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Starting conflict detection...</span>
+                  </>
+                )}
+                {buildStage === "processing_conflicts" && (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Analyzing requirements for conflicts...</span>
+                  </>
+                )}
+                {buildStage === "saving_conflicts" && (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Saving detected conflicts...</span>
+                  </>
+                )}
+                {buildStage === "completed" && (
+                  <>
+                    <Check size={14} className="text-green-600" />
+                    <span className="text-green-600">
+                      Build completed successfully!
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -218,9 +368,14 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
           {/* Error Message */}
           {error && (
             <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-3">
-              <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
+              <AlertCircle
+                size={20}
+                className="text-red-600 flex-shrink-0 mt-0.5"
+              />
               <div className="flex-1">
-                <p className="text-sm font-medium text-red-800">Upload Failed</p>
+                <p className="text-sm font-medium text-red-800">
+                  Upload Failed
+                </p>
                 <p className="text-sm text-red-600 mt-1">{error}</p>
               </div>
             </div>
@@ -230,17 +385,18 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
         {/* Footer */}
         <div className="px-6 py-4 border-t bg-gray-50 flex items-center justify-between rounded-b-xl">
           <p className="text-sm text-gray-600">
-            {selectedFiles.length === 0 
-              ? 'No files selected' 
-              : `${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''} ready to upload`
-            }
+            {selectedFiles.length === 0
+              ? "No files selected"
+              : `${selectedFiles.length} file${
+                  selectedFiles.length !== 1 ? "s" : ""
+                } ready to upload`}
           </p>
           <div className="flex items-center space-x-3">
             <button
               onClick={onClose}
               disabled={isUploading}
               className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
-              style={{ backgroundColor: '#F3F4F6', color: '#6B7280' }}
+              style={{ backgroundColor: "#F3F4F6", color: "#6B7280" }}
             >
               Cancel
             </button>
@@ -248,7 +404,7 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
               onClick={handleUpload}
               disabled={selectedFiles.length === 0 || isUploading}
               className="px-6 py-2 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md flex items-center space-x-2"
-              style={{ backgroundColor: '#4A7BA7', color: '#FFFFFF' }}
+              style={{ backgroundColor: "#4A7BA7", color: "#FFFFFF" }}
             >
               {isUploading ? (
                 <>

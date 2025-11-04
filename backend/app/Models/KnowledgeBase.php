@@ -19,6 +19,8 @@ class KnowledgeBase extends Model
         'last_built_at',
         'last_error',
         'job_id',
+        'build_progress',
+        'build_stage',
     ];
 
     protected $casts = [
@@ -46,12 +48,14 @@ class KnowledgeBase extends Model
     /**
      * Mark KB as building.
      */
-    public function markAsBuilding(string $jobId = null): void
+    public function markAsBuilding(?string $jobId = null): void
     {
         $this->update([
             'status' => 'building',
             'job_id' => $jobId,
             'last_error' => null,
+            'build_progress' => 0,
+            'build_stage' => 'initializing',
         ]);
     }
 
@@ -69,6 +73,8 @@ class KnowledgeBase extends Model
             'last_built_at' => now(),
             'last_error' => null,
             'job_id' => null,
+            'build_progress' => 100,
+            'build_stage' => 'completed',
         ]);
     }
 
@@ -81,6 +87,19 @@ class KnowledgeBase extends Model
             'status' => 'failed',
             'last_error' => $error,
             'job_id' => null,
+            'build_progress' => 0,
+            'build_stage' => 'failed',
+        ]);
+    }
+
+    /**
+     * Update build progress.
+     */
+    public function updateProgress(int $progress, string $stage): void
+    {
+        $this->update([
+            'build_progress' => $progress,
+            'build_stage' => $stage,
         ]);
     }
 }
