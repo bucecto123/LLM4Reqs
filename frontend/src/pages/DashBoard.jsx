@@ -47,6 +47,8 @@ export default function LLMDashboard() {
     setConversationDocuments,
     messagesEndRef,
     isMobile,
+    selectedPersonaId,
+    setSelectedPersonaId,
     loadMessages,
     loadConversations,
     loadConversationDocuments,
@@ -295,6 +297,9 @@ export default function LLMDashboard() {
       };
       if (chatMode === "project" && currentProjectId) {
         body.project_id = currentProjectId;
+      }
+      if (selectedPersonaId) {
+        body.persona_id = selectedPersonaId;
       }
 
       console.log("📤 Sending message...");
@@ -604,6 +609,8 @@ export default function LLMDashboard() {
         isMobile={isMobile}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={toggleSidebar}
+        selectedPersonaId={selectedPersonaId}
+        onPersonaChange={setSelectedPersonaId}
       />
 
       {isFileUploadOpen && (

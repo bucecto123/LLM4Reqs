@@ -12,6 +12,7 @@ import {
 import MessageBubble from "./MessageBubble";
 import ChatInput from "./ChatInput";
 import WelcomeScreen from "./WelcomeScreen";
+import PersonaSelector from "./PersonaSelector";
 
 const ChatArea = ({
   selectedConversation,
@@ -54,6 +55,9 @@ const ChatArea = ({
   isMobile,
   isSidebarOpen,
   onToggleSidebar,
+  // Persona props
+  selectedPersonaId,
+  onPersonaChange,
 }) => {
   // Show WelcomeScreen if no conversation is selected OR if conversation has no messages
   const showWelcome =
@@ -270,6 +274,8 @@ const ChatArea = ({
               isLoading={isLoading}
               isInitializing={isInitializing}
               currentProjectId={currentProjectId}
+              selectedPersonaId={selectedPersonaId}
+              onPersonaChange={onPersonaChange}
             />
           </>
         )}

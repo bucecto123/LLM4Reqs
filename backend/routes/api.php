@@ -77,5 +77,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/conflicts/{conflict}', [ConflictController::class, 'deleteConflict']);
 
     // Personas API
-    Route::get('/personas', [PersonaController::class,'index']);
+    Route::get('/personas', [PersonaController::class, 'index']);
+    Route::get('/personas/{id}', [PersonaController::class, 'show']);
+    Route::post('/personas', [PersonaController::class, 'store']);
+    Route::put('/personas/{id}', [PersonaController::class, 'update']);
+    Route::delete('/personas/{id}', [PersonaController::class, 'destroy']);
+    Route::get('/personas/{id}/stats', [PersonaController::class, 'stats']);
+    Route::post('/personas/{id}/prompt', [PersonaController::class, 'generatePrompt']);
 });

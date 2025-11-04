@@ -1,44 +1,44 @@
-import { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { apiFetch } from '../utils/auth';
-import { useAuth, useLogout } from './useAuth.jsx';
+import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
+import { apiFetch } from "../utils/auth";
+import { useAuth, useLogout } from "./useAuth.jsx";
 
 export const useDashboard = () => {
-   // Authentication
+  // Authentication
   const { user, isAuthenticated } = useAuth();
   const { logout: performLogout } = useLogout();
-  
+
   // Mobile responsiveness and sidebar state
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 768);
-  
+
   // Handle mobile detection and sidebar state
   useEffect(() => {
     const checkMobile = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
       // Only auto-adjust sidebar when switching between mobile and desktop
-      if (mobile !== (window.innerWidth < 768)) {
+      if (mobile !== window.innerWidth < 768) {
         setIsSidebarOpen(!mobile);
       }
     };
-    
+
     // Initial check
     checkMobile();
-    
+
     // Add resize listener
-    window.addEventListener('resize', checkMobile);
-    
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
-  
+
   // URL parameters for project selection
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
   // State
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
   const [chatMode, setChatMode] = useState("normal");
-  
+
   // Chat state
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
@@ -50,14 +50,17 @@ export const useDashboard = () => {
   const [projects, setProjects] = useState([]);
   const [isInitializing, setIsInitializing] = useState(true);
   const [editingConversationId, setEditingConversationId] = useState(null);
-  const [editingTitle, setEditingTitle] = useState('');
+  const [editingTitle, setEditingTitle] = useState("");
   const [showDropdownId, setShowDropdownId] = useState(null);
-  
+
   // File upload state
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [conversationDocuments, setConversationDocuments] = useState([]);
-  
+
+  // Persona state
+  const [selectedPersonaId, setSelectedPersonaId] = useState(null);
+
   // Refs
   const messagesEndRef = useRef(null);
 
@@ -70,17 +73,17 @@ export const useDashboard = () => {
   const loadProjects = async () => {
     try {
       setIsInitializing(true);
-      const data = await apiFetch('/api/projects');
+      const data = await apiFetch("/api/projects");
       setProjects(Array.isArray(data) ? data : []);
-      
-      const projectIdFromUrl = searchParams.get('project');
-      
+
+      const projectIdFromUrl = searchParams.get("project");
+
       if (projectIdFromUrl) {
         const projectId = parseInt(projectIdFromUrl);
-        const projectExists = data?.some(p => p.id === projectId);
-        
+        const projectExists = data?.some((p) => p.id === projectId);
+
         if (projectExists) {
-          setChatMode('project');
+          setChatMode("project");
           setCurrentProjectId(projectId);
           setSearchParams({});
         } else {
@@ -94,7 +97,7 @@ export const useDashboard = () => {
         }
       }
     } catch (err) {
-      console.error('Failed to load projects:', err);
+      console.error("Failed to load projects:", err);
       if (chatMode === "project") {
         await createDefaultProject();
       }
@@ -106,27 +109,28 @@ export const useDashboard = () => {
   // Create a default project
   const createDefaultProject = async () => {
     try {
-      const defaultProject = await apiFetch('/api/projects', {
-        method: 'POST',
+      const defaultProject = await apiFetch("/api/projects", {
+        method: "POST",
         body: {
-          name: 'Default Project',
-          description: 'Default project for conversations',
-          status: 'active'
-        }
+          name: "Default Project",
+          description: "Default project for conversations",
+          status: "active",
+        },
       });
       setProjects([defaultProject]);
       setCurrentProjectId(defaultProject.id);
     } catch (err) {
-      console.error('Failed to create default project:', err);
-      let errorMessage = 'Failed to initialize project. Please refresh the page.';
-      
+      console.error("Failed to create default project:", err);
+      let errorMessage =
+        "Failed to initialize project. Please refresh the page.";
+
       if (err.status === 401) {
-        errorMessage = 'You are not authenticated. Please log in again.';
+        errorMessage = "You are not authenticated. Please log in again.";
         await performLogout();
       } else if (err.status === 422) {
-        errorMessage = 'Failed to create project. Invalid data.';
+        errorMessage = "Failed to create project. Invalid data.";
       }
-      
+
       setError(errorMessage);
     }
   };
@@ -136,16 +140,18 @@ export const useDashboard = () => {
     try {
       let data;
       if (chatMode === "normal") {
-        data = await apiFetch('/api/conversations');
+        data = await apiFetch("/api/conversations");
       } else if (chatMode === "project" && currentProjectId) {
-        data = await apiFetch(`/api/projects/${currentProjectId}/conversations`);
+        data = await apiFetch(
+          `/api/projects/${currentProjectId}/conversations`
+        );
       } else {
         return;
       }
       setConversations(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('Failed to load conversations:', err);
-      setError('Failed to load conversations');
+      console.error("Failed to load conversations:", err);
+      setError("Failed to load conversations");
       setConversations([]);
     }
   };
@@ -154,18 +160,20 @@ export const useDashboard = () => {
   const loadMessages = async (conversationId) => {
     try {
       setIsLoadingMessages(true);
-      const data = await apiFetch(`/api/conversations/${conversationId}/messages`);
-      
+      const data = await apiFetch(
+        `/api/conversations/${conversationId}/messages`
+      );
+
       // FIX: Handle the wrapped response format { messages: [...] }
       const messagesList = data.messages || data;
       setMessages(Array.isArray(messagesList) ? messagesList : []);
       setError(null);
-      
+
       // Also load documents for this conversation
       await loadConversationDocuments(conversationId);
     } catch (err) {
-      console.error('Failed to load messages:', err);
-      setError('Failed to load messages');
+      console.error("Failed to load messages:", err);
+      setError("Failed to load messages");
       setMessages([]);
     } finally {
       setIsLoadingMessages(false);
@@ -176,12 +184,17 @@ export const useDashboard = () => {
   const loadConversationDocuments = async (conversationId) => {
     try {
       if (chatMode === "project" && currentProjectId) {
-        const data = await apiFetch(`/api/projects/${currentProjectId}/documents`);
-        const conversationDocs = data.documents?.filter(doc => doc.conversation_id == conversationId) || [];
+        const data = await apiFetch(
+          `/api/projects/${currentProjectId}/documents`
+        );
+        const conversationDocs =
+          data.documents?.filter(
+            (doc) => doc.conversation_id == conversationId
+          ) || [];
         setConversationDocuments(conversationDocs);
       }
     } catch (err) {
-      console.error('Failed to load conversation documents:', err);
+      console.error("Failed to load conversation documents:", err);
       setConversationDocuments([]);
     }
   };
@@ -202,7 +215,10 @@ export const useDashboard = () => {
   // FIX: Auto-load messages when conversation is selected
   useEffect(() => {
     if (selectedConversation?.id) {
-      console.log('Loading messages for conversation:', selectedConversation.id);
+      console.log(
+        "Loading messages for conversation:",
+        selectedConversation.id
+      );
       loadMessages(selectedConversation.id);
     }
   }, [selectedConversation?.id]);
@@ -253,7 +269,9 @@ export const useDashboard = () => {
     setConversationDocuments,
     messagesEndRef,
     isMobile, // ADD THIS LINE
-    
+    selectedPersonaId,
+    setSelectedPersonaId,
+
     // Functions
     loadProjects,
     createDefaultProject,
@@ -261,6 +279,6 @@ export const useDashboard = () => {
     loadMessages,
     loadConversationDocuments,
     scrollToBottom,
-    performLogout
+    performLogout,
   };
 };

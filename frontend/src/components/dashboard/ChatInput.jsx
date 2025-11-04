@@ -1,9 +1,20 @@
-import React from 'react';
-import { Send, Loader2, Search, Sparkles, Grid3x3, Globe, Paperclip, Mic, X } from 'lucide-react';
+import React from "react";
+import {
+  Send,
+  Loader2,
+  Search,
+  Sparkles,
+  Grid3x3,
+  Globe,
+  Paperclip,
+  Mic,
+  X,
+} from "lucide-react";
+import PersonaSelector from "./PersonaSelector";
 
 const ActionButton = ({ icon, onClick }) => {
   return (
-    <button 
+    <button
       onClick={onClick}
       className="p-1.5 hover:bg-gray-100 rounded-md text-gray-600 transition-all duration-200"
     >
@@ -22,11 +33,27 @@ const ChatInput = ({
   openFileUpload,
   isLoading,
   isInitializing,
-  currentProjectId
+  currentProjectId,
+  selectedPersonaId,
+  onPersonaChange,
 }) => {
   return (
     <div className="bg-white border-t border-gray-200 p-4">
       <div className="max-w-4xl mx-auto">
+        {/* Persona Selector */}
+        <div className="mb-3 flex items-center justify-between">
+          <PersonaSelector
+            selectedPersonaId={selectedPersonaId}
+            onPersonaChange={onPersonaChange}
+            disabled={!currentProjectId}
+          />
+          {selectedPersonaId && (
+            <span className="text-xs text-purple-600">
+              💡 AI will respond from this persona's perspective
+            </span>
+          )}
+        </div>
+
         {/* Attached Files Display */}
         {attachedFiles.length > 0 && (
           <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
@@ -54,7 +81,7 @@ const ChatInput = ({
             </div>
           </div>
         )}
-        
+
         <div className="bg-white rounded-xl shadow-sm border-2 border-gray-300 p-3">
           <div className="flex items-center space-x-3">
             <button
@@ -72,27 +99,39 @@ const ChatInput = ({
               className="flex-1 bg-transparent border-none outline-none resize-none text-gray-800 placeholder-gray-400 text-sm"
               rows={1}
               disabled={isLoading || isInitializing}
-              style={{ minHeight: '24px', maxHeight: '120px' }}
+              style={{ minHeight: "24px", maxHeight: "120px" }}
               onInput={(e) => {
-                e.target.style.height = 'auto';
-                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+                e.target.style.height = "auto";
+                e.target.style.height =
+                  Math.min(e.target.scrollHeight, 120) + "px";
               }}
             />
-            <button 
+            <button
               onClick={sendMessage}
-              disabled={(!message.trim() && attachedFiles.length === 0) || isLoading || isInitializing || !currentProjectId}
+              disabled={
+                (!message.trim() && attachedFiles.length === 0) ||
+                isLoading ||
+                isInitializing ||
+                !currentProjectId
+              }
               className={`p-2 rounded-lg text-white transition-all duration-200 flex-shrink-0 ${
-                (message.trim() || attachedFiles.length > 0) && !isLoading && !isInitializing
-                  ? 'hover:shadow-md opacity-100'
-                  : 'opacity-40 cursor-not-allowed'
+                (message.trim() || attachedFiles.length > 0) &&
+                !isLoading &&
+                !isInitializing
+                  ? "hover:shadow-md opacity-100"
+                  : "opacity-40 cursor-not-allowed"
               }`}
-              style={{ backgroundColor: '#4A7BA7' }}
+              style={{ backgroundColor: "#4A7BA7" }}
             >
-              {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
+              {isLoading ? (
+                <Loader2 className="animate-spin" size={16} />
+              ) : (
+                <Send size={16} />
+              )}
             </button>
           </div>
         </div>
-        
+
         {/* Action buttons below input */}
         <div className="flex items-center justify-center space-x-2 mt-3">
           <ActionButton icon={<Grid3x3 size={14} />} />

@@ -52,16 +52,24 @@ class LLMService
     }
 
     /**
-     * Chat with AI
+     * Chat with AI (with optional persona context)
      */
-    public function chat(string $message, array $history = [], ?string $context = null): array
+    public function chat(string $message, array $history = [], ?string $context = null, ?array $personaData = null): array
     {
         try {
-            $response = Http::timeout(60)->post("{$this->baseUrl}/api/chat", [
+            $payload = [
                 'message' => $message,
                 'conversation_history' => $history,
                 'context' => $context,
-            ]);
+            ];
+            
+            // Add persona data if provided
+            if ($personaData) {
+                $payload['persona_id'] = $personaData['id'] ?? null;
+                $payload['persona_data'] = $personaData;
+            }
+            
+            $response = Http::timeout(60)->post("{$this->baseUrl}/api/chat", $payload);
 
             if ($response->successful()) {
                 return $response->json();

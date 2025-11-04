@@ -40,7 +40,23 @@ class Requirement extends Model
         return $this->belongsTo(Document::class);
     }
 
-    // Persona mapping handled elsewhere; pivot table removed.
+    /**
+     * Relationship: Requirements can be associated with personas
+     */
+    public function personas()
+    {
+        return $this->belongsToMany(Persona::class, 'persona_requirements')
+            ->withPivot('action_type')
+            ->withTimestamps();
+    }
+
+    /**
+     * Relationship: Requirements can have persona-requirement associations
+     */
+    public function personaRequirements()
+    {
+        return $this->hasMany(PersonaRequirement::class);
+    }
 
     public function conflicts()
     {

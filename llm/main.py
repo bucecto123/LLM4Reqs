@@ -206,6 +206,8 @@ class ChatRequest(BaseModel):
     # Avoid mutable default; normalize to an empty list in the endpoint
     conversation_history: Optional[List[ChatMessage]] = None
     context: Optional[str] = None
+    persona_id: Optional[int] = None  # NEW: Optional persona ID
+    persona_data: Optional[Dict[str, Any]] = None  # NEW: Persona profile data
 
 
 class ChatResponse(BaseModel):
@@ -686,21 +688,37 @@ def health_check():
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """
-    Chat endpoint for conversational AI
+    Chat endpoint for conversational AI with optional persona context
 
     Usage:
     POST /api/chat
     {
         "message": "Explain functional requirements",
-        "conversation_history": [
-            {"role": "user", "content": "Hello"},
-            {"role": "assistant", "content": "Hi! How can I help?"}
-        ],
-        "context": "Optional context about the project"
+        "conversation_history": [...],
+        "context": "Optional context about the project",
+        "persona_id": 1,  // Optional: ID of persona to use
+        "persona_data": {...}  // Optional: Full persona profile
     }
     """
     try:
-        messages = [{"role": "system", "content": CHAT_SYSTEM_PROMPT}]
+        # Import persona manager
+        try:
+            from persona_manager import get_persona_prompt
+        except ImportError:
+            get_persona_prompt = None
+        
+        # Check if persona context is provided
+        if request.persona_data and get_persona_prompt:
+            # Use persona-enhanced system prompt
+            persona_context = get_persona_prompt(
+                request.persona_data,
+                request.message
+            )
+            system_prompt = persona_context['system_prompt']
+            messages = [{"role": "system", "content": system_prompt}]
+        else:
+            # Use default system prompt
+            messages = [{"role": "system", "content": CHAT_SYSTEM_PROMPT}]
 
         # Add context if provided
         if request.context:

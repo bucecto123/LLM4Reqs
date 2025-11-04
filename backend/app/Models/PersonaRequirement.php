@@ -5,29 +5,26 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Message extends Model
+class PersonaRequirement extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'conversation_id',
+        'requirement_id',
         'persona_id',
-        'role',
-        'content',
-        'model_used',
-        'tokens_used'
+        'action_type'
     ];
 
     /**
-     * Relationship: Message belongs to a conversation
+     * Relationship: Belongs to a requirement
      */
-    public function conversation()
+    public function requirement()
     {
-        return $this->belongsTo(Conversation::class);
+        return $this->belongsTo(Requirement::class);
     }
 
     /**
-     * Relationship: Message belongs to a persona (optional)
+     * Relationship: Belongs to a persona
      */
     public function persona()
     {

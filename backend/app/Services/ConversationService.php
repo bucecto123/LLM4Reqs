@@ -215,19 +215,57 @@ class ConversationService
             $enhancedContext .= ' The user has uploaded documents in this conversation. Use the document contents provided in the context to answer questions and provide relevant assistance.' . $documentContext;
         }
 
-        // Get AI response from LLM service
+        // Check if persona context should be added
+        $personaData = null;
+        if (isset($messageData['persona_id']) && $messageData['persona_id']) {
+            try {
+                $persona = \App\Models\Persona::find($messageData['persona_id']);
+                if ($persona) {
+                    $personaData = [
+                        'id' => $persona->id,
+                        'name' => $persona->name,
+                        'type' => $persona->type,
+                        'role' => $persona->role,
+                        'description' => $persona->description,
+                        'priorities' => $persona->priorities,
+                        'concerns' => $persona->concerns,
+                        'typical_requirements' => $persona->typical_requirements,
+                        'communication_style' => $persona->communication_style,
+                        'technical_level' => $persona->technical_level,
+                        'focus_areas' => $persona->focus_areas,
+                        'example_questions' => $persona->example_questions,
+                        'custom_attributes' => $persona->custom_attributes,
+                    ];
+                    
+                    Log::info('Using persona for conversation', [
+                        'persona_id' => $persona->id,
+                        'persona_name' => $persona->name,
+                        'conversation_id' => $conversationId
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::warning('Failed to load persona', [
+                    'persona_id' => $messageData['persona_id'],
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
+        // Get AI response from LLM service (with optional persona)
         $llmResponse = $this->llmService->chat(
             $aiContextMessage, 
             $history,
-            $enhancedContext
+            $enhancedContext,
+            $personaData  // NEW: Pass persona data
         );
 
-        // Save the AI response
+        // Save the AI response (with persona_id if used)
         $aiMessage = $this->saveMessage($conversationId, [
             'content' => $this->textCommons->cleanUtf8Content($llmResponse['response']),
             'role' => 'assistant',
             'model_used' => $llmResponse['model'] ?? null,
-            'tokens_used' => $llmResponse['tokens_used'] ?? null
+            'tokens_used' => $llmResponse['tokens_used'] ?? null,
+            'persona_id' => $messageData['persona_id'] ?? null  // NEW: Save persona context
         ]);
 
         return [
