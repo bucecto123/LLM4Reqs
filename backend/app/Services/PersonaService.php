@@ -105,6 +105,7 @@ class PersonaService
             'custom_attributes' => $data['custom_attributes'] ?? [],
             'prompt_template' => $data['prompt_template'] ?? null,
             'is_active' => true,
+            'is_predefined' => false,
             'user_id' => $userId,
         ]);
 

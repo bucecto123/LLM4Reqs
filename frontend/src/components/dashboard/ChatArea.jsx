@@ -230,6 +230,8 @@ const ChatArea = ({
             isLoading={isLoading}
             isInitializing={isInitializing}
             currentProjectId={currentProjectId}
+            selectedPersonaId={selectedPersonaId}
+            onPersonaChange={onPersonaChange}
           />
         ) : (
           <>

@@ -1,0 +1,3 @@
+req1,req2,label,reason,confidence
+"The system shall support transfers up to $10,000 per transaction",The system shall support unlimited transaction amounts for verified business users,contradiction,"Requirement 3 caps all transactions at $10,000, while Requirement 4 allows unlimited amounts for verified business users, creating a direct contradiction for that user class.",high
+,,contradiction,"One requirement forces automatic logout after 5 minutes of inactivity, while the other requires sessions to remain active for up to 15 minutes, creating a direct contradiction on session timeout duration.",high

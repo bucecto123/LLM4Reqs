@@ -8,6 +8,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { apiFetch } from "../../utils/auth";
+import PersonaManager from "./PersonaManager";
 
 const PersonaSelector = ({
   selectedPersonaId,
@@ -18,6 +19,7 @@ const PersonaSelector = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [showPersonaManager, setShowPersonaManager] = useState(false);
 
   // Load personas on mount
   useEffect(() => {
@@ -31,23 +33,56 @@ const PersonaSelector = ({
 
       const response = await apiFetch("/api/personas");
 
+      // The API returns: { success: true, data: { predefined: [...], custom: [...] }, all: [...] }
       if (response.success) {
-        setPersonas(response.data);
+        if (Array.isArray(response.all)) {
+          setPersonas(response.all);
+        } else if (response.data) {
+          // Flatten the grouped data structure
+          const allPersonas = [
+            ...(Array.isArray(response.data.predefined)
+              ? response.data.predefined
+              : []),
+            ...(Array.isArray(response.data.custom)
+              ? response.data.custom
+              : []),
+          ];
+          setPersonas(allPersonas);
+        } else {
+          console.error("Invalid personas response format:", response);
+          setPersonas([]);
+        }
+      } else {
+        console.error("API returned success=false:", response);
+        setPersonas([]);
       }
     } catch (err) {
       console.error("Error loading personas:", err);
       setError(err.message || "Failed to load personas");
+      setPersonas([]); // Ensure personas is always an array
     } finally {
       setLoading(false);
     }
   };
 
-  // Get currently selected persona
-  const selectedPersona = personas.find((p) => p.id === selectedPersonaId);
+  const handlePersonaCreated = (newPersona) => {
+    // Reload personas to include the newly created one
+    loadPersonas();
+    setShowPersonaManager(false);
+  };
 
-  // Separate predefined and custom personas
-  const predefinedPersonas = personas.filter((p) => p.is_predefined);
-  const customPersonas = personas.filter((p) => !p.is_predefined);
+  // Get currently selected persona (with safe check)
+  const selectedPersona = Array.isArray(personas)
+    ? personas.find((p) => p.id === selectedPersonaId)
+    : null;
+
+  // Separate predefined and custom personas (with safe checks)
+  const predefinedPersonas = Array.isArray(personas)
+    ? personas.filter((p) => p.is_predefined)
+    : [];
+  const customPersonas = Array.isArray(personas)
+    ? personas.filter((p) => !p.is_predefined)
+    : [];
 
   // Handle persona selection
   const handleSelect = (personaId) => {
@@ -187,8 +222,7 @@ const PersonaSelector = ({
                   <button
                     onClick={() => {
                       setIsOpen(false);
-                      // TODO: Open PersonaManager modal
-                      console.log("Open persona manager");
+                      setShowPersonaManager(true);
                     }}
                     className="w-full flex items-center justify-center space-x-2 px-4 py-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
                   >
@@ -202,6 +236,15 @@ const PersonaSelector = ({
             )}
           </div>
         </>
+      )}
+
+      {/* PersonaManager Modal */}
+      {showPersonaManager && (
+        <PersonaManager
+          isOpen={showPersonaManager}
+          onClose={() => setShowPersonaManager(false)}
+          onPersonaCreated={handlePersonaCreated}
+        />
       )}
     </div>
   );

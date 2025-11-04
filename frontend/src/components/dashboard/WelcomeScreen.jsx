@@ -1,9 +1,20 @@
-import React from 'react';
-import { Send, Loader2, Search, Sparkles, Grid3x3, Globe, Paperclip, Mic, X } from 'lucide-react';
+import React from "react";
+import {
+  Send,
+  Loader2,
+  Search,
+  Sparkles,
+  Grid3x3,
+  Globe,
+  Paperclip,
+  Mic,
+  X,
+} from "lucide-react";
+import PersonaSelector from "./PersonaSelector";
 
 const ActionButton = ({ icon, onClick }) => {
   return (
-    <button 
+    <button
       onClick={onClick}
       className="p-1.5 hover:bg-gray-100 rounded-md text-gray-600 transition-all duration-200"
     >
@@ -22,25 +33,57 @@ const WelcomeScreen = ({
   openFileUpload,
   isLoading,
   isInitializing,
-  currentProjectId
+  currentProjectId,
+  selectedPersonaId,
+  onPersonaChange,
 }) => {
   return (
     <div className="flex-1 flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center p-8">
         <div className="w-full max-w-3xl text-center">
           <div className="flex items-center justify-center space-x-3 mb-4">
-            <span className="text-5xl font-bold" style={{ color: '#112D4E' }}>Fishy</span>
-            <span 
+            <span className="text-5xl font-bold" style={{ color: "#112D4E" }}>
+              Fishy
+            </span>
+            <span
               className="text-3xl font-bold text-white px-4 py-1 rounded-lg"
-              style={{ backgroundColor: '#4A7BA7' }}
+              style={{ backgroundColor: "#4A7BA7" }}
             >
               pro
             </span>
           </div>
-          <p className="text-gray-600 mb-8">Ask anything. Type a message to start a new conversation.</p>
-          
+          <p className="text-gray-600 mb-8">
+            Ask anything. Type a message to start a new conversation.
+          </p>
+
           {/* Compact Input Area */}
           <div className="max-w-2xl mx-auto">
+            {/* Persona Selector - Always visible */}
+            <div className="mb-3 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <Sparkles className="w-5 h-5 text-purple-600" />
+                  <div className="flex-1">
+                    <PersonaSelector
+                      selectedPersonaId={selectedPersonaId}
+                      onPersonaChange={onPersonaChange}
+                      disabled={!currentProjectId}
+                    />
+                    {!currentProjectId && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Select a project to choose a persona
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {selectedPersonaId && (
+                  <span className="text-xs text-purple-700 font-medium">
+                    💡 AI responds from this perspective
+                  </span>
+                )}
+              </div>
+            </div>
+
             {/* Attached Files Display */}
             {attachedFiles.length > 0 && (
               <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
@@ -68,7 +111,7 @@ const WelcomeScreen = ({
                 </div>
               </div>
             )}
-            
+
             <div className="bg-white rounded-xl shadow-sm border-2 border-gray-300 p-3">
               <div className="flex items-center space-x-3">
                 <button
@@ -82,43 +125,59 @@ const WelcomeScreen = ({
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   onKeyDown={handleKeyPress}
-                  placeholder={isInitializing ? "Initializing..." : "How can I help you today?"}
+                  placeholder={
+                    isInitializing
+                      ? "Initializing..."
+                      : "How can I help you today?"
+                  }
                   className="flex-1 bg-transparent border-none outline-none resize-none text-gray-800 placeholder-gray-400 text-sm"
                   rows={1}
                   disabled={isLoading || isInitializing}
-                  style={{ minHeight: '24px', maxHeight: '120px' }}
+                  style={{ minHeight: "24px", maxHeight: "120px" }}
                   onInput={(e) => {
-                    e.target.style.height = 'auto';
-                    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+                    e.target.style.height = "auto";
+                    e.target.style.height =
+                      Math.min(e.target.scrollHeight, 120) + "px";
                   }}
                 />
-                <button 
+                <button
                   onClick={handleSendMessage}
-                  disabled={(!message.trim() && attachedFiles.length === 0) || isLoading || isInitializing || !currentProjectId}
+                  disabled={
+                    (!message.trim() && attachedFiles.length === 0) ||
+                    isLoading ||
+                    isInitializing ||
+                    !currentProjectId
+                  }
                   className={`p-2 rounded-lg text-white transition-all duration-200 flex-shrink-0 ${
-                    (message.trim() || attachedFiles.length > 0) && !isLoading && !isInitializing
-                      ? 'hover:shadow-md opacity-100'
-                      : 'opacity-40 cursor-not-allowed'
+                    (message.trim() || attachedFiles.length > 0) &&
+                    !isLoading &&
+                    !isInitializing
+                      ? "hover:shadow-md opacity-100"
+                      : "opacity-40 cursor-not-allowed"
                   }`}
-                  style={{ backgroundColor: '#4A7BA7' }}
+                  style={{ backgroundColor: "#4A7BA7" }}
                 >
-                  {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
+                  {isLoading ? (
+                    <Loader2 className="animate-spin" size={16} />
+                  ) : (
+                    <Send size={16} />
+                  )}
                 </button>
               </div>
             </div>
-            
+
             {/* Action buttons below input */}
             <div className="flex items-center justify-center space-x-2 mt-3">
-              <button 
+              <button
                 className="px-3 py-1.5 rounded-md font-medium text-xs transition-all hover:shadow-sm flex items-center space-x-1.5"
-                style={{ backgroundColor: '#DBE2EF', color: '#112D4E' }}
+                style={{ backgroundColor: "#DBE2EF", color: "#112D4E" }}
               >
                 <Search size={12} />
                 <span>Search</span>
               </button>
-              <button 
+              <button
                 className="px-3 py-1.5 rounded-md font-medium text-xs transition-all hover:shadow-sm flex items-center space-x-1.5"
-                style={{ backgroundColor: '#DBE2EF', color: '#112D4E' }}
+                style={{ backgroundColor: "#DBE2EF", color: "#112D4E" }}
               >
                 <Sparkles size={12} />
                 <span>Research</span>

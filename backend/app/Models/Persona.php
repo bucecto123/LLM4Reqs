@@ -25,6 +25,7 @@ class Persona extends Model
         'custom_attributes',
         'prompt_template',
         'is_active',
+        'is_predefined',
         'user_id'
     ];
 
@@ -36,6 +37,7 @@ class Persona extends Model
         'example_questions' => 'array',
         'custom_attributes' => 'array',
         'is_active' => 'boolean',
+        'is_predefined' => 'boolean',
     ];
 
     /**

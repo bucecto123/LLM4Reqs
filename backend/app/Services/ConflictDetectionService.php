@@ -45,6 +45,12 @@ class ConflictDetectionService
             ];
         })->toArray();
 
+        Log::info("Formatted requirements for conflict detection", [
+            'project_id' => $projectId,
+            'requirement_ids' => array_column($formattedRequirements, 'id'),
+            'count' => count($formattedRequirements)
+        ]);
+
         // Call LLM API to detect conflicts
         try {
             $response = Http::withHeaders([
@@ -119,11 +125,29 @@ class ConflictDetectionService
     {
         $saved = 0;
 
+        Log::info("Saving conflicts", [
+            'project_id' => $projectId,
+            'conflicts_received' => count($conflicts),
+            'conflicts_data' => $conflicts
+        ]);
+
         foreach ($conflicts as $conflict) {
             try {
+                // Parse requirement IDs (remove "REQ_" prefix if present)
+                $req1Id = $conflict['req_id_1'];
+                $req2Id = $conflict['req_id_2'];
+                
+                // Strip "REQ_" prefix if it exists
+                if (is_string($req1Id) && str_starts_with($req1Id, 'REQ_')) {
+                    $req1Id = (int)substr($req1Id, 4);
+                }
+                if (is_string($req2Id) && str_starts_with($req2Id, 'REQ_')) {
+                    $req2Id = (int)substr($req2Id, 4);
+                }
+                
                 // Find requirements by their IDs
-                $req1 = Requirement::find($conflict['req_id_1']);
-                $req2 = Requirement::find($conflict['req_id_2']);
+                $req1 = Requirement::find($req1Id);
+                $req2 = Requirement::find($req2Id);
 
                 if (!$req1 || !$req2) {
                     Log::warning("Skipping conflict - requirement not found", [
