@@ -69,11 +69,21 @@ class ConflictDetectionService
 
             $data = $response->json();
             
-            Log::info("Conflict detection started", [
-                'project_id' => $projectId,
-                'job_id' => $data['job_id'],
-                'requirements_count' => count($formattedRequirements)
-            ]);
+            $jobId = $data['job_id'] ?? null;
+
+            if ($jobId === null) {
+                Log::warning("Conflict detection started but no job_id returned from LLM API", [
+                    'project_id' => $projectId,
+                    'response' => $data,
+                    'requirements_count' => count($formattedRequirements)
+                ]);
+            } else {
+                Log::info("Conflict detection started", [
+                    'project_id' => $projectId,
+                    'job_id' => $jobId,
+                    'requirements_count' => count($formattedRequirements)
+                ]);
+            }
 
             return $data;
 

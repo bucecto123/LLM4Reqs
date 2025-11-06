@@ -5,6 +5,7 @@ __pycache__/
 *.pyc
 env/
 *.sqlite*
+data/
 
 # LLM Model files - DO NOT COMMIT
 llm/models/
