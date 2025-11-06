@@ -2,16 +2,24 @@ import React, { useState, useEffect } from "react";
 import { AlertTriangle, X, CheckCircle, Clock } from "lucide-react";
 import { apiFetch } from "../utils/auth";
 
-export const ConflictsDisplay = ({ projectId }) => {
+export const ConflictsDisplay = ({ projectId, onClose }) => {
   const [conflicts, setConflicts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [filters, setFilters] = useState({
+    severity: "",
+    search: "",
+  });
 
   useEffect(() => {
     if (projectId) {
       loadConflicts();
     }
   }, [projectId]);
+
+  const handleFilterChange = (e) => {
+    setFilters({ ...filters, [e.target.name]: e.target.value });
+  };
 
   const loadConflicts = async () => {
     try {
@@ -41,6 +49,15 @@ export const ConflictsDisplay = ({ projectId }) => {
           status: conflict.resolution_status,
           detectedAt: conflict.detected_at,
         }));
+        
+        // Sort by severity: high -> medium -> low
+        const severityOrder = { high: 1, medium: 2, low: 3 };
+        formattedConflicts.sort((a, b) => {
+          const orderA = severityOrder[a.severity?.toLowerCase()] || 2;
+          const orderB = severityOrder[b.severity?.toLowerCase()] || 2;
+          return orderA - orderB;
+        });
+        
         setConflicts(formattedConflicts);
       } else {
         setConflicts([]);
@@ -79,6 +96,30 @@ export const ConflictsDisplay = ({ projectId }) => {
     );
   }
 
+  // Apply filters
+  const filteredConflicts = conflicts.filter((conflict) => {
+    // Filter by severity
+    if (filters.severity && conflict.severity?.toLowerCase() !== filters.severity.toLowerCase()) {
+      return false;
+    }
+    
+    // Filter by search text
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      const matchesTitle = conflict.title?.toLowerCase().includes(searchLower);
+      const matchesDescription = conflict.description?.toLowerCase().includes(searchLower);
+      const matchesRequirements = conflict.requirements?.some(req => 
+        req.toLowerCase().includes(searchLower)
+      );
+      
+      if (!matchesTitle && !matchesDescription && !matchesRequirements) {
+        return false;
+      }
+    }
+    
+    return true;
+  });
+
   if (conflicts.length === 0) {
     return (
       <div className="p-8 text-center">
@@ -96,22 +137,66 @@ export const ConflictsDisplay = ({ projectId }) => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">
-          Detected Conflicts ({conflicts.length})
+        <h3 className="text-xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+          Detected Conflicts ({filteredConflicts.length})
         </h3>
-        <button
-          onClick={loadConflicts}
-          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-        >
-          Refresh
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={loadConflicts}
+            className="px-4 py-2 rounded-lg bg-white hover:bg-orange-50 transition-colors font-medium text-orange-600 hover:text-orange-700 border border-orange-200 shadow-sm hover:shadow-md"
+          >
+            Refresh
+          </button>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg bg-white hover:bg-slate-100 transition-colors font-medium text-slate-600 hover:text-slate-900 border border-slate-300 shadow-sm hover:shadow-md"
+            >
+              Close
+            </button>
+          )}
+        </div>
       </div>
 
-      {conflicts.map((conflict, index) => {
+      {/* Filters */}
+      <div className="flex space-x-3 mb-4">
+        <select
+          name="severity"
+          value={filters.severity}
+          onChange={handleFilterChange}
+          className="px-3 py-2 rounded-lg border border-slate-300 bg-white shadow-sm hover:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all text-sm font-medium"
+        >
+          <option value="">All Severities</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+        <input
+          name="search"
+          value={filters.search}
+          onChange={handleFilterChange}
+          placeholder="Search conflicts..."
+          className="px-3 py-2 rounded-lg border border-slate-300 bg-white shadow-sm hover:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all flex-1 text-sm"
+        />
+      </div>
+
+      {filteredConflicts.length === 0 ? (
+        <div className="p-8 text-center bg-white/90 backdrop-blur-sm rounded-xl border border-slate-200 shadow-sm">
+          <CheckCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+          <h3 className="text-lg font-medium text-gray-900 mb-1">
+            No Conflicts Match Filters
+          </h3>
+          <p className="text-gray-600 text-sm">
+            Try adjusting your filters to see more results.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+        {filteredConflicts.map((conflict, index) => {
         const severityColors = {
-          high: "bg-red-50 border-red-200 text-red-900",
-          medium: "bg-orange-50 border-orange-200 text-orange-900",
-          low: "bg-yellow-50 border-yellow-200 text-yellow-900",
+          high: "border-red-300 bg-red-50/50",
+          medium: "border-orange-300 bg-orange-50/50",
+          low: "border-yellow-300 bg-yellow-50/50",
         };
         const severityBadgeColors = {
           high: "bg-red-100 text-red-800",
@@ -134,7 +219,10 @@ export const ConflictsDisplay = ({ projectId }) => {
         return (
           <div
             key={conflict.id || index}
-            className={`border rounded-lg p-4 ${bgColor}`}
+            className={`border-2 rounded-xl p-5 transition-all duration-200 bg-white/90 backdrop-blur-sm hover:shadow-xl ${bgColor}`}
+            style={{
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+            }}
           >
             <div className="flex items-start space-x-3">
               <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
@@ -161,13 +249,13 @@ export const ConflictsDisplay = ({ projectId }) => {
 
                 {conflict.requirements && conflict.requirements.length > 0 && (
                   <div className="space-y-2 mb-3">
-                    <p className="text-xs font-medium uppercase opacity-70">
+                    <p className="text-xs font-semibold uppercase text-slate-600">
                       Conflicting Requirements:
                     </p>
                     {conflict.requirements.map((req, idx) => (
                       <div
                         key={idx}
-                        className="bg-white border rounded p-2 text-sm"
+                        className="bg-white border border-slate-200 rounded-lg p-3 text-sm shadow-sm"
                       >
                         {req}
                       </div>
@@ -176,14 +264,14 @@ export const ConflictsDisplay = ({ projectId }) => {
                 )}
 
                 {conflict.suggestion && (
-                  <div className="mt-3 p-3 bg-white rounded border">
-                    <p className="text-xs font-medium mb-1">💡 Suggestion:</p>
-                    <p className="text-sm">{conflict.suggestion}</p>
+                  <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+                    <p className="text-xs font-semibold mb-1 text-blue-900">💡 Suggestion:</p>
+                    <p className="text-sm text-blue-800">{conflict.suggestion}</p>
                   </div>
                 )}
 
                 {conflict.detectedAt && (
-                  <p className="text-xs opacity-60 mt-2">
+                  <p className="text-xs text-slate-500 mt-3">
                     Detected: {new Date(conflict.detectedAt).toLocaleString()}
                   </p>
                 )}
@@ -192,6 +280,8 @@ export const ConflictsDisplay = ({ projectId }) => {
           </div>
         );
       })}
+        </div>
+      )}
     </div>
   );
 };

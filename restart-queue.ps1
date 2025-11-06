@@ -4,7 +4,7 @@
 Write-Host "Restarting Laravel Queue Worker..." -ForegroundColor Cyan
 
 # Navigate to backend directory
-Set-Location -Path "D:\Study\Home_work\COS40005\LLM4Reqs\backend"
+Set-Location -Path "D:\HomeWorkOrDeadline\Computing Technology Project A\LLM4Reqs\backend"
 
 # Stop all PHP queue workers
 Write-Host "Stopping existing queue workers..." -ForegroundColor Yellow
@@ -22,7 +22,7 @@ Start-Sleep -Seconds 2
 
 # Start the queue worker
 Write-Host "Starting new queue worker..." -ForegroundColor Yellow
-$command = "cd 'D:\Study\Home_work\COS40005\LLM4Reqs\backend'; php artisan queue:work --tries=3 --timeout=300"
+$command = "cd 'D:\HomeWorkOrDeadline\Computing Technology Project A\LLM4Reqs\backend'; php artisan queue:work --tries=3 --timeout=300"
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $command -WindowStyle Normal
 
 Write-Host ""

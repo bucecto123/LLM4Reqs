@@ -1,0 +1,182 @@
+[
+  {
+    "req_id": "1",
+    "text": "The system shall allow users to transfer funds between accounts in real time.",
+    "cluster_id": 6,
+    "tags": []
+  },
+  {
+    "req_id": "2",
+    "text": "The system shall send an SMS confirmation after each successful transfer.",
+    "cluster_id": 7,
+    "tags": []
+  },
+  {
+    "req_id": "3",
+    "text": "The system shall support transfers up to 01,v,,, per transaction.",
+    "cluster_id": 8,
+    "tags": []
+  },
+  {
+    "req_id": "4",
+    "text": "The system shall support unlimited transaction amounts for verified business users.",
+    "cluster_id": 9,
+    "tags": []
+  },
+  {
+    "req_id": "5",
+    "text": "The system shall automatically log users out after - minutes of inactivity.",
+    "cluster_id": 5,
+    "tags": []
+  },
+  {
+    "req_id": "6",
+    "text": "The system shall maintain user sessions for up to 1- minutes for convenience.",
+    "cluster_id": 4,
+    "tags": []
+  },
+  {
+    "req_id": "7",
+    "text": "The system shall use A2S6P-C encryption for all stored financial data.",
+    "cluster_id": 2,
+    "tags": []
+  },
+  {
+    "req_id": "8",
+    "text": "The system shall comply with ID465SS security standards.",
+    "cluster_id": 1,
+    "tags": []
+  },
+  {
+    "req_id": "9",
+    "text": "The system shall display a summary of recent transactions on the dashboard.",
+    "cluster_id": 0,
+    "tags": []
+  },
+  {
+    "req_id": "10",
+    "text": "The system shall require two-factor authentication before any transaction above 01v,,,.",
+    "cluster_id": 3,
+    "tags": []
+  },
+  {
+    "req_id": "11",
+    "text": "The system shall allow users to transfer funds between accounts in real time.",
+    "cluster_id": 6,
+    "tags": []
+  },
+  {
+    "req_id": "12",
+    "text": "The system shall send an SMS confirmation after each successful transfer.",
+    "cluster_id": 7,
+    "tags": []
+  },
+  {
+    "req_id": "13",
+    "text": "The system shall support transfers up to [unspecified amount] per transaction.",
+    "cluster_id": 8,
+    "tags": []
+  },
+  {
+    "req_id": "14",
+    "text": "The system shall support unlimited transaction amounts for verified business users.",
+    "cluster_id": 9,
+    "tags": []
+  },
+  {
+    "req_id": "15",
+    "text": "The system shall automatically log users out after [unspecified] minutes of inactivity.",
+    "cluster_id": 5,
+    "tags": []
+  },
+  {
+    "req_id": "16",
+    "text": "The system shall maintain user sessions for up to [unspecified] minutes for convenience.",
+    "cluster_id": 4,
+    "tags": []
+  },
+  {
+    "req_id": "17",
+    "text": "The system shall use AES-256 encryption for all stored financial data.",
+    "cluster_id": 2,
+    "tags": []
+  },
+  {
+    "req_id": "18",
+    "text": "The system shall comply with ISO 27001 security standards.",
+    "cluster_id": 1,
+    "tags": []
+  },
+  {
+    "req_id": "19",
+    "text": "The system shall display a summary of recent transactions on the dashboard.",
+    "cluster_id": 0,
+    "tags": []
+  },
+  {
+    "req_id": "20",
+    "text": "The system shall require two-factor authentication before any transaction.",
+    "cluster_id": 3,
+    "tags": []
+  },
+  {
+    "req_id": "21",
+    "text": "The system shall allow users to transfer funds between accounts in real time.",
+    "cluster_id": 6,
+    "tags": []
+  },
+  {
+    "req_id": "22",
+    "text": "The system shall send an SMS confirmation after each successful transfer.",
+    "cluster_id": 7,
+    "tags": []
+  },
+  {
+    "req_id": "23",
+    "text": "The system shall support transfers up to a specified maximum amount per transaction.",
+    "cluster_id": 8,
+    "tags": []
+  },
+  {
+    "req_id": "24",
+    "text": "The system shall support unlimited transaction amounts for verified business users.",
+    "cluster_id": 9,
+    "tags": []
+  },
+  {
+    "req_id": "25",
+    "text": "The system shall automatically log users out after a period of inactivity.",
+    "cluster_id": 5,
+    "tags": []
+  },
+  {
+    "req_id": "26",
+    "text": "The system shall maintain user sessions for up to a short period for convenience.",
+    "cluster_id": 4,
+    "tags": []
+  },
+  {
+    "req_id": "27",
+    "text": "The system shall use AES-256 encryption for all stored financial data.",
+    "cluster_id": 2,
+    "tags": []
+  },
+  {
+    "req_id": "28",
+    "text": "The system shall comply with ID465SS security standards.",
+    "cluster_id": 1,
+    "tags": []
+  },
+  {
+    "req_id": "29",
+    "text": "The system shall display a summary of recent transactions on the dashboard.",
+    "cluster_id": 0,
+    "tags": []
+  },
+  {
+    "req_id": "30",
+    "text": "The system shall require two-factor authentication before any transaction above a specified amount.",
+    "cluster_id": 3,
+    "tags": []
+  }
+]

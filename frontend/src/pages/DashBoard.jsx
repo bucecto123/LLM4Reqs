@@ -641,22 +641,14 @@ export default function LLMDashboard() {
 
       {showConflicts && currentProjectId && (
         <div
-          className="fixed right-0 top-0 h-full w-1/2 bg-white shadow-xl z-40 flex flex-col border-l"
+          className="fixed right-0 top-0 h-full w-1/2 bg-gradient-to-br from-slate-50 to-orange-50 shadow-2xl z-40 flex flex-col border-l border-slate-200"
           style={{ minWidth: 400 }}
         >
-          <div className="flex items-center justify-between px-6 py-4 border-b">
-            <h2 className="text-xl font-bold" style={{ color: "#112D4E" }}>
-              Conflicts
-            </h2>
-            <button
-              onClick={() => setShowConflicts(false)}
-              className="px-3 py-1 rounded hover:bg-gray-100"
-            >
-              Close
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-6">
-            <ConflictsDisplay projectId={currentProjectId} />
+          <div className="flex-1 overflow-y-auto p-5">
+            <ConflictsDisplay 
+              projectId={currentProjectId} 
+              onClose={() => setShowConflicts(false)}
+            />
           </div>
         </div>
       )}
