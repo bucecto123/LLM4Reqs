@@ -1,9 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  TrendingUp, 
-  Plane, 
-  ShoppingBag, 
+  FolderKanban, 
   Plus, 
   MessageSquare, 
   Loader2, 
@@ -18,7 +16,7 @@ import {
 import { useLogout } from '../../hooks/useAuth.jsx';
 
 const NavItem = ({ icon, label, active, isOpen, onClick }) => {
-  const baseClasses = "w-full flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-all duration-200";
+  const baseClasses = `w-full flex items-center ${isOpen ? 'space-x-3 px-4' : 'justify-center px-2'} py-3 rounded-lg font-medium transition-all duration-200`;
   const activeStyle = active 
     ? { backgroundColor: '#112D4E', color: '#DBE2EF' }
     : {};
@@ -298,15 +296,16 @@ const Sidebar = ({
       
       {/* Sidebar Container */}
       <div 
-        className={`bg-white flex flex-col transition-all duration-300 relative ${
+        className={`bg-white flex flex-col transition-all duration-300 relative border-r rounded-r-2xl ${
           isMobile 
             ? `fixed inset-y-0 left-0 z-50 shadow-2xl ${
                 isSidebarOpen ? 'w-80 translate-x-0' : 'w-0 -translate-x-full'
               }` 
-            : `${isSidebarOpen ? 'w-64' : 'w-20'}`
+            : `${isSidebarOpen ? 'w-64' : 'w-24'}`
         }`}
         style={{
-          borderRight: isSidebarOpen ? '1px solid #E5E7EB' : 'none'
+          borderRightColor: '#D1D5DB',
+          borderRightWidth: '2px'
         }}
       >
         {/* Content - Only render when open on mobile OR always on desktop */}
@@ -381,12 +380,7 @@ const Sidebar = ({
                 }}
               />
               <NavItem 
-                icon={<TrendingUp size={20} />} 
-                label="Analytics" 
-                isOpen={isSidebarOpen || isMobile}
-              />
-              <NavItem 
-                icon={<Plane size={20} />} 
+                icon={<FolderKanban size={20} />} 
                 label="Projects" 
                 active={location.pathname === '/projects'}
                 isOpen={isSidebarOpen || isMobile}
@@ -394,11 +388,6 @@ const Sidebar = ({
                   navigate('/projects');
                   if (isMobile) onToggleSidebar();
                 }}
-              />
-              <NavItem 
-                icon={<ShoppingBag size={20} />} 
-                label="Documents" 
-                isOpen={isSidebarOpen || isMobile}
               />
             </nav>
 

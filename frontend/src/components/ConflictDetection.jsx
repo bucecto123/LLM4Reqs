@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { AlertTriangle, X, CheckCircle, Clock } from "lucide-react";
+import { AlertTriangle, X, CheckCircle, Clock, ChevronDown, Shield } from "lucide-react";
 import { apiFetch } from "../utils/auth";
 
 export const ConflictsDisplay = ({ projectId, onClose }) => {
@@ -10,6 +10,7 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
     severity: "",
     search: "",
   });
+  const [isSeverityDropdownOpen, setIsSeverityDropdownOpen] = useState(false);
 
   useEffect(() => {
     if (projectId) {
@@ -159,18 +160,72 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
       </div>
 
       {/* Filters */}
-      <div className="flex space-x-3 mb-4">
-        <select
-          name="severity"
-          value={filters.severity}
-          onChange={handleFilterChange}
-          className="px-3 py-2 rounded-lg border border-slate-300 bg-white shadow-sm hover:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all text-sm font-medium"
-        >
-          <option value="">All Severities</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-        </select>
+      <div className="flex space-x-3 mb-4 relative z-40">
+        {/* Severity Filter Dropdown */}
+        <div className="relative z-50">
+          <button
+            onClick={() => setIsSeverityDropdownOpen(!isSeverityDropdownOpen)}
+            className="flex items-center space-x-2 pl-3 pr-8 py-2.5 rounded-lg border-2 border-orange-200 bg-white text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400 transition-all shadow-sm hover:border-orange-300 hover:shadow-md text-sm"
+          >
+            <Shield size={16} className="text-orange-600" />
+            <span>{filters.severity === "" ? "All Severities" : filters.severity.charAt(0).toUpperCase() + filters.severity.slice(1)}</span>
+            <ChevronDown size={16} className="absolute right-2 text-orange-600" />
+          </button>
+          
+          {isSeverityDropdownOpen && (
+            <div className="absolute top-full mt-2 w-48 bg-white rounded-lg border-2 border-orange-200 shadow-xl overflow-hidden z-50">
+              <button
+                onClick={() => {
+                  setFilters({ ...filters, severity: "" });
+                  setIsSeverityDropdownOpen(false);
+                }}
+                className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
+                  filters.severity === "" ? "bg-orange-50 text-orange-900" : "hover:bg-gray-50 text-gray-700"
+                }`}
+              >
+                <Shield size={16} className={filters.severity === "" ? "text-orange-600" : "text-gray-500"} />
+                <span className="font-medium">All Severities</span>
+              </button>
+              <button
+                onClick={() => {
+                  setFilters({ ...filters, severity: "high" });
+                  setIsSeverityDropdownOpen(false);
+                }}
+                className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
+                  filters.severity === "high" ? "bg-orange-50 text-orange-900" : "hover:bg-gray-50 text-gray-700"
+                }`}
+              >
+                <Shield size={16} className={filters.severity === "high" ? "text-red-600" : "text-gray-500"} />
+                <span className="font-medium">High</span>
+              </button>
+              <button
+                onClick={() => {
+                  setFilters({ ...filters, severity: "medium" });
+                  setIsSeverityDropdownOpen(false);
+                }}
+                className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
+                  filters.severity === "medium" ? "bg-orange-50 text-orange-900" : "hover:bg-gray-50 text-gray-700"
+                }`}
+              >
+                <Shield size={16} className={filters.severity === "medium" ? "text-orange-600" : "text-gray-500"} />
+                <span className="font-medium">Medium</span>
+              </button>
+              <button
+                onClick={() => {
+                  setFilters({ ...filters, severity: "low" });
+                  setIsSeverityDropdownOpen(false);
+                }}
+                className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
+                  filters.severity === "low" ? "bg-orange-50 text-orange-900" : "hover:bg-gray-50 text-gray-700"
+                }`}
+              >
+                <Shield size={16} className={filters.severity === "low" ? "text-yellow-600" : "text-gray-500"} />
+                <span className="font-medium">Low</span>
+              </button>
+            </div>
+          )}
+        </div>
+
         <input
           name="search"
           value={filters.search}

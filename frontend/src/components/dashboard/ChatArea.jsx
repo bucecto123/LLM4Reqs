@@ -58,6 +58,8 @@ const ChatArea = ({
   // Persona props
   selectedPersonaId,
   onPersonaChange,
+  // Scroll handler
+  onScroll,
 }) => {
   // Show WelcomeScreen if no conversation is selected OR if conversation has no messages
   const showWelcome =
@@ -238,6 +240,7 @@ const ChatArea = ({
             {/* Messages Area */}
             <div
               className="flex-1 overflow-y-auto p-4 md:p-6"
+              onScroll={onScroll}
               style={{
                 backgroundColor: chatMode === "project" ? "#F8FAFC" : "#FFFFFF",
                 overscrollBehavior: "contain",

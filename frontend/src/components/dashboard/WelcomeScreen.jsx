@@ -166,26 +166,6 @@ const WelcomeScreen = ({
               </div>
             </div>
 
-            {/* Action buttons below input */}
-            <div className="flex items-center justify-center space-x-2 mt-3">
-              <button
-                className="px-3 py-1.5 rounded-md font-medium text-xs transition-all hover:shadow-sm flex items-center space-x-1.5"
-                style={{ backgroundColor: "#DBE2EF", color: "#112D4E" }}
-              >
-                <Search size={12} />
-                <span>Search</span>
-              </button>
-              <button
-                className="px-3 py-1.5 rounded-md font-medium text-xs transition-all hover:shadow-sm flex items-center space-x-1.5"
-                style={{ backgroundColor: "#DBE2EF", color: "#112D4E" }}
-              >
-                <Sparkles size={12} />
-                <span>Research</span>
-              </button>
-              <ActionButton icon={<Grid3x3 size={14} />} />
-              <ActionButton icon={<Globe size={14} />} />
-              <ActionButton icon={<Mic size={14} />} />
-            </div>
           </div>
         </div>
       </div>

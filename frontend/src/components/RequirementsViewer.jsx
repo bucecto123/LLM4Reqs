@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FileText, AlertCircle, CheckCircle } from "lucide-react";
+import { FileText, AlertCircle, CheckCircle, ChevronDown, Layers, Flag } from "lucide-react";
 import { apiFetch } from "../utils/auth.js";
 
 export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
@@ -14,6 +14,8 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
   const [selectedRequirement, setSelectedRequirement] = useState(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  const [isPriorityDropdownOpen, setIsPriorityDropdownOpen] = useState(false);
 
   useEffect(() => {
     fetchRequirements();
@@ -99,35 +101,139 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
       </div>
       
       {/* Filters */}
-      <div className="p-4 bg-white/80 backdrop-blur-sm border-b border-slate-200 shadow-sm">
+      <div className="p-4 bg-white/80 backdrop-blur-sm border-b border-slate-200 shadow-sm relative z-40">
         <div className="flex space-x-3">
-          <select
-            name="type"
-            value={filters.type}
-            onChange={handleFilterChange}
-            className="px-3 py-2 rounded-lg border border-slate-300 bg-white shadow-sm hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm font-medium"
-          >
-            <option value="">All Types</option>
-            <option value="functional">Functional</option>
-            <option value="non-functional">Non-Functional</option>
-          </select>
-          <select
-            name="priority"
-            value={filters.priority}
-            onChange={handleFilterChange}
-            className="px-3 py-2 rounded-lg border border-slate-300 bg-white shadow-sm hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm font-medium"
-          >
-            <option value="">All Priorities</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
+          {/* Type Filter Dropdown */}
+          <div className="relative z-50">
+            <button
+              onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
+              className="flex items-center space-x-2 pl-3 pr-8 py-2.5 rounded-lg border-2 border-indigo-200 bg-white text-indigo-900 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all shadow-sm hover:border-indigo-300 hover:shadow-md text-sm"
+            >
+              <Layers size={16} className="text-indigo-600" />
+              <span>{filters.type === "" ? "All Types" : filters.type === "functional" ? "Functional" : "Non-Functional"}</span>
+              <ChevronDown size={16} className="absolute right-2 text-indigo-600" />
+            </button>
+            
+            {isTypeDropdownOpen && (
+              <div className="absolute top-full mt-2 w-48 bg-white rounded-lg border-2 border-indigo-200 shadow-xl overflow-hidden z-50">
+                <button
+                  onClick={() => {
+                    setFilters({ ...filters, type: "" });
+                    setIsTypeDropdownOpen(false);
+                    setPage(1);
+                  }}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
+                    filters.type === "" ? "bg-indigo-50 text-indigo-900" : "hover:bg-gray-50 text-gray-700"
+                  }`}
+                >
+                  <Layers size={16} className={filters.type === "" ? "text-indigo-600" : "text-gray-500"} />
+                  <span className="font-medium">All Types</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setFilters({ ...filters, type: "functional" });
+                    setIsTypeDropdownOpen(false);
+                    setPage(1);
+                  }}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
+                    filters.type === "functional" ? "bg-indigo-50 text-indigo-900" : "hover:bg-gray-50 text-gray-700"
+                  }`}
+                >
+                  <Layers size={16} className={filters.type === "functional" ? "text-indigo-600" : "text-gray-500"} />
+                  <span className="font-medium">Functional</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setFilters({ ...filters, type: "non-functional" });
+                    setIsTypeDropdownOpen(false);
+                    setPage(1);
+                  }}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
+                    filters.type === "non-functional" ? "bg-indigo-50 text-indigo-900" : "hover:bg-gray-50 text-gray-700"
+                  }`}
+                >
+                  <Layers size={16} className={filters.type === "non-functional" ? "text-indigo-600" : "text-gray-500"} />
+                  <span className="font-medium">Non-Functional</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Priority Filter Dropdown */}
+          <div className="relative z-50">
+            <button
+              onClick={() => setIsPriorityDropdownOpen(!isPriorityDropdownOpen)}
+              className="flex items-center space-x-2 pl-3 pr-8 py-2.5 rounded-lg border-2 border-indigo-200 bg-white text-indigo-900 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all shadow-sm hover:border-indigo-300 hover:shadow-md text-sm"
+            >
+              <Flag size={16} className="text-indigo-600" />
+              <span>{filters.priority === "" ? "All Priorities" : filters.priority.charAt(0).toUpperCase() + filters.priority.slice(1)}</span>
+              <ChevronDown size={16} className="absolute right-2 text-indigo-600" />
+            </button>
+            
+            {isPriorityDropdownOpen && (
+              <div className="absolute top-full mt-2 w-48 bg-white rounded-lg border-2 border-indigo-200 shadow-xl overflow-hidden z-50">
+                <button
+                  onClick={() => {
+                    setFilters({ ...filters, priority: "" });
+                    setIsPriorityDropdownOpen(false);
+                    setPage(1);
+                  }}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
+                    filters.priority === "" ? "bg-indigo-50 text-indigo-900" : "hover:bg-gray-50 text-gray-700"
+                  }`}
+                >
+                  <Flag size={16} className={filters.priority === "" ? "text-indigo-600" : "text-gray-500"} />
+                  <span className="font-medium">All Priorities</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setFilters({ ...filters, priority: "high" });
+                    setIsPriorityDropdownOpen(false);
+                    setPage(1);
+                  }}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
+                    filters.priority === "high" ? "bg-indigo-50 text-indigo-900" : "hover:bg-gray-50 text-gray-700"
+                  }`}
+                >
+                  <Flag size={16} className={filters.priority === "high" ? "text-red-600" : "text-gray-500"} />
+                  <span className="font-medium">High</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setFilters({ ...filters, priority: "medium" });
+                    setIsPriorityDropdownOpen(false);
+                    setPage(1);
+                  }}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
+                    filters.priority === "medium" ? "bg-indigo-50 text-indigo-900" : "hover:bg-gray-50 text-gray-700"
+                  }`}
+                >
+                  <Flag size={16} className={filters.priority === "medium" ? "text-orange-600" : "text-gray-500"} />
+                  <span className="font-medium">Medium</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setFilters({ ...filters, priority: "low" });
+                    setIsPriorityDropdownOpen(false);
+                    setPage(1);
+                  }}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
+                    filters.priority === "low" ? "bg-indigo-50 text-indigo-900" : "hover:bg-gray-50 text-gray-700"
+                  }`}
+                >
+                  <Flag size={16} className={filters.priority === "low" ? "text-yellow-600" : "text-gray-500"} />
+                  <span className="font-medium">Low</span>
+                </button>
+              </div>
+            )}
+          </div>
+
           <input
             name="search"
             value={filters.search}
             onChange={handleFilterChange}
             placeholder="Search requirements..."
-            className="px-3 py-2 rounded-lg border border-slate-300 bg-white shadow-sm hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all flex-1 text-sm"
+            className="px-4 py-2.5 rounded-lg border-2 border-indigo-200 bg-white shadow-sm hover:border-blue-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all flex-1 text-sm text-slate-700 placeholder-slate-400"
           />
         </div>
       </div>

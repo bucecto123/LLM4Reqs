@@ -61,6 +61,8 @@ export default function LLMDashboard() {
   // Streaming state - simpler approach
   const [streamingMessageId, setStreamingMessageId] = useState(null);
   const streamingTimeoutRef = useRef(null);
+  const [isUserScrolling, setIsUserScrolling] = useState(false);
+  const chatContainerRef = useRef(null);
 
   const fullName = user?.name;
   const currentProject = projects.find((p) => p.id === currentProjectId);
@@ -71,12 +73,21 @@ export default function LLMDashboard() {
   const [isKBUploadOpen, setIsKBUploadOpen] = useState(false);
   const [kbUploadStatus, setKBUploadStatus] = useState(null);
 
-  // Auto-scroll effect - scroll when messages change or streaming
+  // Detect if user has scrolled up manually
+  const handleScroll = (e) => {
+    const container = e.target;
+    const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
+    setIsUserScrolling(!isAtBottom);
+  };
+
+  // Auto-scroll effect - only scroll if user hasn't manually scrolled up
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    if (messagesEndRef.current && !isUserScrolling) {
+      // Use instant scroll during streaming for better tracking, smooth otherwise
+      const behavior = streamingMessageId ? "auto" : "smooth";
+      messagesEndRef.current.scrollIntoView({ behavior, block: "end" });
     }
-  }, [messages, streamingMessageId]);
+  }, [messages, streamingMessageId, isUserScrolling]);
 
   useEffect(() => {
     return () => {
@@ -611,6 +622,7 @@ export default function LLMDashboard() {
         onToggleSidebar={toggleSidebar}
         selectedPersonaId={selectedPersonaId}
         onPersonaChange={setSelectedPersonaId}
+        onScroll={handleScroll}
       />
 
       {isFileUploadOpen && (
