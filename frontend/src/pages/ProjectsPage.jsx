@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, FolderOpen, Menu, Activity, SortAsc, ChevronDown } from "lucide-react";
+import { Plus, Search, FolderOpen, Menu, Activity, SortAsc, ChevronDown, Trash2, Edit2 } from "lucide-react";
 import { apiFetch } from "../utils/auth.js";
 import { useAuth } from "../hooks/useAuth.jsx";
 import Sidebar from "../components/dashboard/Sidebar.jsx";
@@ -17,6 +17,12 @@ export default function ProjectsPage() {
   const [newProjectDescription, setNewProjectDescription] = useState("");
   const [error, setError] = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  
+  // Edit project state
+  const [showEditProjectModal, setShowEditProjectModal] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
+  const [editProjectName, setEditProjectName] = useState("");
+  const [editProjectDescription, setEditProjectDescription] = useState("");
 
   // Mobile and sidebar state
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -86,6 +92,61 @@ export default function ProjectsPage() {
   const openProject = (projectId) => {
     // Navigate to dashboard with selected project
     navigate(`/dashboard?project=${projectId}`);
+  };
+
+  const deleteProject = async (projectId, e) => {
+    e.stopPropagation(); // Prevent opening the project when clicking delete
+    
+    if (!confirm("Are you sure you want to delete this project? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      await apiFetch(`/api/projects/${projectId}`, {
+        method: "DELETE",
+      });
+      
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+      setError(null);
+    } catch (err) {
+      console.error("Failed to delete project:", err);
+      setError("Failed to delete project. Please try again.");
+    }
+  };
+
+  const openEditModal = (project, e) => {
+    e.stopPropagation(); // Prevent opening the project when clicking edit
+    setEditingProject(project);
+    setEditProjectName(project.name);
+    setEditProjectDescription(project.description || "");
+    setShowEditProjectModal(true);
+  };
+
+  const updateProject = async (e) => {
+    e.preventDefault();
+    if (!editProjectName.trim() || !editingProject) return;
+
+    try {
+      const data = await apiFetch(`/api/projects/${editingProject.id}`, {
+        method: "PUT",
+        body: {
+          name: editProjectName.trim(),
+          description: editProjectDescription.trim() || null,
+        },
+      });
+
+      setProjects((prev) =>
+        prev.map((p) => (p.id === editingProject.id ? data : p))
+      );
+      setShowEditProjectModal(false);
+      setEditingProject(null);
+      setEditProjectName("");
+      setEditProjectDescription("");
+      setError(null);
+    } catch (err) {
+      console.error("Failed to update project:", err);
+      setError("Failed to update project. Please try again.");
+    }
   };
 
   const filteredProjects = projects.filter(
@@ -268,14 +329,30 @@ export default function ProjectsPage() {
                 <div
                   key={project.id}
                   onClick={() => openProject(project.id)}
-                  className="group p-6 rounded-xl border-2 border-purple-200 bg-white cursor-pointer transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-indigo-300"
+                  className="group p-6 rounded-xl border-2 border-purple-200 bg-white cursor-pointer transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-indigo-300 relative"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-12 h-12 rounded-lg flex items-center justify-center transition-colors bg-indigo-100">
                       <FolderOpen size={24} className="text-blue-600" />
                     </div>
-                    <div className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-500">
-                      {new Date(project.updated_at).toLocaleDateString()}
+                    <div className="flex items-center space-x-2">
+                      <div className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-500">
+                        {new Date(project.updated_at).toLocaleDateString()}
+                      </div>
+                      <button
+                        onClick={(e) => openEditModal(project, e)}
+                        className="p-2 rounded-lg hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Edit project"
+                      >
+                        <Edit2 size={18} className="text-blue-600" />
+                      </button>
+                      <button
+                        onClick={(e) => deleteProject(project.id, e)}
+                        className="p-2 rounded-lg hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Delete project"
+                      >
+                        <Trash2 size={18} className="text-red-600" />
+                      </button>
                     </div>
                   </div>
 
@@ -356,6 +433,69 @@ export default function ProjectsPage() {
                   className="px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed bg-blue-600 text-white"
                 >
                   Create Project
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Project Modal */}
+      {showEditProjectModal && editingProject && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="rounded-xl shadow-2xl max-w-md w-full p-6 border-2 border-indigo-200 bg-white">
+            <h2 className="text-2xl font-bold mb-4 text-slate-800">
+              Edit Project
+            </h2>
+
+            <form onSubmit={updateProject}>
+              <div className="mb-4">
+                <label className="block text-sm font-semibold mb-2 text-slate-800">
+                  Project Name *
+                </label>
+                <input
+                  type="text"
+                  value={editProjectName}
+                  onChange={(e) => setEditProjectName(e.target.value)}
+                  placeholder="My Awesome Project"
+                  className="w-full px-4 py-2 rounded-lg border-2 border-indigo-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-semibold mb-2 text-slate-800">
+                  Description (Optional)
+                </label>
+                <textarea
+                  value={editProjectDescription}
+                  onChange={(e) => setEditProjectDescription(e.target.value)}
+                  placeholder="What's this project about?"
+                  rows={4}
+                  className="w-full px-4 py-2 rounded-lg border-2 border-indigo-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditProjectModal(false);
+                    setEditingProject(null);
+                    setEditProjectName("");
+                    setEditProjectDescription("");
+                  }}
+                  className="px-4 py-2 rounded-lg font-medium transition-colors bg-gray-100 text-gray-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!editProjectName.trim()}
+                  className="px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed bg-blue-600 text-white"
+                >
+                  Save Changes
                 </button>
               </div>
             </form>
