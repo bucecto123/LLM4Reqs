@@ -656,12 +656,10 @@ export default function LLMDashboard() {
           className="fixed right-0 top-0 h-full w-1/2 bg-gradient-to-br from-slate-50 to-orange-50 shadow-2xl z-40 flex flex-col border-l border-slate-200"
           style={{ minWidth: 400 }}
         >
-          <div className="flex-1 overflow-y-auto p-5">
-            <ConflictsDisplay 
-              projectId={currentProjectId} 
-              onClose={() => setShowConflicts(false)}
-            />
-          </div>
+          <ConflictsDisplay 
+            projectId={currentProjectId} 
+            onClose={() => setShowConflicts(false)}
+          />
         </div>
       )}
     </div>

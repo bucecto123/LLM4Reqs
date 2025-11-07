@@ -72,31 +72,6 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
-        <span className="ml-3 text-gray-600">Loading conflicts...</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-6 bg-red-50 border border-red-200 rounded-lg">
-        <div className="flex items-start space-x-3">
-          <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <h3 className="text-red-900 font-medium">
-              Error Loading Conflicts
-            </h3>
-            <p className="text-red-700 text-sm mt-1">{error}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Apply filters
   const filteredConflicts = conflicts.filter((conflict) => {
     // Filter by severity
@@ -121,26 +96,13 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
     return true;
   });
 
-  if (conflicts.length === 0) {
-    return (
-      <div className="p-8 text-center">
-        <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
-        <h3 className="text-lg font-medium text-gray-900 mb-1">
-          No Conflicts Detected
-        </h3>
-        <p className="text-gray-600 text-sm">
-          All requirements are consistent and conflict-free.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
-          Detected Conflicts ({filteredConflicts.length})
-        </h3>
+    <div className="flex flex-col h-full">
+      {/* Header - Always visible */}
+      <div className="flex items-center justify-between px-6 py-5 bg-white/90 backdrop-blur-sm border-b border-slate-200 shadow-sm">
+        <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+          Conflict Detection
+        </h2>
         <div className="flex items-center space-x-2">
           <button
             onClick={loadConflicts}
@@ -158,6 +120,43 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
           )}
         </div>
       </div>
+
+      {/* Content Area */}
+      <div className="flex-1 overflow-y-auto p-5">
+        {loading ? (
+          <div className="flex items-center justify-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+            <span className="ml-3 text-gray-600">Loading conflicts...</span>
+          </div>
+        ) : error ? (
+          <div className="p-6 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start space-x-3">
+              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-red-900 font-medium">
+                  Error Loading Conflicts
+                </h3>
+                <p className="text-red-700 text-sm mt-1">{error}</p>
+              </div>
+            </div>
+          </div>
+        ) : conflicts.length === 0 ? (
+          <div className="p-8 text-center">
+            <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+            <h3 className="text-lg font-medium text-gray-900 mb-1">
+              No Conflicts Detected
+            </h3>
+            <p className="text-gray-600 text-sm">
+              All requirements are consistent and conflict-free.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-slate-800">
+                Detected Conflicts ({filteredConflicts.length})
+              </h3>
+            </div>
 
       {/* Filters */}
       <div className="flex space-x-3 mb-4 relative z-40">
@@ -235,108 +234,111 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
         />
       </div>
 
-      {filteredConflicts.length === 0 ? (
-        <div className="p-8 text-center bg-white/90 backdrop-blur-sm rounded-xl border border-slate-200 shadow-sm">
-          <CheckCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-gray-900 mb-1">
-            No Conflicts Match Filters
-          </h3>
-          <p className="text-gray-600 text-sm">
-            Try adjusting your filters to see more results.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-        {filteredConflicts.map((conflict, index) => {
-        const severityColors = {
-          high: "border-red-300 bg-red-50/50",
-          medium: "border-orange-300 bg-orange-50/50",
-          low: "border-yellow-300 bg-yellow-50/50",
-        };
-        const severityBadgeColors = {
-          high: "bg-red-100 text-red-800",
-          medium: "bg-orange-100 text-orange-800",
-          low: "bg-yellow-100 text-yellow-800",
-        };
-        const confidenceColors = {
-          high: "text-green-700",
-          medium: "text-yellow-700",
-          low: "text-gray-600",
-        };
-
-        const bgColor =
-          severityColors[conflict.severity] || severityColors.medium;
-        const badgeColor =
-          severityBadgeColors[conflict.severity] || severityBadgeColors.medium;
-        const confColor =
-          confidenceColors[conflict.confidence] || confidenceColors.medium;
-
-        return (
-          <div
-            key={conflict.id || index}
-            className={`border-2 rounded-xl p-5 transition-all duration-200 bg-white/90 backdrop-blur-sm hover:shadow-xl ${bgColor}`}
-            style={{
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-            }}
-          >
-            <div className="flex items-start space-x-3">
-              <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <div className="flex items-start justify-between mb-2">
-                  <h4 className="font-medium">
-                    {conflict.title || `Conflict ${index + 1}`}
-                  </h4>
-                  <div className="flex items-center space-x-2">
-                    <span
-                      className={`text-xs px-2 py-1 rounded font-medium ${badgeColor}`}
-                    >
-                      {conflict.severity?.toUpperCase() || "MEDIUM"}
-                    </span>
-                    {conflict.confidence && (
-                      <span className={`text-xs ${confColor}`}>
-                        {conflict.confidence} confidence
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <p className="text-sm mb-3">{conflict.description}</p>
-
-                {conflict.requirements && conflict.requirements.length > 0 && (
-                  <div className="space-y-2 mb-3">
-                    <p className="text-xs font-semibold uppercase text-slate-600">
-                      Conflicting Requirements:
-                    </p>
-                    {conflict.requirements.map((req, idx) => (
-                      <div
-                        key={idx}
-                        className="bg-white border border-slate-200 rounded-lg p-3 text-sm shadow-sm"
-                      >
-                        {req}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {conflict.suggestion && (
-                  <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
-                    <p className="text-xs font-semibold mb-1 text-blue-900">💡 Suggestion:</p>
-                    <p className="text-sm text-blue-800">{conflict.suggestion}</p>
-                  </div>
-                )}
-
-                {conflict.detectedAt && (
-                  <p className="text-xs text-slate-500 mt-3">
-                    Detected: {new Date(conflict.detectedAt).toLocaleString()}
-                  </p>
-                )}
+            {filteredConflicts.length === 0 ? (
+              <div className="p-8 text-center bg-white/90 backdrop-blur-sm rounded-xl border border-slate-200 shadow-sm">
+                <CheckCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <h3 className="text-lg font-medium text-gray-900 mb-1">
+                  No Conflicts Match Filters
+                </h3>
+                <p className="text-gray-600 text-sm">
+                  Try adjusting your filters to see more results.
+                </p>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredConflicts.map((conflict, index) => {
+                  const severityColors = {
+                    high: "border-red-300 bg-red-50/50",
+                    medium: "border-orange-300 bg-orange-50/50",
+                    low: "border-yellow-300 bg-yellow-50/50",
+                  };
+                  const severityBadgeColors = {
+                    high: "bg-red-100 text-red-800",
+                    medium: "bg-orange-100 text-orange-800",
+                    low: "bg-yellow-100 text-yellow-800",
+                  };
+                  const confidenceColors = {
+                    high: "text-green-700",
+                    medium: "text-yellow-700",
+                    low: "text-gray-600",
+                  };
+
+                  const bgColor =
+                    severityColors[conflict.severity] || severityColors.medium;
+                  const badgeColor =
+                    severityBadgeColors[conflict.severity] || severityBadgeColors.medium;
+                  const confColor =
+                    confidenceColors[conflict.confidence] || confidenceColors.medium;
+
+                  return (
+                    <div
+                      key={conflict.id || index}
+                      className={`border-2 rounded-xl p-5 transition-all duration-200 bg-white/90 backdrop-blur-sm hover:shadow-xl ${bgColor}`}
+                      style={{
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                      }}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between mb-2">
+                            <h4 className="font-medium">
+                              {conflict.title || `Conflict ${index + 1}`}
+                            </h4>
+                            <div className="flex items-center space-x-2">
+                              <span
+                                className={`text-xs px-2 py-1 rounded font-medium ${badgeColor}`}
+                              >
+                                {conflict.severity?.toUpperCase() || "MEDIUM"}
+                              </span>
+                              {conflict.confidence && (
+                                <span className={`text-xs ${confColor}`}>
+                                  {conflict.confidence} confidence
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <p className="text-sm mb-3">{conflict.description}</p>
+
+                          {conflict.requirements && conflict.requirements.length > 0 && (
+                            <div className="space-y-2 mb-3">
+                              <p className="text-xs font-semibold uppercase text-slate-600">
+                                Conflicting Requirements:
+                              </p>
+                              {conflict.requirements.map((req, idx) => (
+                                <div
+                                  key={idx}
+                                  className="bg-white border border-slate-200 rounded-lg p-3 text-sm shadow-sm"
+                                >
+                                  {req}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {conflict.suggestion && (
+                            <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+                              <p className="text-xs font-semibold mb-1 text-blue-900">💡 Suggestion:</p>
+                              <p className="text-sm text-blue-800">{conflict.suggestion}</p>
+                            </div>
+                          )}
+
+                          {conflict.detectedAt && (
+                            <p className="text-xs text-slate-500 mt-3">
+                              Detected: {new Date(conflict.detectedAt).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        );
-      })}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
