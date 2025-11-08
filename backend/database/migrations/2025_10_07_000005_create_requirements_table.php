@@ -12,10 +12,13 @@ class CreateRequirementsTable extends Migration
             $table->id();
             $table->foreignId('project_id')->constrained('projects')->onDelete('cascade');
             $table->string('title');
-            $table->text('content')->nullable();
+            $table->text('requirement_text')->nullable();
+            $table->string('requirement_type')->default('functional'); // functional, non-functional, constraint
             $table->string('priority')->default('medium'); // low, medium, high
             $table->float('confidence_score')->nullable();
             $table->string('status')->default('draft'); // draft, review, approved
+            $table->string('source')->default('manual'); // manual, extracted
+            $table->foreignId('document_id')->nullable()->constrained('documents')->onDelete('set null');
             $table->timestamps();
             $table->softDeletes();
         });

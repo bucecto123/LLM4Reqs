@@ -71,7 +71,7 @@ class ConversationController extends Controller
     public function show(string $id)
     {
         $messages = $this->conversationService->getMessages($id);
-        return response()->json($messages);
+        return response()->json(['messages' => $messages]);
     }
     
     public function sendMessage(MessageRequest $request, string $conversationId)

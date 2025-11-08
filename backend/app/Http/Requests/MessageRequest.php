@@ -25,7 +25,8 @@ class MessageRequest extends FormRequest
             'role' => 'required|in:user,assistant,system',
             'content' => 'required|string',
             'model_used' => 'nullable|string',
-            'tokens_used' => 'nullable|integer'
+            'tokens_used' => 'nullable|integer',
+            'persona_id' => 'nullable|integer|exists:personas,id'  // NEW: Optional persona
         ];
     }
 }

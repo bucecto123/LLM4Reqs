@@ -11,15 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('requirements', function (Blueprint $table) {
-            // Add missing columns that the controller expects
-            $table->string('requirement_type')->nullable()->after('title');
-            $table->foreignId('document_id')->nullable()->constrained('documents')->onDelete('set null')->after('project_id');
-            $table->string('source')->default('manual')->after('status'); // 'extracted' or 'manual'
-            
-            // Rename content to requirement_text to match controller
-            $table->renameColumn('content', 'requirement_text');
-        });
+        if (Schema::hasColumn('requirements', 'content')) {
+            Schema::table('requirements', function (Blueprint $table) {
+                // Only rename the column if it exists
+                $table->renameColumn('content', 'requirement_text');
+            });
+        }
     }
 
     /**
@@ -27,14 +24,11 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('requirements', function (Blueprint $table) {
-            // Remove added columns
-            $table->dropColumn(['requirement_type', 'source']);
-            $table->dropForeign(['document_id']);
-            $table->dropColumn('document_id');
-            
-            // Rename back
-            $table->renameColumn('requirement_text', 'content');
-        });
+        if (Schema::hasColumn('requirements', 'requirement_text')) {
+            Schema::table('requirements', function (Blueprint $table) {
+                // Only rename back if the column exists
+                $table->renameColumn('requirement_text', 'content');
+            });
+        }
     }
 };

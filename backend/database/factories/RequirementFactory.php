@@ -15,10 +15,12 @@ class RequirementFactory extends Factory
         return [
             'project_id' => Project::factory(),
             'title' => $this->faker->sentence(4),
-            'content' => $this->faker->paragraph(),
-            'priority' => 'medium',
+            'requirement_text' => $this->faker->paragraph(),
+            'requirement_type' => $this->faker->randomElement(['functional', 'non-functional', 'constraint']),
+            'priority' => $this->faker->randomElement(['low', 'medium', 'high']),
             'confidence_score' => $this->faker->randomFloat(2, 0, 1),
-            'status' => 'draft',
+            'status' => $this->faker->randomElement(['draft', 'active', 'archived']),
+            'source' => 'manual',
         ];
     }
 }

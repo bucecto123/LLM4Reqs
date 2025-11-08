@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\PersonaController;
+use App\Http\Controllers\Api\ConflictController;
 use App\Models\Persona;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -9,6 +10,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\ProjectController;
+use App\Http\Controllers\Api\ProjectKBController;
 
 Route::get('/health', function () {
     return response()->json(['status' => 'ok', 'service' => 'backend']);
@@ -42,7 +44,13 @@ Route::middleware('auth:sanctum')->group(function () {
     // Projects API
     Route::apiResource('projects', ProjectController::class);
     Route::get('/projects/{project}/requirements', [ProjectController::class, 'getRequirements']);
+    Route::get('/projects/{project}/conflicts', [ProjectController::class, 'getConflicts']);
     Route::get('/users/{user}/projects', [ProjectController::class, 'getUserProjects']);
+
+    // Knowledge Base API
+    Route::get('/projects/{project}/kb/status', [ProjectKBController::class, 'getStatus']);
+    Route::post('/projects/{project}/kb/build', [ProjectKBController::class, 'build']);
+    Route::post('/projects/{project}/kb/reindex', [ProjectKBController::class, 'reindex']);
 
     // Conversations API
     Route::post('/conversations', [ConversationController::class, 'store']);
@@ -60,6 +68,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/documents/{id}/process', [DocumentController::class, 'processDocument']);
     Route::get('/projects/{id}/documents', [DocumentController::class, 'getProjectDocuments']);
 
+    // Conflict Detection API
+    Route::post('/projects/{project}/conflicts/detect', [ConflictController::class, 'detectConflicts']);
+    Route::get('/conflicts/status/{jobId}', [ConflictController::class, 'getJobStatus']);
+    Route::post('/conflicts/process/{jobId}', [ConflictController::class, 'processJob']);
+    Route::get('/projects/{project}/conflicts', [ConflictController::class, 'getProjectConflicts']);
+    Route::put('/conflicts/{conflict}/resolve', [ConflictController::class, 'resolveConflict']);
+    Route::delete('/conflicts/{conflict}', [ConflictController::class, 'deleteConflict']);
+
     // Personas API
-    Route::get('/personas', [PersonaController::class,'index']);
+    Route::get('/personas', [PersonaController::class, 'index']);
+    Route::get('/personas/{id}', [PersonaController::class, 'show']);
+    Route::post('/personas', [PersonaController::class, 'store']);
+    Route::put('/personas/{id}', [PersonaController::class, 'update']);
+    Route::delete('/personas/{id}', [PersonaController::class, 'destroy']);
+    Route::get('/personas/{id}/stats', [PersonaController::class, 'stats']);
+    Route::post('/personas/{id}/prompt', [PersonaController::class, 'generatePrompt']);
 });

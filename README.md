@@ -94,12 +94,9 @@ php artisan migrate --seed
 Open `backend\.env` file and make sure these lines are set:
 
 ```env
-# Environment variables
 LLM_URL=http://127.0.0.1:8000/extract
 SANCTUM_STATEFUL_DOMAINS=localhost:5173
 CORS_ALLOWED_ORIGINS=http://localhost:5173
-
-DB_CONNECTION=sqlite
 ```
 
 > **Note:** Update the path to match your actual project location!

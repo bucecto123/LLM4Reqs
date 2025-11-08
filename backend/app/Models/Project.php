@@ -33,4 +33,14 @@ class Project extends Model
     {
         return $this->hasMany(Document::class);
     }
+
+    public function knowledgeBase()
+    {
+        return $this->hasOne(KnowledgeBase::class);
+    }
+
+    public function requirementConflicts()
+    {
+        return $this->hasMany(RequirementConflict::class);
+    }
 }
