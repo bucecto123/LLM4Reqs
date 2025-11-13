@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, FolderOpen, Menu, Activity, SortAsc, ChevronDown, Trash2, Edit2 } from "lucide-react";
+import {
+  Plus,
+  Search,
+  FolderOpen,
+  Menu,
+  Activity,
+  SortAsc,
+  ChevronDown,
+  Trash2,
+  Edit2,
+} from "lucide-react";
 import { apiFetch } from "../utils/auth.js";
 import { useAuth } from "../hooks/useAuth.jsx";
 import Sidebar from "../components/dashboard/Sidebar.jsx";
@@ -17,7 +27,7 @@ export default function ProjectsPage() {
   const [newProjectDescription, setNewProjectDescription] = useState("");
   const [error, setError] = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  
+
   // Edit project state
   const [showEditProjectModal, setShowEditProjectModal] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
@@ -90,14 +100,18 @@ export default function ProjectsPage() {
   };
 
   const openProject = (projectId) => {
-    // Navigate to dashboard with selected project
-    navigate(`/dashboard?project=${projectId}`);
+    // Navigate to project detail page
+    navigate(`/projects/${projectId}`);
   };
 
   const deleteProject = async (projectId, e) => {
     e.stopPropagation(); // Prevent opening the project when clicking delete
-    
-    if (!confirm("Are you sure you want to delete this project? This action cannot be undone.")) {
+
+    if (
+      !confirm(
+        "Are you sure you want to delete this project? This action cannot be undone."
+      )
+    ) {
       return;
     }
 
@@ -105,7 +119,7 @@ export default function ProjectsPage() {
       await apiFetch(`/api/projects/${projectId}`, {
         method: "DELETE",
       });
-      
+
       setProjects((prev) => prev.filter((p) => p.id !== projectId));
       setError(null);
     } catch (err) {
@@ -176,9 +190,15 @@ export default function ProjectsPage() {
         editingTitle=""
         showDropdownId={null}
         isInitializing={false}
+        projects={projects}
+        currentProjectId={null}
         fullName={user?.name}
         hasEmptyConversation={false}
+        chatMode="normal"
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+        onSwitchToNormalMode={() => navigate("/dashboard")}
+        onSwitchToProjectMode={() => {}}
+        onSelectProject={() => {}}
         onCreateNewConversation={() => navigate("/dashboard")}
         onSelectConversation={() => {}}
         onStartEditingConversation={() => {}}
@@ -188,7 +208,6 @@ export default function ProjectsPage() {
         onEditTitleChange={() => {}}
         onToggleDropdown={() => {}}
         onEditKeyPress={() => {}}
-        loadMessages={() => {}}
       />
 
       {/* Main Content */}
@@ -200,9 +219,7 @@ export default function ProjectsPage() {
           }`}
         >
           <div className="flex items-center space-x-4">
-            <h1 className="text-2xl font-bold text-slate-800">
-              Projects
-            </h1>
+            <h1 className="text-2xl font-bold text-slate-800">Projects</h1>
           </div>
 
           <button
@@ -247,9 +264,12 @@ export default function ProjectsPage() {
                     <SortAsc size={16} className="text-indigo-600" />
                   )}
                   <span>{sortBy === "activity" ? "Activity" : "Name"}</span>
-                  <ChevronDown size={16} className="absolute right-2 text-indigo-600" />
+                  <ChevronDown
+                    size={16}
+                    className="absolute right-2 text-indigo-600"
+                  />
                 </button>
-                
+
                 {isDropdownOpen && (
                   <div className="absolute top-full mt-2 w-full bg-white rounded-lg border-2 border-purple-200 shadow-xl overflow-hidden z-50">
                     <button
@@ -258,10 +278,19 @@ export default function ProjectsPage() {
                         setIsDropdownOpen(false);
                       }}
                       className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors ${
-                        sortBy === "activity" ? "bg-indigo-50 text-indigo-900" : "hover:bg-gray-50 text-gray-700"
+                        sortBy === "activity"
+                          ? "bg-indigo-50 text-indigo-900"
+                          : "hover:bg-gray-50 text-gray-700"
                       }`}
                     >
-                      <Activity size={16} className={sortBy === "activity" ? "text-indigo-600" : "text-gray-500"} />
+                      <Activity
+                        size={16}
+                        className={
+                          sortBy === "activity"
+                            ? "text-indigo-600"
+                            : "text-gray-500"
+                        }
+                      />
                       <span className="font-medium">Activity</span>
                     </button>
                     <button
@@ -270,10 +299,19 @@ export default function ProjectsPage() {
                         setIsDropdownOpen(false);
                       }}
                       className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors ${
-                        sortBy === "name" ? "bg-indigo-50 text-indigo-900" : "hover:bg-gray-50 text-gray-700"
+                        sortBy === "name"
+                          ? "bg-indigo-50 text-indigo-900"
+                          : "hover:bg-gray-50 text-gray-700"
                       }`}
                     >
-                      <SortAsc size={16} className={sortBy === "name" ? "text-indigo-600" : "text-gray-500"} />
+                      <SortAsc
+                        size={16}
+                        className={
+                          sortBy === "name"
+                            ? "text-indigo-600"
+                            : "text-gray-500"
+                        }
+                      />
                       <span className="font-medium">Name</span>
                     </button>
                   </div>
@@ -299,10 +337,7 @@ export default function ProjectsPage() {
             </div>
           ) : sortedProjects.length === 0 ? (
             <div className="text-center py-20">
-              <FolderOpen
-                size={64}
-                className="mx-auto mb-4 text-gray-300"
-              />
+              <FolderOpen size={64} className="mx-auto mb-4 text-gray-300" />
               <h3 className="text-xl font-semibold mb-2 text-slate-800">
                 {searchQuery
                   ? "No projects found"

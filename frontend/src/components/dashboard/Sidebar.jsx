@@ -1,30 +1,34 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { 
-  FolderKanban, 
-  Plus, 
-  MessageSquare, 
-  Loader2, 
-  MoreVertical, 
-  Edit2, 
-  Trash2, 
-  Check, 
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import {
+  FolderKanban,
+  Plus,
+  MessageSquare,
+  Loader2,
+  MoreVertical,
+  Edit2,
+  Trash2,
+  Check,
   X,
   ChevronLeft,
-  ChevronRight
-} from 'lucide-react';
-import { useLogout } from '../../hooks/useAuth.jsx';
+  ChevronRight,
+} from "lucide-react";
+import { useLogout } from "../../hooks/useAuth.jsx";
 
 const NavItem = ({ icon, label, active, isOpen, onClick }) => {
-  const baseClasses = `w-full flex items-center ${isOpen ? 'space-x-3 px-4' : 'justify-center px-2'} py-3 rounded-lg font-medium transition-all duration-200`;
-  const activeStyle = active 
-    ? { backgroundColor: '#112D4E', color: '#DBE2EF' }
+  const baseClasses = `w-full flex items-center ${
+    isOpen ? "space-x-3 px-4" : "justify-center px-2"
+  } py-3 rounded-lg font-medium transition-all duration-200`;
+  const activeStyle = active
+    ? { backgroundColor: "#112D4E", color: "#DBE2EF" }
     : {};
 
   return (
-    <button 
+    <button
       onClick={onClick}
-      className={`${baseClasses} ${!active ? 'text-gray-600 hover:bg-gray-100' : ''}`}
+      className={`${baseClasses} ${
+        !active ? "text-gray-600 hover:bg-gray-100" : ""
+      }`}
       style={activeStyle}
     >
       <div>{icon}</div>
@@ -33,29 +37,27 @@ const NavItem = ({ icon, label, active, isOpen, onClick }) => {
   );
 };
 
-const ConversationItem = ({ 
-  conversation, 
-  isSelected, 
-  isEditing, 
-  editingTitle, 
+const ConversationItem = ({
+  conversation,
+  isSelected,
+  isEditing,
+  editingTitle,
   showDropdown,
-  onSelect, 
+  onSelect,
   onStartEdit,
   onCancelEdit,
   onSaveEdit,
   onDelete,
   onTitleChange,
   onToggleDropdown,
-  onKeyPress
+  onKeyPress,
 }) => (
   <div
     className={`group relative p-3 rounded-lg cursor-pointer transition-colors ${
-      isSelected
-        ? 'bg-blue-50 border-l-4 border-blue-500'
-        : 'hover:bg-gray-50'
+      isSelected ? "bg-blue-50 border-l-4 border-blue-500" : "hover:bg-gray-50"
     }`}
   >
-    <div 
+    <div
       onClick={() => {
         if (!isEditing) {
           onSelect(conversation);
@@ -89,7 +91,7 @@ const ConversationItem = ({
       ) : (
         <>
           <div className="font-medium text-sm text-gray-800 truncate">
-            {conversation.title || 'New Chat'}
+            {conversation.title || "New Chat"}
           </div>
           <div className="text-xs text-gray-500 mt-1">
             {new Date(conversation.updated_at).toLocaleDateString()}
@@ -97,7 +99,7 @@ const ConversationItem = ({
         </>
       )}
     </div>
-    
+
     {!isEditing && (
       <div className="absolute right-2 top-2">
         <button
@@ -109,7 +111,7 @@ const ConversationItem = ({
         >
           <MoreVertical size={14} />
         </button>
-        
+
         {showDropdown && (
           <div className="conversation-dropdown absolute right-0 top-8 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[120px]">
             <button
@@ -148,10 +150,16 @@ const Sidebar = ({
   editingTitle,
   showDropdownId,
   isInitializing,
+  projects,
+  currentProjectId,
   fullName,
   hasEmptyConversation,
   isMobile,
   onToggleSidebar,
+  chatMode,
+  onSwitchToNormalMode,
+  onSwitchToProjectMode,
+  onSelectProject,
   onCreateNewConversation,
   onSelectConversation,
   onStartEditingConversation,
@@ -161,7 +169,6 @@ const Sidebar = ({
   onEditTitleChange,
   onToggleDropdown,
   onEditKeyPress,
-  loadMessages
 }) => {
   const { logout: performLogout, isLoading: logoutLoading } = useLogout();
   const navigate = useNavigate();
@@ -174,17 +181,16 @@ const Sidebar = ({
       if (accountRef.current && !accountRef.current.contains(e.target)) {
         setIsAccountOpen(false);
       }
-      if (!e.target.closest('.conversation-dropdown')) {
+      if (!e.target.closest(".conversation-dropdown")) {
         onToggleDropdown(null);
       }
     }
-    window.addEventListener('click', handleClickOutside);
-    return () => window.removeEventListener('click', handleClickOutside);
+    window.addEventListener("click", handleClickOutside);
+    return () => window.removeEventListener("click", handleClickOutside);
   }, [onToggleDropdown]);
 
   const handleSelectConversation = (conversation) => {
     onSelectConversation(conversation);
-    loadMessages(conversation.id);
     if (isMobile) {
       onToggleSidebar();
     }
@@ -277,12 +283,9 @@ const Sidebar = ({
 
       {/* Mobile Overlay */}
       {isMobile && isSidebarOpen && (
-        <div 
-          className="sidebar-overlay"
-          onClick={onToggleSidebar}
-        />
+        <div className="sidebar-overlay" onClick={onToggleSidebar} />
       )}
-      
+
       {/* Mobile Menu Button - Only show when sidebar is closed on mobile */}
       {isMobile && !isSidebarOpen && (
         <button
@@ -293,19 +296,19 @@ const Sidebar = ({
           <ChevronRight size={24} className="text-gray-700" />
         </button>
       )}
-      
+
       {/* Sidebar Container */}
-      <div 
+      <div
         className={`bg-white flex flex-col transition-all duration-300 relative border-r rounded-r-2xl ${
-          isMobile 
+          isMobile
             ? `fixed inset-y-0 left-0 z-50 shadow-2xl ${
-                isSidebarOpen ? 'w-80 translate-x-0' : 'w-0 -translate-x-full'
-              }` 
-            : `${isSidebarOpen ? 'w-64' : 'w-24'}`
+                isSidebarOpen ? "w-80 translate-x-0" : "w-0 -translate-x-full"
+              }`
+            : `${isSidebarOpen ? "w-64" : "w-24"}`
         }`}
         style={{
-          borderRightColor: '#D1D5DB',
-          borderRightWidth: '2px'
+          borderRightColor: "#D1D5DB",
+          borderRightWidth: "2px",
         }}
       >
         {/* Content - Only render when open on mobile OR always on desktop */}
@@ -314,14 +317,19 @@ const Sidebar = ({
             {/* Header with Toggle Button */}
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="fish-container w-10 h-10 rounded-lg flex items-center justify-center cursor-pointer transition-transform" style={{ backgroundColor: '#4A7BA7' }}>
+                <div
+                  className="fish-container w-10 h-10 rounded-lg flex items-center justify-center cursor-pointer transition-transform"
+                  style={{ backgroundColor: "#4A7BA7" }}
+                >
                   <span className="fish-swim text-2xl">🐟</span>
                 </div>
                 {(isSidebarOpen || isMobile) && (
-                  <span className="font-semibold text-lg text-gray-800">Fishy</span>
+                  <span className="font-semibold text-lg text-gray-800">
+                    Fishy
+                  </span>
                 )}
               </div>
-              
+
               {/* Toggle Button */}
               <button
                 onClick={onToggleSidebar}
@@ -338,30 +346,50 @@ const Sidebar = ({
 
             {/* New Chat Button */}
             <div className="p-4">
-              <button 
+              <button
                 onClick={() => {
-                  if (location.pathname === '/projects') {
-                    navigate('/dashboard');
+                  if (location.pathname === "/projects") {
+                    navigate("/dashboard");
                   } else {
                     onCreateNewConversation();
                   }
                   if (isMobile) onToggleSidebar();
                 }}
                 disabled={isInitializing || hasEmptyConversation}
-                className={`group w-full flex items-center ${(isSidebarOpen || isMobile) ? 'justify-start space-x-2' : 'justify-center'} px-4 py-3 rounded-lg font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:scale-105 ${
-                  !isInitializing && !hasEmptyConversation && location.pathname === '/dashboard' ? 'animate-pulse' : ''
+                className={`group w-full flex items-center ${
+                  isSidebarOpen || isMobile
+                    ? "justify-start space-x-2"
+                    : "justify-center"
+                } px-4 py-3 rounded-lg font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:scale-105 ${
+                  !isInitializing &&
+                  !hasEmptyConversation &&
+                  location.pathname === "/dashboard" &&
+                  chatMode === "normal"
+                    ? "animate-pulse"
+                    : ""
                 }`}
-                style={{ backgroundColor: '#DBE2EF', color: '#112D4E' }}
-                title={hasEmptyConversation ? "Send a message first" : "Create new chat"}
+                style={{ backgroundColor: "#DBE2EF", color: "#112D4E" }}
+                title={
+                  hasEmptyConversation
+                    ? "Send a message first"
+                    : "Create new chat"
+                }
               >
-                <div className={`flex items-center ${(isSidebarOpen || isMobile) ? 'space-x-2' : ''}`}>
+                <div
+                  className={`flex items-center ${
+                    isSidebarOpen || isMobile ? "space-x-2" : ""
+                  }`}
+                >
                   {isInitializing ? (
                     <Loader2 className="animate-spin" size={20} />
                   ) : (
-                    <Plus size={20} className="transition-transform group-hover:rotate-90" />
+                    <Plus
+                      size={20}
+                      className="transition-transform group-hover:rotate-90"
+                    />
                   )}
                   {(isSidebarOpen || isMobile) && (
-                    <span>{isInitializing ? 'Loading...' : 'New Chat'}</span>
+                    <span>{isInitializing ? "Loading..." : "New Chat"}</span>
                   )}
                 </div>
               </button>
@@ -369,38 +397,49 @@ const Sidebar = ({
 
             {/* Navigation */}
             <nav className="px-4 space-y-1">
-              <NavItem 
-                icon={<MessageSquare size={20} />} 
-                label="Conversations" 
-                active={location.pathname === '/dashboard'} 
+              <NavItem
+                icon={<MessageSquare size={20} />}
+                label="Conversations"
+                active={
+                  chatMode === "normal" && location.pathname === "/dashboard"
+                }
                 isOpen={isSidebarOpen || isMobile}
                 onClick={() => {
-                  navigate('/dashboard');
+                  onSwitchToNormalMode();
+                  navigate("/dashboard");
                   if (isMobile) onToggleSidebar();
                 }}
               />
-              <NavItem 
-                icon={<FolderKanban size={20} />} 
-                label="Projects" 
-                active={location.pathname === '/projects'}
+              <NavItem
+                icon={<FolderKanban size={20} />}
+                label="Projects"
+                active={
+                  location.pathname === "/projects" ||
+                  location.pathname.startsWith("/projects/")
+                }
                 isOpen={isSidebarOpen || isMobile}
                 onClick={() => {
-                  navigate('/projects');
+                  navigate("/projects");
                   if (isMobile) onToggleSidebar();
                 }}
               />
             </nav>
 
             {/* Conversations List */}
-            {(isSidebarOpen || isMobile) && location.pathname === '/dashboard' && (
+            {(isSidebarOpen || isMobile) && (
               <div className="flex-1 px-4 mt-6 overflow-y-auto pb-24">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold text-gray-500 uppercase">Recent Chats</span>
+                  <span className="text-xs font-semibold text-gray-500 uppercase">
+                    {chatMode === "project" ? "Project Chats" : "Recent Chats"}
+                  </span>
                 </div>
                 <div className="space-y-2">
                   {conversations.length === 0 ? (
                     <div className="text-center py-8">
-                      <MessageSquare size={32} className="mx-auto text-gray-400 mb-2" />
+                      <MessageSquare
+                        size={32}
+                        className="mx-auto text-gray-400 mb-2"
+                      />
                       <p className="text-sm text-gray-500">No conversations</p>
                       <p className="text-xs text-gray-400">Click "New Chat"</p>
                     </div>
@@ -409,7 +448,9 @@ const Sidebar = ({
                       <ConversationItem
                         key={conversation.id}
                         conversation={conversation}
-                        isSelected={selectedConversation?.id === conversation.id}
+                        isSelected={
+                          selectedConversation?.id === conversation.id
+                        }
                         isEditing={editingConversationId === conversation.id}
                         editingTitle={editingTitle}
                         showDropdown={showDropdownId === conversation.id}
@@ -428,26 +469,40 @@ const Sidebar = ({
               </div>
             )}
 
-            {(!isSidebarOpen && !isMobile && location.pathname !== '/dashboard') && (
-              <div className="flex-1"></div>
-            )}
+            {!isSidebarOpen &&
+              !isMobile &&
+              location.pathname === "/dashboard" && (
+                <div className="flex-1"></div>
+              )}
 
             {/* Account - Fixed at bottom */}
             <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-white">
               <div ref={accountRef} className="w-full">
-                <button 
-                  onClick={() => setIsAccountOpen(!isAccountOpen)} 
-                  className={`w-full flex items-center ${(isSidebarOpen || isMobile) ? 'space-x-3' : 'justify-center'} hover:bg-gray-50 p-3 rounded-lg transition-colors`}
+                <button
+                  onClick={() => setIsAccountOpen(!isAccountOpen)}
+                  className={`w-full flex items-center ${
+                    isSidebarOpen || isMobile ? "space-x-3" : "justify-center"
+                  } hover:bg-gray-50 p-3 rounded-lg transition-colors`}
                 >
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#4A7BA7' }}>
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: "#4A7BA7" }}
+                  >
                     <span className="text-white text-sm font-semibold">
-                      {fullName ? fullName.charAt(0).toUpperCase() : 'A'}
+                      {fullName ? fullName.charAt(0).toUpperCase() : "A"}
                     </span>
                   </div>
                   {(isSidebarOpen || isMobile) && (
                     <div className="flex-1 text-left">
-                      <div className="text-sm font-medium text-gray-800">{fullName || 'Account'}</div>
-                      <div className="text-xs font-semibold" style={{ color: '#4A7BA7' }}>Pro</div>
+                      <div className="text-sm font-medium text-gray-800">
+                        {fullName || "Account"}
+                      </div>
+                      <div
+                        className="text-xs font-semibold"
+                        style={{ color: "#4A7BA7" }}
+                      >
+                        Pro
+                      </div>
                     </div>
                   )}
                 </button>
@@ -455,16 +510,18 @@ const Sidebar = ({
                 {isAccountOpen && (
                   <div
                     className={`absolute bottom-20 rounded-lg shadow-lg z-50 w-40 overflow-hidden ${
-                      (isSidebarOpen || isMobile) ? 'left-4' : 'left-1/2 -translate-x-1/2'
+                      isSidebarOpen || isMobile
+                        ? "left-4"
+                        : "left-1/2 -translate-x-1/2"
                     }`}
-                    style={{ backgroundColor: '#112D4E' }}
+                    style={{ backgroundColor: "#112D4E" }}
                   >
                     <button
                       onClick={performLogout}
                       disabled={logoutLoading}
                       className="w-full text-left px-4 py-3 text-sm text-white font-medium hover:bg-opacity-90 disabled:opacity-50 transition-all"
                     >
-                      {logoutLoading ? 'Logging out...' : 'Log out'}
+                      {logoutLoading ? "Logging out..." : "Log out"}
                     </button>
                   </div>
                 )}

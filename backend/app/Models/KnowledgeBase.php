@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\KBProgressUpdated;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -57,6 +58,14 @@ class KnowledgeBase extends Model
             'build_progress' => 0,
             'build_stage' => 'initializing',
         ]);
+
+        // Broadcast progress update
+        broadcast(new KBProgressUpdated(
+            $this->project_id,
+            0,
+            'initializing',
+            'building'
+        ));
     }
 
     /**
@@ -76,6 +85,14 @@ class KnowledgeBase extends Model
             'build_progress' => 100,
             'build_stage' => 'completed',
         ]);
+
+        // Broadcast completion
+        broadcast(new KBProgressUpdated(
+            $this->project_id,
+            100,
+            'completed',
+            'ready'
+        ));
     }
 
     /**
@@ -90,6 +107,15 @@ class KnowledgeBase extends Model
             'build_progress' => 0,
             'build_stage' => 'failed',
         ]);
+
+        // Broadcast failure
+        broadcast(new KBProgressUpdated(
+            $this->project_id,
+            0,
+            'failed',
+            'failed',
+            $error
+        ));
     }
 
     /**
@@ -101,5 +127,13 @@ class KnowledgeBase extends Model
             'build_progress' => $progress,
             'build_stage' => $stage,
         ]);
+
+        // Broadcast progress update
+        broadcast(new KBProgressUpdated(
+            $this->project_id,
+            $progress,
+            $stage,
+            $this->status
+        ));
     }
 }

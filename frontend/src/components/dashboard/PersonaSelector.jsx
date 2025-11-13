@@ -14,6 +14,8 @@ const PersonaSelector = ({
   selectedPersonaId,
   onPersonaChange,
   disabled = false,
+  personas: externalPersonas = null, // Accept personas from parent
+  onReloadPersonas = null, // Accept reload function from parent
 }) => {
   const [personas, setPersonas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,10 +23,18 @@ const PersonaSelector = ({
   const [isOpen, setIsOpen] = useState(false);
   const [showPersonaManager, setShowPersonaManager] = useState(false);
 
-  // Load personas on mount
+  // Use external personas if provided, otherwise load internally
+  const shouldLoadInternally = externalPersonas === null;
+
+  // Load personas on mount only if not provided externally
   useEffect(() => {
-    loadPersonas();
-  }, []);
+    if (shouldLoadInternally) {
+      loadPersonas();
+    } else {
+      setPersonas(externalPersonas);
+      setLoading(false);
+    }
+  }, [shouldLoadInternally, externalPersonas]);
 
   const loadPersonas = async () => {
     try {
@@ -67,7 +77,11 @@ const PersonaSelector = ({
 
   const handlePersonaCreated = (newPersona) => {
     // Reload personas to include the newly created one
-    loadPersonas();
+    if (onReloadPersonas) {
+      onReloadPersonas(); // Use parent's reload function if provided
+    } else {
+      loadPersonas(); // Otherwise reload internally
+    }
     setShowPersonaManager(false);
   };
 

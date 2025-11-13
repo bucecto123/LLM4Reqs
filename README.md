@@ -1,251 +1,179 @@
-# 🚀 LLM4Reqs - Getting Started Guide
+# 🚀 LLM4Reqs - AI-Powered Requirements Extraction
 
-Welcome to **LLM4Reqs**! This guide will help you set up and run the AI-powered requirements extraction system on your local machine.
+**LLM4Reqs** is an intelligent system that uses Large Language Models to automatically analyze documents and extract software requirements. It features persona-based requirement generation, conflict detection, and real-time collaboration.
 
-## 📋 What is LLM4Reqs?
+## ✨ Features
 
-LLM4Reqs is an intelligent system that uses Large Language Models (LLMs) to automatically analyze documents and extract software requirements. Upload your documents, and let AI do the heavy lifting!
+- 📄 **Document Upload** - PDF, Word (DOC/DOCX), Text, and Markdown
+- 🤖 **AI Extraction** - Automated requirement identification and extraction
+- 👥 **Persona-Based Analysis** - 8 predefined personas (End User, Product Manager, Developer, etc.)
+- ⚔️ **Conflict Detection** - Domain-agnostic conflict detection using RAG
+- � **Real-time Chat** - WebSocket-powered streaming responses
+- 🔒 **Secure** - Token-based authentication
 
-### What Can It Do?
+## 🎯 Architecture
 
-- 📄 **Upload Documents** - Supports PDF, Word (DOC/DOCX), Text, and Markdown files
-- 🤖 **AI Extraction** - Automatically identifies and extracts requirements from documents
-- 💬 **Interactive Chat** - Ask questions and get AI-powered responses
-- 👥 **Team Collaboration** - Multiple users can work on projects together
-- 🔒 **Secure** - Token-based authentication keeps your data safe
-
----
-
-## 🎯 System Overview
-
-The project has 3 main parts:
-
-1. **Backend** (Laravel/PHP) - Handles API, database, and file storage
-2. **Frontend** (React) - User interface you interact with
-3. **LLM Service** (Python/FastAPI) - AI brain for requirement extraction
-
-All three need to be running for the full system to work!
+| Component        | Technology        | Port | Purpose            |
+| ---------------- | ----------------- | ---- | ------------------ |
+| **Backend**      | Laravel/PHP       | 8001 | REST API, Database |
+| **Frontend**     | React/Vite        | 5173 | User Interface     |
+| **LLM Service**  | Python/FastAPI    | 8000 | AI Processing      |
+| **Reverb**       | Laravel WebSocket | 8080 | Real-time Updates  |
+| **Queue Worker** | Laravel Queue     | -    | Background Jobs    |
 
 ---
 
-## ✅ Before You Start - Prerequisites
+## ⚡ Quick Start
 
-Make sure you have these installed on your computer:
+### Prerequisites
 
-| Software     | Version            | Check Command      | Download Link                                   |
-| ------------ | ------------------ | ------------------ | ----------------------------------------------- |
-| **PHP**      | 8.2 or higher      | `php -v`           | [php.net](https://www.php.net/downloads)        |
-| **Composer** | Latest             | `composer -V`      | [getcomposer.org](https://getcomposer.org/)     |
-| **Node.js**  | 18 or higher       | `node -v`          | [nodejs.org](https://nodejs.org/)               |
-| **npm**      | Comes with Node.js | `npm -v`           | (included with Node.js)                         |
-| **Python**   | 3.8 or higher      | `python --version` | [python.org](https://www.python.org/downloads/) |
-| **Git**      | Latest             | `git --version`    | [git-scm.com](https://git-scm.com/)             |
+| Software | Version | Check              |
+| -------- | ------- | ------------------ |
+| PHP      | 8.2+    | `php -v`           |
+| Composer | Latest  | `composer -V`      |
+| Node.js  | 18+     | `node -v`          |
+| Python   | 3.8+    | `python --version` |
 
-### Quick Check (Run in PowerShell)
+### 1️⃣ Clone Repository
 
 ```powershell
-# Check all prerequisites at once
-php -v; composer -V; node -v; npm -v; python --version; git --version
-```
-
----
-
-## 🚀 Installation Steps
-
-### Step 1: Get the Code
-
-```powershell
-# Clone the repository (if you haven't already)
-git clone https://github.com/your-org/LLM4Reqs.git
+git clone https://github.com/bucecto123/LLM4Reqs.git
 cd LLM4Reqs
 ```
 
----
-
-### Step 2: Setup Backend (Laravel API)
-
-**Time: ~3 minutes**
+### 2️⃣ Backend Setup
 
 ```powershell
-# 1. Navigate to backend folder
 cd backend
-
-# 2. Install PHP dependencies
 composer install
 
-# 3. Create environment configuration file
+# Copy environment configuration
 copy .env.example .env
 
-# 4. Generate application encryption key
+# Generate application key
 php artisan key:generate
 
-# 5. Create SQLite database file
+# Create database
 mkdir database -ErrorAction SilentlyContinue
 New-Item -Path database\database.sqlite -ItemType File -Force
 
-# 6. Run database setup (creates all tables)
+# Run migrations and seed data
 php artisan migrate --seed
-
-# Done! Backend is ready.
 ```
 
-#### 📝 Important: Configure Your Database
+**📝 The `.env.example` file is already pre-configured with:**
 
-Open `backend\.env` file and make sure these lines are set:
+- ✅ WebSocket/Reverb settings
+- ✅ LLM Service URL and API key
+- ✅ CORS configuration
+- ✅ Queue connection
 
-```env
-LLM_URL=http://127.0.0.1:8000/extract
-SANCTUM_STATEFUL_DOMAINS=localhost:5173
-CORS_ALLOWED_ORIGINS=http://localhost:5173
-```
+**No manual configuration needed!** Just copy and run. The defaults work out of the box.
 
-> **Note:** Update the path to match your actual project location!
-
-#### Optional: Use MySQL Instead of SQLite
-
-If you prefer MySQL, update `.env` like this:
-
-```env
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=llm4reqs
-DB_USERNAME=root
-DB_PASSWORD=your_password
-```
-
-Then create the database: `CREATE DATABASE llm4reqs;`
-
----
-
-### Step 3: Setup Frontend (React UI)
-
-**Time: ~2 minutes**
+### 3️⃣ Frontend Setup
 
 ```powershell
-# 1. Navigate to frontend folder (from project root)
 cd ..\frontend
-
-# 2. Install JavaScript dependencies
 npm install
 
-# Done! Frontend is ready.
+# Copy environment configuration
+copy .env.example .env
 ```
 
----
+**📝 The `.env.example` file is already pre-configured with:**
 
-### Step 4: Setup LLM Service (AI Engine)
+- ✅ Backend API URL
+- ✅ WebSocket configuration (matches backend)
 
-**Time: ~2 minutes**
+**No manual configuration needed!** The REVERB_APP_KEY automatically matches the backend.
+
+### 4️⃣ LLM Service Setup
 
 ```powershell
-# 1. Navigate to LLM folder (from project root)
 cd ..\llm
-
-# 2. Create Python virtual environment
 python -m venv env
-
-# 3. Activate virtual environment
 .\env\Scripts\Activate.ps1
-
-# 4. Install Python packages
 pip install -r requirements.txt
 
-# Done! LLM service is ready.
+# Copy environment configuration
+copy .env.example .env
 ```
 
-#### 🔑 Get Your API Key (Required for AI Features)
-
-The system uses GROQ API for AI processing. You need a free API key:
+**🔑 Get Your Free GROQ API Key:**
 
 1. Visit [console.groq.com](https://console.groq.com/)
 2. Sign up for a free account
-3. Go to API Keys section
-4. Create a new API key
-5. Copy the key
+3. Create an API key
+4. Open `llm/.env` and paste your key:
+   ```env
+   GROQ_API_KEY=your_actual_api_key_here
+   ```
 
-**Set your API key (choose one method):**
+**📝 The `.env.example` already includes:**
 
-**Option A - Temporary (this session only):**
+- ✅ Default GROQ model (llama-3.3-70b-versatile)
+- ✅ LLM API key (matches backend)
+- ✅ RAG configuration
 
-```powershell
-$env:GROQ_API_KEY = "your_actual_api_key_here"
-$env:GROQ_MODEL = "llama-3.3-70b-versatile" (or change this to any available model on groq.com)
-```
+**Only update the GROQ_API_KEY with your actual key!**
 
-**Option B - Permanent (create `.env` file in `llm/` folder):**
+### 5️⃣ Start All Services
 
-```env
-GROQ_API_KEY=your_actual_api_key_here
-GROQ_MODEL=llama-3.3-70b-versatile (or change this to any available model on groq.com)
-```
-
----
-
-## 🎮 Running the Application
-
-You need to run all three services in **separate terminal windows**.
-
-### Terminal 1: Start Backend
+**Option A - Automated (Recommended):**
 
 ```powershell
-cd backend
-php artisan serve --host=127.0.0.1 --port=8001
+.\start-dev.ps1
 ```
 
-✅ **You should see:** `Server running on [http://127.0.0.1:8001]`
-
-> **Keep this terminal open!**
-
-### Terminal 2: Start Frontend
+**Option B - Manual (5 separate terminals):**
 
 ```powershell
-cd frontend
-npm run dev
-```
-
-✅ **You should see:** `Local: http://localhost:5173/`
-
-> **Keep this terminal open!**
-
-### Terminal 3: Start LLM Service
-
-```powershell
+# Terminal 1: LLM Service
 cd llm
 .\env\Scripts\Activate.ps1
-uvicorn main:app --reload --host 127.0.0.1 --port=8000
+uvicorn main:app --reload
+
+# Terminal 2: Frontend
+cd frontend
+npm run dev
+
+# Terminal 3: Backend
+cd backend
+php -d upload_max_filesize=20M -d post_max_size=25M artisan serve --port=8001
+
+# Terminal 4: Reverb WebSocket
+cd backend
+php artisan reverb:start
+
+# Terminal 5: Queue Worker
+cd backend
+php artisan queue:work --tries=3
 ```
 
-✅ **You should see:** `Application startup complete`
-
-> **Keep this terminal open!**
-
 ---
 
-## 🎉 Access the Application
+## � Access Points
 
-Once all three services are running:
+Once all services are running:
 
-- **Frontend (Main App):** http://localhost:5173
+- **Frontend:** http://localhost:5173
 - **Backend API:** http://localhost:8001/api
-- **LLM Service API Docs:** http://localhost:8000/docs
+- **LLM Docs:** http://localhost:8000/docs
+- **Reverb WebSocket:** ws://localhost:8080
 
-### First Time Using the App?
+### First Time Setup
 
-1. Open http://localhost:5173 in your browser
-2. Click "Register" to create a new account
-3. Fill in your name, email, and password
-4. Login with your credentials
-5. Start creating projects and uploading documents!
+1. Navigate to http://localhost:5173
+2. Click **Register** → Create account
+3. **Login** with credentials
+4. Create a project and upload documents!
 
 ---
 
-## 🧪 Verify Everything Works
-
-Run these health checks to make sure all services are running:
+## 🧪 Verify Installation
 
 ```powershell
-# Test backend (should return: {"status":"ok","service":"backend"})
+# Test Backend
 curl http://localhost:8001/api/health
 
 # Test LLM service (should return: {"status":"healthy"})
@@ -296,192 +224,159 @@ The system will automatically extract the text content!
 
 ---
 
-## 🔧 Configuration Files Explained
+## ⚙️ Environment Configuration
 
-### Backend Configuration (`backend/.env`)
+All three components use `.env` files for configuration. We provide `.env.example` templates with sensible defaults.
 
-```env
-# Application Settings
-APP_NAME=LLM4Reqs
-APP_ENV=local
-APP_DEBUG=true
-APP_URL=http://localhost:8001
-
-# Database (SQLite - easiest for local development)
-DB_CONNECTION=sqlite
-DB_DATABASE=full_path_to_database.sqlite
-
-# LLM Service Connection
-LLM_SERVICE_URL=http://localhost:8000
-
-# Frontend Access (for CORS)
-SANCTUM_STATEFUL_DOMAINS=localhost:5173
-CORS_ALLOWED_ORIGINS=http://localhost:5173
-```
-
-### Frontend Configuration (`frontend/vite.config.js`)
-
-The frontend is pre-configured to connect to the backend at `http://localhost:8001/api`.
-
-### LLM Service Configuration (`llm/.env`)
-
-```env
-GROQ_API_KEY=your_api_key_here
-GROQ_MODEL=gemma2-9b-it
-```
-
----
-
-## 🚨 Troubleshooting Common Issues
-
-### ❌ "Could not open input file: artisan"
-
-**Problem:** You're not in the `backend/` directory.
-
-**Solution:**
+### Quick Setup
 
 ```powershell
+# Backend
 cd backend
-php artisan serve
-```
+copy .env.example .env
 
----
-
-### ❌ "SQLSTATE[HY000]: General error: 1 no such table"
-
-**Problem:** Database migrations haven't been run.
-
-**Solution:**
-
-```powershell
-cd backend
-php artisan migrate --seed
-```
-
----
-
-### ❌ "Port 8001 already in use"
-
-**Problem:** Another application is using port 8001.
-
-**Solution:** Use a different port:
-
-```powershell
-php artisan serve --port=8002
-```
-
-Then update `frontend/vite.config.js` to proxy to port 8002.
-
----
-
-### ❌ "LLM service not accessible" or "Connection refused"
-
-**Problem:** LLM service isn't running.
-
-**Solution:** Start it in a separate terminal:
-
-```powershell
-cd llm
-.\env\Scripts\Activate.ps1
-uvicorn main:app --reload --host 127.0.0.1 --port=8000
-```
-
----
-
-### ❌ "npm ERR! code ENOENT"
-
-**Problem:** Node modules not installed.
-
-**Solution:**
-
-```powershell
+# Frontend
 cd frontend
-npm install
+copy .env.example .env
+
+# LLM Service
+cd llm
+copy .env.example .env
+# Then add your GROQ_API_KEY
 ```
 
+### Important Configuration Notes
+
+**Backend (`backend/.env`)**
+
+- Uses SQLite by default (no MySQL setup required)
+- Reverb WebSocket pre-configured on port 8080
+- CORS already set for `localhost:5173`
+
+**Frontend (`frontend/.env`)**
+
+- `VITE_REVERB_APP_KEY` must match backend's `REVERB_APP_KEY`
+- All Vite env vars must start with `VITE_`
+
+**LLM Service (`llm/.env`)**
+
+- **Required:** Add your GROQ API key
+- `LLM_API_KEY` must match backend's `LLM_API_KEY`
+
 ---
 
-### ❌ "composer: command not found"
+## 🚨 Common Issues & Solutions
 
-**Problem:** Composer is not installed or not in PATH.
+### ❌ "GROQ API Key Missing"
 
-**Solution:** Download and install Composer from [getcomposer.org](https://getcomposer.org/)
+**Solution:** Add your API key to `llm/.env`:
 
----
+```env
+GROQ_API_KEY=your_actual_api_key_here
+```
 
-### ❌ File Upload Fails
+### ❌ Port Already in Use
 
-**Possible Causes & Solutions:**
+```powershell
+# Find and kill process on port 8001 (Backend)
+netstat -ano | findstr :8001
+taskkill /PID <PID> /F
 
-1. **File too large** - Maximum size is 10MB
-2. **Wrong file type** - Only PDF, DOC, DOCX, TXT, MD are supported
-3. **Not logged in** - Make sure you're authenticated
-4. **Storage permission** - Check `backend/storage/app/` folder permissions
+# For other ports: 5173 (Frontend), 8000 (LLM), 8080 (Reverb)
+```
 
-**Check logs:**
+### ❌ Database Not Found
 
 ```powershell
 cd backend
-Get-Content storage\logs\laravel.log -Tail 50
+php artisan migrate:fresh --seed
 ```
 
----
+### ❌ WebSocket Connection Failed
 
-### ❌ CORS Errors in Browser Console
+**Check:**
 
-**Problem:** Frontend can't connect to backend due to CORS policy.
+1. Reverb server is running (`php artisan reverb:start`)
+2. `REVERB_APP_KEY` matches in both `backend/.env` and `frontend/.env`
+3. Port 8080 is not blocked by firewall
 
-**Solution:** Check `backend/.env` has these lines:
+### ❌ CORS Errors
 
-```env
-SANCTUM_STATEFUL_DOMAINS=localhost:5173
-CORS_ALLOWED_ORIGINS=http://localhost:5173
-```
-
-Then restart backend:
+If you see CORS errors in browser console:
 
 ```powershell
 cd backend
 php artisan config:clear
-php artisan serve --host=127.0.0.1 --port=8001
+# Restart backend server
+```
+
+### ❌ Missing Packages
+
+```powershell
+# Backend
+cd backend
+composer install
+
+# Frontend
+cd frontend
+npm install
+
+# LLM
+cd llm
+python -m venv env
+.\env\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+### ❌ Queue Jobs Not Processing
+
+Make sure queue worker is running:
+
+```powershell
+cd backend
+php artisan queue:work --tries=3
 ```
 
 ---
 
-## 📊 API Quick Reference
+## 📚 Key Features Explained
 
-All API endpoints require authentication (except register/login/health).
+### 1. Persona-Based Analysis
 
-### Authentication
+8 predefined personas (End User, Product Manager, Developer, QA, Business Analyst, System Architect, Security Expert, System Administrator) provide different perspectives on requirements.
+
+**API Example:**
 
 ```powershell
-# Register new user
-curl -X POST http://localhost:8001/api/register -H "Content-Type: application/json" -d '{"name":"John","email":"john@example.com","password":"password123","password_confirmation":"password123"}'
+# Get all personas
+curl http://localhost:8001/api/personas -H "Authorization: Bearer YOUR_TOKEN"
 
-# Login
-curl -X POST http://localhost:8001/api/login -H "Content-Type: application/json" -d '{"email":"john@example.com","password":"password123"}'
-
-# Returns: {"user":{...},"token":"your-auth-token"}
+# Generate requirements with persona
+curl -X POST http://localhost:8001/api/personas/1/generate -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
-### Documents
+### 2. Conflict Detection
+
+Domain-agnostic conflict detection using RAG (Retrieval-Augmented Generation) identifies contradictions and inconsistencies.
+
+**Run Detection:**
 
 ```powershell
-# Upload document
-curl -X POST http://localhost:8001/api/documents -H "Authorization: Bearer YOUR_TOKEN" -F "file=@document.pdf" -F "project_id=1"
-
-# Process document (extract requirements)
-curl -X POST http://localhost:8001/api/documents/1/process -H "Authorization: Bearer YOUR_TOKEN"
-
-# List project documents
-curl -X GET http://localhost:8001/api/projects/1/documents -H "Authorization: Bearer YOUR_TOKEN"
+cd backend
+php artisan queue:work  # Start queue worker
+# Upload documents and trigger conflict detection via UI
 ```
 
-### Chat
+### 3. Real-time WebSocket Updates
 
-```powershell
-# Send message to AI
-curl -X POST http://localhost:8001/api/chat -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" -d '{"text":"Hello, can you help me with requirements?"}'
+Progress updates stream in real-time via Reverb WebSocket server.
+
+**Test WebSocket:**
+
+```javascript
+// Browser console
+const ws = new WebSocket("ws://localhost:8080");
+ws.onmessage = (e) => console.log("Received:", e.data);
 ```
 
 ---
@@ -490,151 +385,83 @@ curl -X POST http://localhost:8001/api/chat -H "Authorization: Bearer YOUR_TOKEN
 
 ```
 LLM4Reqs/
-│
-├── backend/              # Laravel PHP Application
+├── backend/              # Laravel API
 │   ├── app/
-│   │   ├── Http/Controllers/  # API endpoints
-│   │   ├── Models/            # Database models
-│   │   └── Services/          # Business logic
-│   ├── database/
-│   │   ├── migrations/        # Database schema
-│   │   └── database.sqlite    # SQLite database file
-│   ├── routes/api.php         # API route definitions
-│   └── .env                   # Configuration file
+│   │   ├── Events/       # WebSocket events
+│   │   ├── Jobs/         # Background jobs (KB build, conflict detection)
+│   │   ├── Models/       # Eloquent models
+│   │   └── Services/     # Business logic
+│   ├── database/migrations/
+│   └── routes/api.php
 │
-├── frontend/            # React Application
+├── frontend/             # React UI
 │   ├── src/
-│   │   ├── components/       # Reusable UI components
-│   │   ├── pages/            # Page components
-│   │   └── main.jsx          # App entry point
-│   └── vite.config.js        # Frontend configuration
+│   │   ├── components/   # UI components
+│   │   ├── pages/        # DashBoard, Projects, ProjectDetail
+│   │   └── services/     # API clients
+│   └── vite.config.js
 │
-├── llm/                 # Python AI Service
-│   ├── main.py               # FastAPI application
-│   ├── rag.py                # RAG implementation
-│   ├── requirements.txt      # Python dependencies
-│   └── .env                  # API keys
+├── llm/                  # Python AI Service
+│   ├── main.py           # FastAPI app
+│   ├── rag.py            # RAG implementation
+│   ├── persona_manager.py
+│   ├── conflict_detection_api.py
+│   └── domain_agnostic_conflict_detector.py
 │
-└── Setup.md             # This file!
+└── start-dev.ps1         # Automated startup script
 ```
 
 ---
 
-## 🎓 Learning Resources
+## 🔧 Useful Commands
 
-New to these technologies? Here are some helpful links:
-
-- **Laravel (Backend):** [laravel.com/docs](https://laravel.com/docs)
-- **React (Frontend):** [react.dev](https://react.dev)
-- **FastAPI (LLM Service):** [fastapi.tiangolo.com](https://fastapi.tiangolo.com)
-- **Vite (Build Tool):** [vitejs.dev](https://vitejs.dev)
-
----
-
-## 🔄 Daily Development Workflow
-
-### Starting Your Development Session
+### Backend (Laravel)
 
 ```powershell
-# Terminal 1: Backend
-cd backend
-php artisan serve --host=127.0.0.1 --port=8001
-
-# Terminal 2: Frontend
-cd frontend
-npm run dev
-
-# Terminal 3: LLM Service
-cd llm
-.\env\Scripts\Activate.ps1
-uvicorn main:app --reload --host 127.0.0.1 --port=8000
+php artisan route:list            # List all routes
+php artisan migrate:fresh --seed  # Reset database
+php artisan queue:work            # Process jobs
+php artisan reverb:start          # Start WebSocket server
+php artisan config:clear          # Clear config cache
 ```
 
-### Stopping Everything
-
-Just press `Ctrl+C` in each terminal window.
-
-### Resetting the Database
+### Frontend (React)
 
 ```powershell
-cd backend
-php artisan migrate:fresh --seed
+npm run dev        # Development server
+npm run build      # Production build
+npm run preview    # Preview production build
 ```
 
-⚠️ **Warning:** This deletes all data and recreates tables with sample data!
-
----
-
-## 📝 Quick Commands Cheat Sheet
-
-### Backend Commands
+### LLM Service (Python)
 
 ```powershell
-php artisan serve              # Start server
-php artisan migrate            # Run new migrations
-php artisan migrate:fresh      # Reset database
-php artisan test               # Run tests
-php artisan route:list         # List all API routes
-php artisan config:clear       # Clear cached config
-composer install               # Install dependencies
-composer dump-autoload         # Reload autoloader
+uvicorn main:app --reload         # Development server
+python build_faiss.py             # Build FAISS index
+python run_domain_agnostic_detection.ps1  # Run conflict detection
 ```
-
-### Frontend Commands
-
-```powershell
-npm run dev                    # Start dev server
-npm run build                  # Build for production
-npm run preview                # Preview production build
-npm install                    # Install dependencies
-npm run lint                   # Run code linter
-```
-
-### LLM Service Commands
-
-```powershell
-uvicorn main:app --reload      # Start service
-pip install -r requirements.txt  # Install dependencies
-python -m pytest               # Run tests
-```
-
----
-
-## 🎯 Next Steps
-
-Now that you have everything set up:
-
-1. ✅ **Explore the UI** - Create projects, upload documents
-2. ✅ **Test AI Features** - Process documents and extract requirements
-3. ✅ **Read the API Docs** - Visit http://localhost:8000/docs
-4. ✅ **Check the Code** - Explore the project structure
-5. ✅ **Make Changes** - Start building new features!
-
----
-
-## 🆘 Need Help?
-
-- **Technical Issues:** Check the troubleshooting section above
-- **API Documentation:** See the complete API reference section
-- **Code Questions:** Review the project structure and key files
-- **Error Logs:** Check `backend/storage/logs/laravel.log`
 
 ---
 
 ## 📜 License
 
-This project is part of COS40005 - Computing Technology Project A.
+This project is part of **COS40005 - Computing Technology Project A**.
 
-The Laravel framework is licensed under the [MIT license](https://opensource.org/licenses/MIT).
-
----
-
-**Last Updated:** October 15, 2025  
-**Version:** 1.0  
-**Status:** Production Ready ✅
+Laravel framework is licensed under the [MIT license](https://opensource.org/licenses/MIT).
 
 ---
 
-## 🎊 You're All Set!
+## 🎯 Quick Tips
 
-Congratulations! Your LLM4Reqs system is ready to use. Start building amazing AI-powered requirement extraction tools! 🚀
+- ⚡ **Use `start-dev.ps1`** - Starts all 5 services in separate windows
+- 📋 **Copy `.env.example` files** - Pre-configured with working defaults
+- 🔑 **Only GROQ_API_KEY needed** - Everything else works out of the box
+- 📝 **Check logs:** `backend/storage/logs/laravel.log`
+- 📚 **API Documentation:** http://localhost:8000/docs (FastAPI Swagger UI)
+- 💾 **Database:** SQLite at `backend/database/database.sqlite` (no MySQL needed)
+- 🔌 **WebSocket Port:** 8080 (configurable in `.env`)
+- 🔄 **Reset everything:** `php artisan migrate:fresh --seed`
+
+---
+
+**🚀 You're ready to go! Happy coding!**

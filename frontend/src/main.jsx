@@ -1,14 +1,15 @@
-import React, { useEffect, useState } from 'react'
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import './index.css'
-import LLMDashboard from './pages/DashBoard'
-import ProjectsPage from './pages/ProjectsPage'
-import AuthPages from './pages/Login_SignUp'
-import { AuthProvider, useAuth } from './hooks/useAuth.jsx'
-import { isAuthenticated, getAccessToken } from './utils/auth'
-import ErrorBoundary from './components/ErrorBoundary'
+import React, { useEffect, useState } from "react";
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import "./index.css";
+import LLMDashboard from "./pages/DashBoard";
+import ProjectsPage from "./pages/ProjectsPage";
+import ProjectDetailPage from "./pages/ProjectDetailPage";
+import AuthPages from "./pages/Login_SignUp";
+import { AuthProvider, useAuth } from "./hooks/useAuth.jsx";
+import { isAuthenticated, getAccessToken } from "./utils/auth";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 // Loading component
 function LoadingScreen() {
@@ -25,7 +26,7 @@ function LoadingScreen() {
 // Main App Component
 function AppContent() {
   const { isAuthenticated: authState, isLoading, user } = useAuth();
-  
+
   if (isLoading) {
     return <LoadingScreen />;
   }
@@ -38,6 +39,7 @@ function AppContent() {
     <Routes>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/projects" element={<ProjectsPage />} />
+      <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
       <Route path="/dashboard" element={<LLMDashboard />} />
       <Route path="*" element={<Navigate to="/projects" replace />} />
     </Routes>
@@ -62,11 +64,11 @@ function LegacyApp() {
   const [token, setToken] = useState(() => getAccessToken());
 
   useEffect(() => {
-    function onAuth() { 
-      setToken(getAccessToken()); 
+    function onAuth() {
+      setToken(getAccessToken());
     }
-    window.addEventListener('authChanged', onAuth);
-    return () => window.removeEventListener('authChanged', onAuth);
+    window.addEventListener("authChanged", onAuth);
+    return () => window.removeEventListener("authChanged", onAuth);
   }, []);
 
   if (!token) {
@@ -76,8 +78,11 @@ function LegacyApp() {
   return <LLMDashboard />;
 }
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+// NOTE: StrictMode disabled in development to prevent duplicate API calls
+// Re-enable before production build for better error detection
+// Production builds automatically disable StrictMode anyway
+createRoot(document.getElementById("root")).render(
+  // <StrictMode>  // Temporarily disabled - causes duplicate renders
+  <App />
+  // </StrictMode>
+);

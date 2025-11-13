@@ -83,6 +83,61 @@ class LLMService
     }
 
     /**
+     * Chat with AI with streaming support (simulated)
+     * Streams response in chunks via callback for real-time display
+     */
+    public function chatStream(
+        string $message, 
+        array $history = [], 
+        ?string $context = null, 
+        ?array $personaData = null,
+        ?callable $onChunk = null
+    ): array {
+        try {
+            $payload = [
+                'message' => $message,
+                'conversation_history' => $history,
+                'context' => $context,
+            ];
+            
+            // Add persona data if provided
+            if ($personaData) {
+                $payload['persona_id'] = $personaData['id'] ?? null;
+                $payload['persona_data'] = $personaData;
+            }
+            
+            // Get full response from LLM (TODO: implement true streaming when LLM backend supports it)
+            $response = Http::timeout(120)->post("{$this->baseUrl}/api/chat", $payload);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $fullResponse = $data['response'] ?? '';
+                
+                // Simulate streaming by breaking response into chunks
+                if ($onChunk && !empty($fullResponse)) {
+                    // Split into individual characters for ultra-smooth streaming
+                    $length = mb_strlen($fullResponse);
+                    $charsPerChunk = 3; // Send 3 characters at a time for smooth typing
+                    
+                    for ($i = 0; $i < $length; $i += $charsPerChunk) {
+                        $chunk = mb_substr($fullResponse, $i, $charsPerChunk);
+                        $onChunk($chunk);
+                        // Very small delay for smooth typewriter effect (5ms = 200 chars/second)
+                        usleep(5000);
+                    }
+                }
+                
+                return $data;
+            }
+
+            throw new \Exception('LLM chat stream failed: ' . $response->body());
+        } catch (\Exception $e) {
+            Log::error('LLM chat stream failed', ['error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
+    /**
      * Generate persona-specific view
      */
     public function generatePersonaView(string $requirementText, string $personaName, string $personaPrompt): array

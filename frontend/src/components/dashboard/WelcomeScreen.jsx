@@ -10,7 +10,6 @@ import {
   Mic,
   X,
 } from "lucide-react";
-import PersonaSelector from "./PersonaSelector";
 
 const ActionButton = ({ icon, onClick }) => {
   return (
@@ -34,8 +33,6 @@ const WelcomeScreen = ({
   isLoading,
   isInitializing,
   currentProjectId,
-  selectedPersonaId,
-  onPersonaChange,
 }) => {
   return (
     <div className="flex-1 flex flex-col">
@@ -58,32 +55,6 @@ const WelcomeScreen = ({
 
           {/* Compact Input Area */}
           <div className="max-w-2xl mx-auto">
-            {/* Persona Selector - Always visible */}
-            <div className="mb-3 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <Sparkles className="w-5 h-5 text-purple-600" />
-                  <div className="flex-1">
-                    <PersonaSelector
-                      selectedPersonaId={selectedPersonaId}
-                      onPersonaChange={onPersonaChange}
-                      disabled={!currentProjectId}
-                    />
-                    {!currentProjectId && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Select a project to choose a persona
-                      </p>
-                    )}
-                  </div>
-                </div>
-                {selectedPersonaId && (
-                  <span className="text-xs text-purple-700 font-medium">
-                    💡 AI responds from this perspective
-                  </span>
-                )}
-              </div>
-            </div>
-
             {/* Attached Files Display */}
             {attachedFiles.length > 0 && (
               <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
@@ -165,7 +136,6 @@ const WelcomeScreen = ({
                 </button>
               </div>
             </div>
-
           </div>
         </div>
       </div>

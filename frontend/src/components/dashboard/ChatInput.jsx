@@ -1,27 +1,14 @@
 import React from "react";
-import {
-  Send,
-  Loader2,
-  Search,
-  Sparkles,
-  Grid3x3,
-  Globe,
-  Paperclip,
-  Mic,
-  X,
-} from "lucide-react";
-import PersonaSelector from "./PersonaSelector";
+import { Send, Loader2, Grid3x3, Globe, Paperclip, Mic, X } from "lucide-react";
 
-const ActionButton = ({ icon, onClick }) => {
-  return (
-    <button
-      onClick={onClick}
-      className="p-1.5 hover:bg-gray-100 rounded-md text-gray-600 transition-all duration-200"
-    >
-      {icon}
-    </button>
-  );
-};
+const ActionButton = ({ icon, onClick }) => (
+  <button
+    onClick={onClick}
+    className="p-1.5 hover:bg-gray-100 rounded-md text-gray-600 transition-all duration-200"
+  >
+    {icon}
+  </button>
+);
 
 const ChatInput = ({
   message,
@@ -33,39 +20,23 @@ const ChatInput = ({
   openFileUpload,
   isLoading,
   isInitializing,
+  chatMode,
   currentProjectId,
-  selectedPersonaId,
-  onPersonaChange,
 }) => {
+  const isDisabled = isLoading || isInitializing;
+  const canSend =
+    (message.trim() || attachedFiles.length > 0) &&
+    !isDisabled &&
+    currentProjectId;
+
+  const handleTextareaInput = (e) => {
+    e.target.style.height = "auto";
+    e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+  };
+
   return (
     <div className="bg-white border-t border-gray-200 p-4">
       <div className="max-w-4xl mx-auto">
-        {/* Persona Selector - Always visible */}
-        <div className="mb-3 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Sparkles className="w-5 h-5 text-purple-600" />
-              <div className="flex-1">
-                <PersonaSelector
-                  selectedPersonaId={selectedPersonaId}
-                  onPersonaChange={onPersonaChange}
-                  disabled={!currentProjectId}
-                />
-                {!currentProjectId && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Select a project to choose a persona
-                  </p>
-                )}
-              </div>
-            </div>
-            {selectedPersonaId && (
-              <span className="text-xs text-purple-700 font-medium">
-                💡 AI responds from this perspective
-              </span>
-            )}
-          </div>
-        </div>
-
         {/* Attached Files Display */}
         {attachedFiles.length > 0 && (
           <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
@@ -85,6 +56,7 @@ const ChatInput = ({
                   <button
                     onClick={() => removeAttachedFile(index)}
                     className="text-gray-400 hover:text-red-500 transition-colors"
+                    aria-label="Remove file"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -94,46 +66,40 @@ const ChatInput = ({
           </div>
         )}
 
+        {/* Message Input */}
         <div className="bg-white rounded-xl shadow-sm border-2 border-gray-300 p-3">
           <div className="flex items-center space-x-3">
             <button
               onClick={openFileUpload}
-              disabled={isLoading || isInitializing}
+              disabled={isDisabled}
               className="p-1.5 hover:bg-gray-100 rounded-md text-gray-600 transition-all duration-200 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Attach file"
             >
               <Paperclip size={18} />
             </button>
+
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleKeyPress}
+              onInput={handleTextareaInput}
               placeholder="Type your message here..."
               className="flex-1 bg-transparent border-none outline-none resize-none text-gray-800 placeholder-gray-400 text-sm"
               rows={1}
-              disabled={isLoading || isInitializing}
+              disabled={isDisabled}
               style={{ minHeight: "24px", maxHeight: "120px" }}
-              onInput={(e) => {
-                e.target.style.height = "auto";
-                e.target.style.height =
-                  Math.min(e.target.scrollHeight, 120) + "px";
-              }}
             />
+
             <button
               onClick={sendMessage}
-              disabled={
-                (!message.trim() && attachedFiles.length === 0) ||
-                isLoading ||
-                isInitializing ||
-                !currentProjectId
-              }
+              disabled={!canSend}
               className={`p-2 rounded-lg text-white transition-all duration-200 flex-shrink-0 ${
-                (message.trim() || attachedFiles.length > 0) &&
-                !isLoading &&
-                !isInitializing
+                canSend
                   ? "hover:shadow-md opacity-100"
                   : "opacity-40 cursor-not-allowed"
               }`}
               style={{ backgroundColor: "#4A7BA7" }}
+              aria-label="Send message"
             >
               {isLoading ? (
                 <Loader2 className="animate-spin" size={16} />
@@ -144,7 +110,7 @@ const ChatInput = ({
           </div>
         </div>
 
-        {/* Action buttons below input */}
+        {/* Action Buttons */}
         <div className="flex items-center justify-center space-x-2 mt-3">
           <ActionButton icon={<Grid3x3 size={14} />} />
           <ActionButton icon={<Globe size={14} />} />

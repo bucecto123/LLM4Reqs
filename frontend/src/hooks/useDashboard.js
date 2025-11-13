@@ -12,43 +12,27 @@ export const useDashboard = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 768);
 
-  // Handle mobile detection and sidebar state
-  useEffect(() => {
-    const checkMobile = () => {
-      const mobile = window.innerWidth < 768;
-      setIsMobile(mobile);
-      // Only auto-adjust sidebar when switching between mobile and desktop
-      if (mobile !== window.innerWidth < 768) {
-        setIsSidebarOpen(!mobile);
-      }
-    };
-
-    // Initial check
-    checkMobile();
-
-    // Add resize listener
-    window.addEventListener("resize", checkMobile);
-
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
   // URL parameters for project selection
   const [searchParams, setSearchParams] = useSearchParams();
 
   // State
   const [message, setMessage] = useState("");
   const [chatMode, setChatMode] = useState("normal");
-
-  // Chat state
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [messages, setMessages] = useState([]);
+
+  // Loading and error states
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [error, setError] = useState(null);
+
+  // Project state
   const [currentProjectId, setCurrentProjectId] = useState(null);
   const [projects, setProjects] = useState([]);
   const [isInitializing, setIsInitializing] = useState(true);
+
+  // UI state
   const [editingConversationId, setEditingConversationId] = useState(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [showDropdownId, setShowDropdownId] = useState(null);
@@ -58,11 +42,11 @@ export const useDashboard = () => {
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [conversationDocuments, setConversationDocuments] = useState([]);
 
-  // Persona state
-  const [selectedPersonaId, setSelectedPersonaId] = useState(null);
-
   // Refs
   const messagesEndRef = useRef(null);
+  const prevChatModeRef = useRef(null);
+  const prevProjectIdRef = useRef(null);
+  const isLoadingConversationsRef = useRef(false);
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -136,23 +120,40 @@ export const useDashboard = () => {
   };
 
   // Load conversations for current project
-  const loadConversations = async () => {
+  const loadConversations = async (
+    mode = chatMode,
+    projectId = currentProjectId
+  ) => {
+    // Prevent concurrent loads
+    if (isLoadingConversationsRef.current) {
+      return;
+    }
+
+    // Don't load if in project mode but no project ID yet
+    if (mode === "project" && !projectId) {
+      return;
+    }
+
+    isLoadingConversationsRef.current = true;
+
     try {
       let data;
-      if (chatMode === "normal") {
+      if (mode === "normal") {
         data = await apiFetch("/api/conversations");
-      } else if (chatMode === "project" && currentProjectId) {
-        data = await apiFetch(
-          `/api/projects/${currentProjectId}/conversations`
-        );
+      } else if (mode === "project" && projectId) {
+        data = await apiFetch(`/api/projects/${projectId}/conversations`);
       } else {
+        isLoadingConversationsRef.current = false;
         return;
       }
+
       setConversations(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to load conversations:", err);
       setError("Failed to load conversations");
       setConversations([]);
+    } finally {
+      isLoadingConversationsRef.current = false;
     }
   };
 
@@ -164,12 +165,12 @@ export const useDashboard = () => {
         `/api/conversations/${conversationId}/messages`
       );
 
-      // FIX: Handle the wrapped response format { messages: [...] }
+      // Handle wrapped response format { messages: [...] }
       const messagesList = data.messages || data;
       setMessages(Array.isArray(messagesList) ? messagesList : []);
       setError(null);
 
-      // Also load documents for this conversation
+      // Load documents for this conversation
       await loadConversationDocuments(conversationId);
     } catch (err) {
       console.error("Failed to load messages:", err);
@@ -199,30 +200,95 @@ export const useDashboard = () => {
     }
   };
 
-  // Effects
+  // ============================================
+  // EFFECTS
+  // ============================================
+
+  // Handle mobile detection and sidebar auto-collapse
   useEffect(() => {
-    loadProjects();
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile !== isMobile) {
+        setIsSidebarOpen(!mobile);
+      }
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, [isMobile]);
+
+  // Check for project parameter on initial load
+  useEffect(() => {
+    const projectIdFromUrl = searchParams.get("project");
+
+    if (projectIdFromUrl) {
+      setConversations([]);
+      setChatMode("project");
+      setCurrentProjectId(parseInt(projectIdFromUrl));
+      setSearchParams({});
+    }
+  }, [searchParams]);
+
+  // Initialize projects when switching to project mode
+  useEffect(() => {
+    if (chatMode === "project") {
+      loadProjects();
+    } else {
+      setIsInitializing(false);
+    }
   }, [chatMode]);
 
+  // Load conversations when chat mode or project changes
   useEffect(() => {
-    if (chatMode === "normal") {
-      loadConversations();
-    } else if (chatMode === "project" && currentProjectId) {
-      loadConversations();
+    const shouldLoad =
+      chatMode === "normal" || (chatMode === "project" && currentProjectId);
+
+    if (!shouldLoad) {
+      if (chatMode === "project" && !currentProjectId) {
+        setConversations([]);
+      }
+      return;
     }
+
+    // Create conversation key to track changes
+    const conversationKey =
+      chatMode === "normal" ? "normal" : `project-${currentProjectId}`;
+    const prevKey =
+      prevChatModeRef.current === "normal"
+        ? "normal"
+        : `project-${prevProjectIdRef.current}`;
+
+    // Only load if key actually changed
+    if (conversationKey === prevKey) {
+      return;
+    }
+
+    // Update refs and load
+    prevChatModeRef.current = chatMode;
+    prevProjectIdRef.current = currentProjectId;
+    setConversations([]);
+    loadConversations(chatMode, currentProjectId);
   }, [chatMode, currentProjectId]);
 
-  // FIX: Auto-load messages when conversation is selected
+  // Track previous conversation ID to only load when it actually changes
+  const prevConversationIdRef = useRef(null);
+
+  // Auto-load messages when conversation is selected (only when ID actually changes)
   useEffect(() => {
-    if (selectedConversation?.id) {
-      console.log(
-        "Loading messages for conversation:",
-        selectedConversation.id
-      );
+    if (
+      selectedConversation?.id &&
+      selectedConversation.id !== prevConversationIdRef.current
+    ) {
+      prevConversationIdRef.current = selectedConversation.id;
       loadMessages(selectedConversation.id);
+    } else if (!selectedConversation?.id) {
+      prevConversationIdRef.current = null;
     }
   }, [selectedConversation?.id]);
 
+  // Auto-scroll to bottom when messages update
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
@@ -269,8 +335,6 @@ export const useDashboard = () => {
     setConversationDocuments,
     messagesEndRef,
     isMobile, // ADD THIS LINE
-    selectedPersonaId,
-    setSelectedPersonaId,
 
     // Functions
     loadProjects,

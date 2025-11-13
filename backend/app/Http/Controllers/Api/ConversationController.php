@@ -103,6 +103,49 @@ class ConversationController extends Controller
     }
 
     /**
+     * Send message with streaming support via WebSocket
+     */
+    public function sendMessageStream(MessageRequest $request, string $conversationId)
+    {
+        try {
+            $messageData = $request->validated();
+            
+            // Save user message first
+            $userMessage = $this->conversationService->saveUserMessage($conversationId, $messageData);
+            
+            // Dispatch streaming job to background - returns immediately!
+            \App\Jobs\StreamMessageJob::dispatch($conversationId, $messageData);
+            
+            // Return immediately so frontend doesn't wait
+            return response()->json([
+                'success' => true,
+                'user_message' => $userMessage,
+                'streaming' => true,
+                'message' => 'Streaming started'
+            ], 201);
+            
+        } catch (\Exception $e) {
+            Log::error('Failed to start stream: ' . $e->getMessage());
+            
+            $errorMessage = 'Failed to generate AI response';
+            
+            // Handle specific error types
+            if (strpos($e->getMessage(), 'Malformed UTF-8') !== false || 
+                strpos($e->getMessage(), 'json_encode') !== false) {
+                $errorMessage = 'Message contains invalid characters. Please check your file encoding.';
+            } elseif (strpos($e->getMessage(), 'Request too large') !== false ||
+                     strpos($e->getMessage(), 'rate_limit_exceeded') !== false) {
+                $errorMessage = 'Message is too large. Please try with smaller files or shorter text.';
+            }
+            
+            return response()->json([
+                'error' => $errorMessage,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Update the specified conversation.
      */
     public function update(ConversationRequest $request, string $id)

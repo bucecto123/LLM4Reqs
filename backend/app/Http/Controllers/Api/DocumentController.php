@@ -389,4 +389,74 @@ class DocumentController extends Controller
             'document_id' => $document->id,
         ], 202);
     }
+
+    /**
+     * Delete a document and its associated file
+     */
+    public function destroy($documentId)
+    {
+        try {
+            $document = Document::findOrFail($documentId);
+            
+            // Check if user owns this document
+            if ($document->user_id !== auth()->id()) {
+                Log::warning('Unauthorized document deletion attempt', [
+                    'document_id' => $documentId,
+                    'user_id' => auth()->id(),
+                    'document_user_id' => $document->user_id
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized to delete this document'
+                ], 403);
+            }
+
+            Log::info('Deleting document', [
+                'document_id' => $documentId,
+                'filename' => $document->original_filename,
+                'file_path' => $document->file_path
+            ]);
+
+            // Delete associated requirements
+            $requirementsDeleted = Requirement::where('document_id', $document->id)->delete();
+            
+            Log::info('Deleted associated requirements', [
+                'document_id' => $documentId,
+                'requirements_deleted' => $requirementsDeleted
+            ]);
+
+            // Delete physical file if it exists
+            if ($document->file_path && Storage::exists($document->file_path)) {
+                Storage::delete($document->file_path);
+                Log::info('Deleted file from storage', [
+                    'file_path' => $document->file_path
+                ]);
+            }
+
+            // Delete document record
+            $document->delete();
+
+            Log::info('Document deleted successfully', [
+                'document_id' => $documentId
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Document deleted successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to delete document', [
+                'document_id' => $documentId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete document: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

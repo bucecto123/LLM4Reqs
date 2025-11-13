@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Upload, FileText, Loader2, Check, AlertCircle } from "lucide-react";
 import { apiFetch } from "../utils/auth";
+import echo from "../utils/echo";
 
 const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -13,7 +14,7 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
   const [error, setError] = useState(null);
   const [buildProgress, setBuildProgress] = useState(0);
   const [buildStage, setBuildStage] = useState("");
-  const [isPolling, setIsPolling] = useState(false);
+  const [isListening, setIsListening] = useState(false);
 
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
@@ -52,43 +53,42 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
     addFiles(files);
   };
 
-  // Poll KB build progress
+  // Listen to KB build progress via WebSocket
   useEffect(() => {
-    if (!isPolling || !projectId) return;
+    if (!isListening || !projectId) return;
 
-    const pollProgress = async () => {
-      try {
-        const response = await apiFetch(`/api/projects/${projectId}/kb/status`);
-        if (response.success && response.kb) {
-          const { build_progress, build_stage, status } = response.kb;
-          setBuildProgress(build_progress || 0);
-          setBuildStage(build_stage || "");
+    console.log(`Subscribing to project.${projectId} channel`);
 
-          // Stop polling when complete or failed
-          if (status === "ready" || status === "failed") {
-            setIsPolling(false);
-            setIsUploading(false);
+    // Subscribe to project-specific channel
+    const channel = echo.channel(`project.${projectId}`);
 
-            if (status === "ready") {
-              setTimeout(() => {
-                onClose();
-              }, 1500);
-            } else if (status === "failed") {
-              setError(response.kb.last_error || "KB build failed");
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Failed to poll KB status:", err);
+    // Listen for KB progress updates
+    channel.listen(".kb.progress", (data) => {
+      console.log("KB Progress Update:", data);
+
+      setBuildProgress(data.progress || 0);
+      setBuildStage(data.stage || "");
+
+      // Handle completion or failure
+      if (data.status === "ready") {
+        setIsListening(false);
+        setIsUploading(false);
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+      } else if (data.status === "failed") {
+        setIsListening(false);
+        setIsUploading(false);
+        setError(data.error || "KB build failed");
       }
+    });
+
+    // Cleanup: unsubscribe when component unmounts or listening stops
+    return () => {
+      console.log(`Unsubscribing from project.${projectId} channel`);
+      echo.leaveChannel(`project.${projectId}`);
     };
-
-    // Poll every 2 seconds
-    const interval = setInterval(pollProgress, 2000);
-    pollProgress(); // Initial poll
-
-    return () => clearInterval(interval);
-  }, [isPolling, projectId, onClose]);
+  }, [isListening, projectId, onClose]);
 
   const handleUpload = async () => {
     if (selectedFiles.length === 0) return;
@@ -102,10 +102,10 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
         setUploadProgress({ completed, total: selectedFiles.length });
       });
 
-      // Start polling for build progress
-      setIsPolling(true);
+      // Start listening for build progress via WebSocket
+      setIsListening(true);
       setBuildProgress(0);
-      setBuildStage("building_index");
+      setBuildStage("initializing");
     } catch (err) {
       console.error("KB upload failed:", err);
       setError(err.message || "Failed to upload documents. Please try again.");
@@ -268,7 +268,7 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
           )}
 
           {/* Upload Progress */}
-          {isUploading && !isPolling && (
+          {isUploading && !isListening && (
             <div className="mt-6 p-4 bg-blue-50 rounded-lg">
               <div className="flex items-center justify-between mb-2">
                 <span
@@ -296,7 +296,7 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
           )}
 
           {/* KB Build Progress */}
-          {isPolling && (
+          {isListening && (
             <div className="mt-6 p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
               <div className="flex items-center justify-between mb-2">
                 <span

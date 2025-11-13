@@ -60,6 +60,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/projects/{project}/conversations', [ConversationController::class, 'getProjectConversations']);
     Route::get('/conversations/{conversation}/messages', [ConversationController::class, 'show']);
     Route::post('/conversations/{conversation}/messages', [ConversationController::class, 'sendMessage']);
+    Route::post('/conversations/{conversation}/messages/stream', [ConversationController::class, 'sendMessageStream']);
     Route::put('/conversations/{conversation}', [ConversationController::class, 'update']);
     Route::delete('/conversations/{conversation}', [ConversationController::class, 'destroy']);
 
@@ -67,6 +68,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/documents', [DocumentController::class, 'upload']);
     Route::post('/documents/{id}/process', [DocumentController::class, 'processDocument']);
     Route::get('/projects/{id}/documents', [DocumentController::class, 'getProjectDocuments']);
+    Route::delete('/documents/{id}', [DocumentController::class, 'destroy']);
 
     // Conflict Detection API
     Route::post('/projects/{project}/conflicts/detect', [ConflictController::class, 'detectConflicts']);
