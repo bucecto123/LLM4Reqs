@@ -32,4 +32,9 @@ class Document extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function requirements()
+    {
+        return $this->hasMany(Requirement::class);
+    }
 }

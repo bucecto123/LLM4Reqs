@@ -112,13 +112,41 @@ const MessageBubble = ({
         </p>
       );
     },
-    ul: ({ children }) => (
-      <ul className="list-disc list-inside my-2 space-y-1">{children}</ul>
+    ul: ({ children, node }) => {
+      const childArray = React.Children.toArray(children);
+      const lastChild = childArray[childArray.length - 1];
+
+      return (
+        <ul className="list-disc list-inside my-2 space-y-1">
+          {React.Children.map(children, (child, index) => {
+            if (index === childArray.length - 1 && showCursor) {
+              return React.cloneElement(child, { isLastItem: true });
+            }
+            return child;
+          })}
+        </ul>
+      );
+    },
+    ol: ({ children, node }) => {
+      const childArray = React.Children.toArray(children);
+
+      return (
+        <ol className="list-decimal list-inside my-2 space-y-1">
+          {React.Children.map(children, (child, index) => {
+            if (index === childArray.length - 1 && showCursor) {
+              return React.cloneElement(child, { isLastItem: true });
+            }
+            return child;
+          })}
+        </ol>
+      );
+    },
+    li: ({ children, isLastItem, ...props }) => (
+      <li className="mb-1" {...props}>
+        {children}
+        {isLastItem && <FishCursor />}
+      </li>
     ),
-    ol: ({ children }) => (
-      <ol className="list-decimal list-inside my-2 space-y-1">{children}</ol>
-    ),
-    li: ({ children }) => <li className="mb-1">{children}</li>,
     strong: ({ children }) => (
       <strong className="font-semibold">{children}</strong>
     ),
@@ -174,6 +202,33 @@ const MessageBubble = ({
     },
   };
 
+  // Check for duplicate content (if content is literally repeated)
+  const cleanedContent = React.useMemo(() => {
+    if (!finalContent || isUser) return finalContent;
+
+    // Check if content is duplicated by splitting in half and comparing
+    const halfLength = Math.floor(finalContent.length / 2);
+    if (halfLength > 50) {
+      // Only check for substantial content
+      const firstHalf = finalContent.substring(0, halfLength).trim();
+      const secondHalf = finalContent.substring(halfLength).trim();
+
+      // If second half starts with the same content as first half, it's likely a duplicate
+      if (
+        secondHalf.startsWith(
+          firstHalf.substring(0, Math.min(100, firstHalf.length))
+        )
+      ) {
+        console.warn(
+          "Detected duplicate content in message, using first half only"
+        );
+        return firstHalf;
+      }
+    }
+
+    return finalContent;
+  }, [finalContent, isUser]);
+
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}>
       <div className={isUser ? userMessageStyles : aiMessageStyles}>
@@ -188,13 +243,8 @@ const MessageBubble = ({
                   rehypePlugins={[rehypeRaw]}
                   components={markdownComponents}
                 >
-                  {finalContent || " "}
+                  {cleanedContent || " "}
                 </ReactMarkdown>
-
-                {/* Fallback cursor if content is empty or plain text without paragraphs */}
-                {showCursor &&
-                  !finalContent.includes("\n") &&
-                  !finalContent.match(/[#*\->`]/) && <FishCursor />}
               </div>
             </div>
           )}

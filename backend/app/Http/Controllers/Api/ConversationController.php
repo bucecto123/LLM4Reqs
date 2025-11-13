@@ -40,10 +40,15 @@ class ConversationController extends Controller
      */
     public function getProjectConversations($projectId)
     {
-        $conversations = Conversation::where('project_id', $projectId)
-            ->where('user_id', Auth::id())
-            ->orderBy('updated_at', 'desc')
-            ->get();
+        // Cache conversations for 1 minute to improve LCP
+        $cacheKey = "project_conversations_{$projectId}_" . Auth::id();
+        $conversations = \Cache::remember($cacheKey, 60, function () use ($projectId) {
+            return Conversation::where('project_id', $projectId)
+                ->where('user_id', Auth::id())
+                ->orderBy('updated_at', 'desc')
+                ->get();
+        });
+        
         return response()->json($conversations);
     }
 

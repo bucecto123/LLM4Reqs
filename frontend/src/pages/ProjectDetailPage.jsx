@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -24,10 +24,24 @@ import Sidebar from "../components/dashboard/Sidebar.jsx";
 import MessageBubble from "../components/dashboard/MessageBubble.jsx";
 import FileUpload from "../components/FileUpload.jsx";
 import KBUploadModal from "../components/KBUploadModal.jsx";
-import RequirementsViewer from "../components/RequirementsViewer.jsx";
-import { ConflictsDisplay } from "../components/ConflictDetection.jsx";
 import PersonaSelector from "../components/dashboard/PersonaSelector.jsx";
 import echo from "../utils/echo.js";
+import {
+  ProjectDetailSkeleton,
+  MessagesSkeleton,
+  DocumentsSkeleton,
+  RequirementsSkeleton,
+} from "../components/LoadingSkeleton.jsx";
+
+// Lazy load heavy components for better LCP
+const RequirementsViewer = lazy(() =>
+  import("../components/RequirementsViewer.jsx")
+);
+const ConflictsDisplay = lazy(() =>
+  import("../components/ConflictDetection.jsx").then((module) => ({
+    default: module.ConflictsDisplay,
+  }))
+);
 
 export default function ProjectDetailPage() {
   const { projectId } = useParams();
@@ -270,16 +284,15 @@ export default function ProjectDetailPage() {
       setIsLoading(true);
       setError(null);
 
-      // Load project details
-      const projectData = await apiFetch(`/api/projects/${projectId}`);
+      // Load project details and documents in parallel for faster LCP
+      const [projectData, docsResponse] = await Promise.all([
+        apiFetch(`/api/projects/${projectId}`),
+        apiFetch(`/api/projects/${projectId}/documents`),
+      ]);
+
       setProject(projectData);
       setEditProjectName(projectData.name);
       setEditProjectDescription(projectData.description || "");
-
-      // Load documents for this project
-      const docsResponse = await apiFetch(
-        `/api/projects/${projectId}/documents`
-      );
       setDocuments(docsResponse.documents || docsResponse || []);
     } catch (err) {
       console.error("Failed to load project data:", err);
@@ -736,15 +749,9 @@ export default function ProjectDetailPage() {
     navigate(`/dashboard?project=${projectId}`);
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading project...</p>
-        </div>
-      </div>
-    );
+  // Show skeleton immediately for fast LCP - DON'T wait for data
+  if (isLoading && !project) {
+    return <ProjectDetailSkeleton />;
   }
 
   if (error && !project) {
@@ -1011,15 +1018,19 @@ export default function ProjectDetailPage() {
                     )}
 
                     {/* Messages */}
-                    {messages.map((msg, index) => (
-                      <MessageBubble
-                        key={msg.id}
-                        message={msg}
-                        isLatest={msg.id === latestAIMessageId}
-                      />
-                    ))}
+                    {isLoadingMessages && messages.length === 0 ? (
+                      <MessagesSkeleton />
+                    ) : (
+                      messages.map((msg, index) => (
+                        <MessageBubble
+                          key={msg.id}
+                          message={msg}
+                          isLatest={msg.id === latestAIMessageId}
+                        />
+                      ))
+                    )}
 
-                    {isLoadingMessages && (
+                    {isLoadingMessages && messages.length > 0 && (
                       <div className="flex justify-center py-4">
                         <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
                       </div>
@@ -1247,11 +1258,13 @@ export default function ProjectDetailPage() {
 
       {/* Requirements Viewer */}
       {showRequirements && (
-        <RequirementsViewer
-          projectId={projectId}
-          onClose={() => setShowRequirements(false)}
-          refreshKey={kbRefreshKey}
-        />
+        <Suspense fallback={<RequirementsSkeleton />}>
+          <RequirementsViewer
+            projectId={projectId}
+            onClose={() => setShowRequirements(false)}
+            refreshKey={kbRefreshKey}
+          />
+        </Suspense>
       )}
 
       {/* Conflicts Display */}
@@ -1260,10 +1273,18 @@ export default function ProjectDetailPage() {
           className="fixed right-0 top-0 h-full w-1/2 bg-gradient-to-br from-slate-50 to-orange-50 shadow-2xl z-40 flex flex-col border-l border-slate-200"
           style={{ minWidth: 400 }}
         >
-          <ConflictsDisplay
-            projectId={projectId}
-            onClose={() => setShowConflicts(false)}
-          />
+          <Suspense
+            fallback={
+              <div className="p-8 text-center">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto text-orange-600" />
+              </div>
+            }
+          >
+            <ConflictsDisplay
+              projectId={projectId}
+              onClose={() => setShowConflicts(false)}
+            />
+          </Suspense>
         </div>
       )}
     </div>

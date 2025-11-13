@@ -32,7 +32,11 @@ class ProjectController extends Controller
 
     public function show(string $id)
     {
-        $project = Project::findOrFail($id);
+        // Cache project data for 5 minutes to improve LCP
+        $project = \Cache::remember("project_{$id}", 300, function () use ($id) {
+            return Project::findOrFail($id);
+        });
+        
         return response()->json($project);
     }
 

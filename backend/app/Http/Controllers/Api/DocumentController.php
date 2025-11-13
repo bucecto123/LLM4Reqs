@@ -103,6 +103,9 @@ class DocumentController extends Controller
                 'status' => 'pending'
             ]);
 
+            // Clear cache when new document is created
+            \Cache::forget("project_documents_{$projectId}");
+
             Log::info('Document record created', [
                 'document_id' => $document->id,
                 'project_id' => $document->project_id
@@ -319,14 +322,15 @@ class DocumentController extends Controller
         $project = Project::findOrFail($projectId);
         
         try {
-            $documents = Document::where('project_id', $projectId)
-                ->with(['user:id,name'])
-                ->orderBy('created_at', 'desc')
-                ->get();
-
-            // Add requirement counts for each document
-            $documents->each(function ($doc) {
-                $doc->requirements_count = Requirement::where('document_id', $doc->id)->count();
+            // Cache documents for 2 minutes to improve performance
+            $documents = \Cache::remember("project_documents_{$projectId}", 120, function () use ($projectId) {
+                $docs = Document::where('project_id', $projectId)
+                    ->with(['user:id,name'])
+                    ->withCount('requirements') // Use withCount instead of loading all requirements
+                    ->orderBy('created_at', 'desc')
+                    ->get();
+                
+                return $docs;
             });
 
             Log::info('Retrieved project documents', [
@@ -417,6 +421,9 @@ class DocumentController extends Controller
                 'filename' => $document->original_filename,
                 'file_path' => $document->file_path
             ]);
+
+            // Clear cache when document is deleted
+            \Cache::forget("project_documents_{$document->project_id}");
 
             // Delete associated requirements
             $requirementsDeleted = Requirement::where('document_id', $document->id)->delete();

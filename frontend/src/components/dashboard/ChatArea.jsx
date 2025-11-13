@@ -167,7 +167,7 @@ const ChatArea = ({
                     <div className="max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-2xl px-4 py-3 rounded-lg shadow-sm bg-gray-100 text-gray-800 rounded-bl-none">
                       <div className="text-sm leading-relaxed">
                         <span
-                          className="fish-cursor-blink text-2xl"
+                          className="fish-cursor-animate text-2xl"
                           style={{
                             transform: "scaleX(-1)",
                             display: "inline-block",
@@ -208,7 +208,7 @@ const ChatArea = ({
           50% { opacity: 0.3; }
         }
         
-        .fish-cursor-blink {
+        .fish-cursor-animate {
           animation: fishBlink 0.8s ease-in-out infinite;
         }
       `}</style>
