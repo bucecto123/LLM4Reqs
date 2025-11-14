@@ -214,7 +214,7 @@ export default function ProjectsPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <header
-          className={`border-b-2 border-indigo-100 bg-white py-4 flex items-center justify-between shadow-sm ${
+          className={`border-b-2 border-indigo-100 bg-white py-5 flex items-center justify-between   ${
             isMobile && !isSidebarOpen ? "pl-14 pr-6" : "px-6"
           }`}
         >

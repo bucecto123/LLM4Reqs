@@ -4,6 +4,7 @@ import { useDashboard } from "../hooks/useDashboard.js";
 import Sidebar from "../components/dashboard/Sidebar.jsx";
 import ChatArea from "../components/dashboard/ChatArea.jsx";
 import FileUpload from "../components/FileUpload.jsx";
+import { DashboardSkeleton } from "../components/LoadingSkeleton.jsx";
 import echo from "../utils/echo.js";
 
 export default function LLMDashboard() {
@@ -561,6 +562,11 @@ export default function LLMDashboard() {
     setIsNewChatMode(false);
     setLatestAIMessageId(null);
   };
+
+  // Show skeleton while initializing
+  if (isInitializing) {
+    return <DashboardSkeleton />;
+  }
 
   return (
     <div className="flex h-screen bg-gray-50 relative">

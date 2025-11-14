@@ -115,15 +115,17 @@ class LLMService
                 
                 // Simulate streaming by breaking response into chunks
                 if ($onChunk && !empty($fullResponse)) {
-                    // Split into individual characters for ultra-smooth streaming
+                    // Send in small batches for smooth streaming
+                    // Larger chunks = less network overhead = smoother display
                     $length = mb_strlen($fullResponse);
-                    $charsPerChunk = 3; // Send 3 characters at a time for smooth typing
+                    $charsPerChunk = 3; // Send 3-5 chars per chunk for smooth streaming
                     
                     for ($i = 0; $i < $length; $i += $charsPerChunk) {
                         $chunk = mb_substr($fullResponse, $i, $charsPerChunk);
                         $onChunk($chunk);
-                        // Very small delay for smooth typewriter effect (5ms = 200 chars/second)
-                        usleep(5000);
+                        // Small delay to control speed, but not per-character
+                        // This gives smooth flow without stuttering
+                        usleep(1000); // 10ms per chunk (3 chars) = ~30ms per char effective
                     }
                 }
                 

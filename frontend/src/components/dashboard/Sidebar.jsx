@@ -315,7 +315,10 @@ const Sidebar = ({
         {(isSidebarOpen || !isMobile) && (
           <>
             {/* Header with Toggle Button */}
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+            <div
+              className="px-4 py-5 flex items-center justify-between"
+              style={{ borderBottom: "1px solid #E2E8F0" }}
+            >
               <div className="flex items-center space-x-3">
                 <div
                   className="fish-container w-10 h-10 rounded-lg flex items-center justify-center cursor-pointer transition-transform"

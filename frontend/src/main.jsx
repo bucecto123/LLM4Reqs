@@ -11,6 +11,12 @@ import { AuthProvider, useAuth } from "./hooks/useAuth.jsx";
 import { isAuthenticated, getAccessToken } from "./utils/auth";
 import ErrorBoundary from "./components/ErrorBoundary";
 
+// Demo components (for testing typing animations)
+import DemoIndex from "./pages/DemoIndex";
+import TypingStylesDemo from "./components/TypingStylesDemo";
+import StreamingVsClientSideDemo from "./components/StreamingVsClientSideDemo";
+import TypingAnimationExample from "./components/TypingAnimationExample";
+
 // Loading component
 function LoadingScreen() {
   return (
@@ -41,6 +47,13 @@ function AppContent() {
       <Route path="/projects" element={<ProjectsPage />} />
       <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
       <Route path="/dashboard" element={<LLMDashboard />} />
+
+      {/* Demo Routes - Remove these in production */}
+      <Route path="/demo" element={<DemoIndex />} />
+      <Route path="/demo/typing-styles" element={<TypingStylesDemo />} />
+      <Route path="/demo/comparison" element={<StreamingVsClientSideDemo />} />
+      <Route path="/demo/basic" element={<TypingAnimationExample />} />
+
       <Route path="*" element={<Navigate to="/projects" replace />} />
     </Routes>
   );
