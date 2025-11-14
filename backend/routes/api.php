@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\PersonaController;
 use App\Http\Controllers\Api\ConflictController;
+use App\Http\Controllers\Api\ExportController;
 use App\Models\Persona;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -86,4 +87,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/personas/{id}', [PersonaController::class, 'destroy']);
     Route::get('/personas/{id}/stats', [PersonaController::class, 'stats']);
     Route::post('/personas/{id}/prompt', [PersonaController::class, 'generatePrompt']);
+
+    // Export API (with CORS for file downloads)
+    Route::get('/projects/{project}/export', [ExportController::class, 'exportProject'])->middleware('cors');
 });

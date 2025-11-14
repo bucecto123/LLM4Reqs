@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { AlertTriangle, X, CheckCircle, Clock, ChevronDown, Shield } from "lucide-react";
+import {
+  AlertTriangle,
+  X,
+  CheckCircle,
+  Clock,
+  ChevronDown,
+  Shield,
+  Download,
+} from "lucide-react";
 import { apiFetch } from "../utils/auth";
+import ExportModal from "./ExportModal.jsx";
 
 export const ConflictsDisplay = ({ projectId, onClose }) => {
   const [conflicts, setConflicts] = useState([]);
@@ -11,12 +20,27 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
     search: "",
   });
   const [isSeverityDropdownOpen, setIsSeverityDropdownOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [projectName, setProjectName] = useState("");
 
   useEffect(() => {
     if (projectId) {
       loadConflicts();
+      fetchProjectName();
     }
   }, [projectId]);
+
+  const fetchProjectName = async () => {
+    try {
+      const response = await apiFetch(`/api/projects/${projectId}`);
+      if (response && response.name) {
+        setProjectName(response.name);
+      }
+    } catch (err) {
+      console.error("Failed to load project name:", err);
+      setProjectName("Project");
+    }
+  };
 
   const handleFilterChange = (e) => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
@@ -50,7 +74,7 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
           status: conflict.resolution_status,
           detectedAt: conflict.detected_at,
         }));
-        
+
         // Sort by severity: high -> medium -> low
         const severityOrder = { high: 1, medium: 2, low: 3 };
         formattedConflicts.sort((a, b) => {
@@ -58,7 +82,7 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
           const orderB = severityOrder[b.severity?.toLowerCase()] || 2;
           return orderA - orderB;
         });
-        
+
         setConflicts(formattedConflicts);
       } else {
         setConflicts([]);
@@ -75,24 +99,29 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
   // Apply filters
   const filteredConflicts = conflicts.filter((conflict) => {
     // Filter by severity
-    if (filters.severity && conflict.severity?.toLowerCase() !== filters.severity.toLowerCase()) {
+    if (
+      filters.severity &&
+      conflict.severity?.toLowerCase() !== filters.severity.toLowerCase()
+    ) {
       return false;
     }
-    
+
     // Filter by search text
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       const matchesTitle = conflict.title?.toLowerCase().includes(searchLower);
-      const matchesDescription = conflict.description?.toLowerCase().includes(searchLower);
-      const matchesRequirements = conflict.requirements?.some(req => 
+      const matchesDescription = conflict.description
+        ?.toLowerCase()
+        .includes(searchLower);
+      const matchesRequirements = conflict.requirements?.some((req) =>
         req.toLowerCase().includes(searchLower)
       );
-      
+
       if (!matchesTitle && !matchesDescription && !matchesRequirements) {
         return false;
       }
     }
-    
+
     return true;
   });
 
@@ -109,6 +138,13 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
             className="px-4 py-2 rounded-lg bg-white hover:bg-orange-50 transition-colors font-medium text-orange-600 hover:text-orange-700 border border-orange-200 shadow-sm hover:shadow-md"
           >
             Refresh
+          </button>
+          <button
+            onClick={() => setIsExportModalOpen(true)}
+            className="px-4 py-2 rounded-lg bg-white hover:bg-green-50 transition-colors font-medium text-green-600 hover:text-green-700 border border-green-200 shadow-sm hover:shadow-md"
+          >
+            <Download className="w-4 h-4 mr-2 inline" />
+            Export
           </button>
           {onClose && (
             <button
@@ -158,81 +194,127 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
               </h3>
             </div>
 
-      {/* Filters */}
-      <div className="flex space-x-3 mb-4 relative z-40">
-        {/* Severity Filter Dropdown */}
-        <div className="relative z-50">
-          <button
-            onClick={() => setIsSeverityDropdownOpen(!isSeverityDropdownOpen)}
-            className="flex items-center space-x-2 pl-3 pr-8 py-2.5 rounded-lg border-2 border-orange-200 bg-white text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400 transition-all shadow-sm hover:border-orange-300 hover:shadow-md text-sm"
-          >
-            <Shield size={16} className="text-orange-600" />
-            <span>{filters.severity === "" ? "All Severities" : filters.severity.charAt(0).toUpperCase() + filters.severity.slice(1)}</span>
-            <ChevronDown size={16} className="absolute right-2 text-orange-600" />
-          </button>
-          
-          {isSeverityDropdownOpen && (
-            <div className="absolute top-full mt-2 w-48 bg-white rounded-lg border-2 border-orange-200 shadow-xl overflow-hidden z-50">
-              <button
-                onClick={() => {
-                  setFilters({ ...filters, severity: "" });
-                  setIsSeverityDropdownOpen(false);
-                }}
-                className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
-                  filters.severity === "" ? "bg-orange-50 text-orange-900" : "hover:bg-gray-50 text-gray-700"
-                }`}
-              >
-                <Shield size={16} className={filters.severity === "" ? "text-orange-600" : "text-gray-500"} />
-                <span className="font-medium">All Severities</span>
-              </button>
-              <button
-                onClick={() => {
-                  setFilters({ ...filters, severity: "high" });
-                  setIsSeverityDropdownOpen(false);
-                }}
-                className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
-                  filters.severity === "high" ? "bg-orange-50 text-orange-900" : "hover:bg-gray-50 text-gray-700"
-                }`}
-              >
-                <Shield size={16} className={filters.severity === "high" ? "text-red-600" : "text-gray-500"} />
-                <span className="font-medium">High</span>
-              </button>
-              <button
-                onClick={() => {
-                  setFilters({ ...filters, severity: "medium" });
-                  setIsSeverityDropdownOpen(false);
-                }}
-                className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
-                  filters.severity === "medium" ? "bg-orange-50 text-orange-900" : "hover:bg-gray-50 text-gray-700"
-                }`}
-              >
-                <Shield size={16} className={filters.severity === "medium" ? "text-orange-600" : "text-gray-500"} />
-                <span className="font-medium">Medium</span>
-              </button>
-              <button
-                onClick={() => {
-                  setFilters({ ...filters, severity: "low" });
-                  setIsSeverityDropdownOpen(false);
-                }}
-                className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
-                  filters.severity === "low" ? "bg-orange-50 text-orange-900" : "hover:bg-gray-50 text-gray-700"
-                }`}
-              >
-                <Shield size={16} className={filters.severity === "low" ? "text-yellow-600" : "text-gray-500"} />
-                <span className="font-medium">Low</span>
-              </button>
-            </div>
-          )}
-        </div>
+            {/* Filters */}
+            <div className="flex space-x-3 mb-4 relative z-40">
+              {/* Severity Filter Dropdown */}
+              <div className="relative z-50">
+                <button
+                  onClick={() =>
+                    setIsSeverityDropdownOpen(!isSeverityDropdownOpen)
+                  }
+                  className="flex items-center space-x-2 pl-3 pr-8 py-2.5 rounded-lg border-2 border-orange-200 bg-white text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400 transition-all shadow-sm hover:border-orange-300 hover:shadow-md text-sm"
+                >
+                  <Shield size={16} className="text-orange-600" />
+                  <span>
+                    {filters.severity === ""
+                      ? "All Severities"
+                      : filters.severity.charAt(0).toUpperCase() +
+                        filters.severity.slice(1)}
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    className="absolute right-2 text-orange-600"
+                  />
+                </button>
 
-        <input
-          name="search"
-          value={filters.search}
-          onChange={handleFilterChange}
-          placeholder="Search conflicts..."
-          className="px-3 py-2 rounded-lg border border-slate-300 bg-white shadow-sm hover:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all flex-1 text-sm"
-        />
-      </div>
+                {isSeverityDropdownOpen && (
+                  <div className="absolute top-full mt-2 w-48 bg-white rounded-lg border-2 border-orange-200 shadow-xl overflow-hidden z-50">
+                    <button
+                      onClick={() => {
+                        setFilters({ ...filters, severity: "" });
+                        setIsSeverityDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
+                        filters.severity === ""
+                          ? "bg-orange-50 text-orange-900"
+                          : "hover:bg-gray-50 text-gray-700"
+                      }`}
+                    >
+                      <Shield
+                        size={16}
+                        className={
+                          filters.severity === ""
+                            ? "text-orange-600"
+                            : "text-gray-500"
+                        }
+                      />
+                      <span className="font-medium">All Severities</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFilters({ ...filters, severity: "high" });
+                        setIsSeverityDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
+                        filters.severity === "high"
+                          ? "bg-orange-50 text-orange-900"
+                          : "hover:bg-gray-50 text-gray-700"
+                      }`}
+                    >
+                      <Shield
+                        size={16}
+                        className={
+                          filters.severity === "high"
+                            ? "text-red-600"
+                            : "text-gray-500"
+                        }
+                      />
+                      <span className="font-medium">High</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFilters({ ...filters, severity: "medium" });
+                        setIsSeverityDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
+                        filters.severity === "medium"
+                          ? "bg-orange-50 text-orange-900"
+                          : "hover:bg-gray-50 text-gray-700"
+                      }`}
+                    >
+                      <Shield
+                        size={16}
+                        className={
+                          filters.severity === "medium"
+                            ? "text-orange-600"
+                            : "text-gray-500"
+                        }
+                      />
+                      <span className="font-medium">Medium</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFilters({ ...filters, severity: "low" });
+                        setIsSeverityDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
+                        filters.severity === "low"
+                          ? "bg-orange-50 text-orange-900"
+                          : "hover:bg-gray-50 text-gray-700"
+                      }`}
+                    >
+                      <Shield
+                        size={16}
+                        className={
+                          filters.severity === "low"
+                            ? "text-yellow-600"
+                            : "text-gray-500"
+                        }
+                      />
+                      <span className="font-medium">Low</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <input
+                name="search"
+                value={filters.search}
+                onChange={handleFilterChange}
+                placeholder="Search conflicts..."
+                className="px-3 py-2 rounded-lg border border-slate-300 bg-white shadow-sm hover:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all flex-1 text-sm"
+              />
+            </div>
 
             {filteredConflicts.length === 0 ? (
               <div className="p-8 text-center bg-white/90 backdrop-blur-sm rounded-xl border border-slate-200 shadow-sm">
@@ -266,16 +348,18 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
                   const bgColor =
                     severityColors[conflict.severity] || severityColors.medium;
                   const badgeColor =
-                    severityBadgeColors[conflict.severity] || severityBadgeColors.medium;
+                    severityBadgeColors[conflict.severity] ||
+                    severityBadgeColors.medium;
                   const confColor =
-                    confidenceColors[conflict.confidence] || confidenceColors.medium;
+                    confidenceColors[conflict.confidence] ||
+                    confidenceColors.medium;
 
                   return (
                     <div
                       key={conflict.id || index}
                       className={`border-2 rounded-xl p-5 transition-all duration-200 bg-white/90 backdrop-blur-sm hover:shadow-xl ${bgColor}`}
                       style={{
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
                       }}
                     >
                       <div className="flex items-start space-x-3">
@@ -301,32 +385,38 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
 
                           <p className="text-sm mb-3">{conflict.description}</p>
 
-                          {conflict.requirements && conflict.requirements.length > 0 && (
-                            <div className="space-y-2 mb-3">
-                              <p className="text-xs font-semibold uppercase text-slate-600">
-                                Conflicting Requirements:
-                              </p>
-                              {conflict.requirements.map((req, idx) => (
-                                <div
-                                  key={idx}
-                                  className="bg-white border border-slate-200 rounded-lg p-3 text-sm shadow-sm"
-                                >
-                                  {req}
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                          {conflict.requirements &&
+                            conflict.requirements.length > 0 && (
+                              <div className="space-y-2 mb-3">
+                                <p className="text-xs font-semibold uppercase text-slate-600">
+                                  Conflicting Requirements:
+                                </p>
+                                {conflict.requirements.map((req, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="bg-white border border-slate-200 rounded-lg p-3 text-sm shadow-sm"
+                                  >
+                                    {req}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
 
                           {conflict.suggestion && (
                             <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
-                              <p className="text-xs font-semibold mb-1 text-blue-900">💡 Suggestion:</p>
-                              <p className="text-sm text-blue-800">{conflict.suggestion}</p>
+                              <p className="text-xs font-semibold mb-1 text-blue-900">
+                                💡 Suggestion:
+                              </p>
+                              <p className="text-sm text-blue-800">
+                                {conflict.suggestion}
+                              </p>
                             </div>
                           )}
 
                           {conflict.detectedAt && (
                             <p className="text-xs text-slate-500 mt-3">
-                              Detected: {new Date(conflict.detectedAt).toLocaleString()}
+                              Detected:{" "}
+                              {new Date(conflict.detectedAt).toLocaleString()}
                             </p>
                           )}
                         </div>
@@ -338,6 +428,14 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
             )}
           </div>
         )}
+
+        {/* Export Modal */}
+        <ExportModal
+          projectId={projectId}
+          projectName={projectName}
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+        />
       </div>
     </div>
   );

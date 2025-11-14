@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { FileText, AlertCircle, CheckCircle, ChevronDown, Layers, Flag } from "lucide-react";
+import {
+  FileText,
+  AlertCircle,
+  CheckCircle,
+  ChevronDown,
+  Layers,
+  Flag,
+  Download,
+} from "lucide-react";
 import { apiFetch } from "../utils/auth.js";
+import ExportModal from "./ExportModal.jsx";
 
 export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
   const [requirements, setRequirements] = useState([]);
@@ -16,11 +25,26 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
   const [totalPages, setTotalPages] = useState(1);
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const [isPriorityDropdownOpen, setIsPriorityDropdownOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [projectName, setProjectName] = useState("");
 
   useEffect(() => {
     fetchRequirements();
+    fetchProjectName();
     // eslint-disable-next-line
   }, [projectId, filters, page, refreshKey]);
+
+  const fetchProjectName = async () => {
+    try {
+      const response = await apiFetch(`/api/projects/${projectId}`);
+      if (response && response.name) {
+        setProjectName(response.name);
+      }
+    } catch (err) {
+      console.error("Failed to load project name:", err);
+      setProjectName("Project");
+    }
+  };
 
   const fetchRequirements = async () => {
     setIsLoading(true);
@@ -86,6 +110,13 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
         </h2>
         <div className="flex items-center space-x-2">
           <button
+            onClick={() => setIsExportModalOpen(true)}
+            className="px-4 py-2 rounded-lg bg-white hover:bg-green-50 transition-colors font-medium text-green-600 hover:text-green-700 border border-green-200 shadow-sm hover:shadow-md"
+          >
+            <Download className="w-4 h-4 mr-2 inline" />
+            Export
+          </button>
+          <button
             onClick={fetchRequirements}
             className="px-4 py-2 rounded-lg bg-white hover:bg-blue-50 transition-colors font-medium text-blue-600 hover:text-blue-700 border border-blue-200 shadow-sm hover:shadow-md"
           >
@@ -99,7 +130,7 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
           </button>
         </div>
       </div>
-      
+
       {/* Filters */}
       <div className="p-4 bg-white/80 backdrop-blur-sm border-b border-slate-200 shadow-sm relative z-40">
         <div className="flex space-x-3">
@@ -110,10 +141,19 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
               className="flex items-center space-x-2 pl-3 pr-8 py-2.5 rounded-lg border-2 border-indigo-200 bg-white text-indigo-900 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all shadow-sm hover:border-indigo-300 hover:shadow-md text-sm"
             >
               <Layers size={16} className="text-indigo-600" />
-              <span>{filters.type === "" ? "All Types" : filters.type === "functional" ? "Functional" : "Non-Functional"}</span>
-              <ChevronDown size={16} className="absolute right-2 text-indigo-600" />
+              <span>
+                {filters.type === ""
+                  ? "All Types"
+                  : filters.type === "functional"
+                  ? "Functional"
+                  : "Non-Functional"}
+              </span>
+              <ChevronDown
+                size={16}
+                className="absolute right-2 text-indigo-600"
+              />
             </button>
-            
+
             {isTypeDropdownOpen && (
               <div className="absolute top-full mt-2 w-48 bg-white rounded-lg border-2 border-indigo-200 shadow-xl overflow-hidden z-50">
                 <button
@@ -123,10 +163,17 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
                     setPage(1);
                   }}
                   className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
-                    filters.type === "" ? "bg-indigo-50 text-indigo-900" : "hover:bg-gray-50 text-gray-700"
+                    filters.type === ""
+                      ? "bg-indigo-50 text-indigo-900"
+                      : "hover:bg-gray-50 text-gray-700"
                   }`}
                 >
-                  <Layers size={16} className={filters.type === "" ? "text-indigo-600" : "text-gray-500"} />
+                  <Layers
+                    size={16}
+                    className={
+                      filters.type === "" ? "text-indigo-600" : "text-gray-500"
+                    }
+                  />
                   <span className="font-medium">All Types</span>
                 </button>
                 <button
@@ -136,10 +183,19 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
                     setPage(1);
                   }}
                   className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
-                    filters.type === "functional" ? "bg-indigo-50 text-indigo-900" : "hover:bg-gray-50 text-gray-700"
+                    filters.type === "functional"
+                      ? "bg-indigo-50 text-indigo-900"
+                      : "hover:bg-gray-50 text-gray-700"
                   }`}
                 >
-                  <Layers size={16} className={filters.type === "functional" ? "text-indigo-600" : "text-gray-500"} />
+                  <Layers
+                    size={16}
+                    className={
+                      filters.type === "functional"
+                        ? "text-indigo-600"
+                        : "text-gray-500"
+                    }
+                  />
                   <span className="font-medium">Functional</span>
                 </button>
                 <button
@@ -149,10 +205,19 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
                     setPage(1);
                   }}
                   className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
-                    filters.type === "non-functional" ? "bg-indigo-50 text-indigo-900" : "hover:bg-gray-50 text-gray-700"
+                    filters.type === "non-functional"
+                      ? "bg-indigo-50 text-indigo-900"
+                      : "hover:bg-gray-50 text-gray-700"
                   }`}
                 >
-                  <Layers size={16} className={filters.type === "non-functional" ? "text-indigo-600" : "text-gray-500"} />
+                  <Layers
+                    size={16}
+                    className={
+                      filters.type === "non-functional"
+                        ? "text-indigo-600"
+                        : "text-gray-500"
+                    }
+                  />
                   <span className="font-medium">Non-Functional</span>
                 </button>
               </div>
@@ -166,10 +231,18 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
               className="flex items-center space-x-2 pl-3 pr-8 py-2.5 rounded-lg border-2 border-indigo-200 bg-white text-indigo-900 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all shadow-sm hover:border-indigo-300 hover:shadow-md text-sm"
             >
               <Flag size={16} className="text-indigo-600" />
-              <span>{filters.priority === "" ? "All Priorities" : filters.priority.charAt(0).toUpperCase() + filters.priority.slice(1)}</span>
-              <ChevronDown size={16} className="absolute right-2 text-indigo-600" />
+              <span>
+                {filters.priority === ""
+                  ? "All Priorities"
+                  : filters.priority.charAt(0).toUpperCase() +
+                    filters.priority.slice(1)}
+              </span>
+              <ChevronDown
+                size={16}
+                className="absolute right-2 text-indigo-600"
+              />
             </button>
-            
+
             {isPriorityDropdownOpen && (
               <div className="absolute top-full mt-2 w-48 bg-white rounded-lg border-2 border-indigo-200 shadow-xl overflow-hidden z-50">
                 <button
@@ -179,10 +252,19 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
                     setPage(1);
                   }}
                   className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
-                    filters.priority === "" ? "bg-indigo-50 text-indigo-900" : "hover:bg-gray-50 text-gray-700"
+                    filters.priority === ""
+                      ? "bg-indigo-50 text-indigo-900"
+                      : "hover:bg-gray-50 text-gray-700"
                   }`}
                 >
-                  <Flag size={16} className={filters.priority === "" ? "text-indigo-600" : "text-gray-500"} />
+                  <Flag
+                    size={16}
+                    className={
+                      filters.priority === ""
+                        ? "text-indigo-600"
+                        : "text-gray-500"
+                    }
+                  />
                   <span className="font-medium">All Priorities</span>
                 </button>
                 <button
@@ -192,10 +274,19 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
                     setPage(1);
                   }}
                   className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
-                    filters.priority === "high" ? "bg-indigo-50 text-indigo-900" : "hover:bg-gray-50 text-gray-700"
+                    filters.priority === "high"
+                      ? "bg-indigo-50 text-indigo-900"
+                      : "hover:bg-gray-50 text-gray-700"
                   }`}
                 >
-                  <Flag size={16} className={filters.priority === "high" ? "text-red-600" : "text-gray-500"} />
+                  <Flag
+                    size={16}
+                    className={
+                      filters.priority === "high"
+                        ? "text-red-600"
+                        : "text-gray-500"
+                    }
+                  />
                   <span className="font-medium">High</span>
                 </button>
                 <button
@@ -205,10 +296,19 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
                     setPage(1);
                   }}
                   className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
-                    filters.priority === "medium" ? "bg-indigo-50 text-indigo-900" : "hover:bg-gray-50 text-gray-700"
+                    filters.priority === "medium"
+                      ? "bg-indigo-50 text-indigo-900"
+                      : "hover:bg-gray-50 text-gray-700"
                   }`}
                 >
-                  <Flag size={16} className={filters.priority === "medium" ? "text-orange-600" : "text-gray-500"} />
+                  <Flag
+                    size={16}
+                    className={
+                      filters.priority === "medium"
+                        ? "text-orange-600"
+                        : "text-gray-500"
+                    }
+                  />
                   <span className="font-medium">Medium</span>
                 </button>
                 <button
@@ -218,10 +318,19 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
                     setPage(1);
                   }}
                   className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors text-sm ${
-                    filters.priority === "low" ? "bg-indigo-50 text-indigo-900" : "hover:bg-gray-50 text-gray-700"
+                    filters.priority === "low"
+                      ? "bg-indigo-50 text-indigo-900"
+                      : "hover:bg-gray-50 text-gray-700"
                   }`}
                 >
-                  <Flag size={16} className={filters.priority === "low" ? "text-yellow-600" : "text-gray-500"} />
+                  <Flag
+                    size={16}
+                    className={
+                      filters.priority === "low"
+                        ? "text-yellow-600"
+                        : "text-gray-500"
+                    }
+                  />
                   <span className="font-medium">Low</span>
                 </button>
               </div>
@@ -285,8 +394,7 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
               };
 
               const borderColor =
-                priorityColors[req.priority] ||
-                "border-gray-300 bg-gray-50/50";
+                priorityColors[req.priority] || "border-gray-300 bg-gray-50/50";
               const badgeColor =
                 priorityBadgeColors[req.priority] ||
                 "bg-gray-100 text-gray-800";
@@ -299,7 +407,7 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
                   className={`border-2 rounded-xl p-5 cursor-pointer hover:shadow-xl hover:scale-[1.02] transition-all duration-200 bg-white/90 backdrop-blur-sm ${borderColor}`}
                   onClick={() => setSelectedRequirement(req)}
                   style={{
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
                   }}
                 >
                   <div className="flex items-start space-x-3">
@@ -380,7 +488,7 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
             className="fixed inset-0 bg-black bg-opacity-50 z-50"
             onClick={() => setSelectedRequirement(null)}
           ></div>
-          
+
           {/* Modal */}
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
@@ -425,11 +533,13 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
                     <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
                       Type
                     </div>
-                    <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                      selectedRequirement.requirement_type === "functional"
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-purple-100 text-purple-700"
-                    }`}>
+                    <span
+                      className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                        selectedRequirement.requirement_type === "functional"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-purple-100 text-purple-700"
+                      }`}
+                    >
                       {selectedRequirement.requirement_type}
                     </span>
                   </div>
@@ -438,13 +548,15 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
                     <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
                       Priority
                     </div>
-                    <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                      selectedRequirement.priority === "high"
-                        ? "bg-red-100 text-red-700"
-                        : selectedRequirement.priority === "medium"
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-green-100 text-green-700"
-                    }`}>
+                    <span
+                      className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                        selectedRequirement.priority === "high"
+                          ? "bg-red-100 text-red-700"
+                          : selectedRequirement.priority === "medium"
+                          ? "bg-yellow-100 text-yellow-700"
+                          : "bg-green-100 text-green-700"
+                      }`}
+                    >
                       {selectedRequirement.priority?.toUpperCase()}
                     </span>
                   </div>
@@ -460,12 +572,17 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
                       <div
                         className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-500"
                         style={{
-                          width: `${(selectedRequirement.confidence_score || 0) * 100}%`,
+                          width: `${
+                            (selectedRequirement.confidence_score || 0) * 100
+                          }%`,
                         }}
                       ></div>
                     </div>
                     <span className="font-bold text-slate-700 text-sm min-w-[50px] text-right">
-                      {((selectedRequirement.confidence_score || 0) * 100).toFixed(1)}%
+                      {(
+                        (selectedRequirement.confidence_score || 0) * 100
+                      ).toFixed(1)}
+                      %
                     </span>
                   </div>
                 </div>
@@ -499,7 +616,9 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
                     </div>
                     <div className="text-slate-700 text-sm font-medium">
                       {selectedRequirement.created_at
-                        ? new Date(selectedRequirement.created_at).toLocaleDateString()
+                        ? new Date(
+                            selectedRequirement.created_at
+                          ).toLocaleDateString()
                         : "N/A"}
                     </div>
                   </div>
@@ -521,6 +640,14 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
           </div>
         </>
       )}
+
+      {/* Export Modal */}
+      <ExportModal
+        projectId={projectId}
+        projectName={projectName}
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+      />
     </div>
   );
 }

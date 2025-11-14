@@ -88,7 +88,7 @@ Write-Host "Services running:" -ForegroundColor Cyan
 Write-Host "  1. LLM Service      - http://localhost:8000" -ForegroundColor White
 Write-Host "  2. Frontend         - http://localhost:5173" -ForegroundColor White
 Write-Host "  3. Backend API      - http://localhost:8001" -ForegroundColor White
-Write-Host "  4. Reverb WebSocket - ws://localhost:8080" -ForegroundColor White
+Write-Host "  4. Reverb WebSocket - ws://localhost:8081 (configured in .env)" -ForegroundColor White
 Write-Host "  5. Queue Worker     - Processing background jobs" -ForegroundColor White
 Write-Host ""
 Write-Host "Use the opened windows to view logs." -ForegroundColor Yellow
