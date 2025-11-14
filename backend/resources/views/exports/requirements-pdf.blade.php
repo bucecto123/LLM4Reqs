@@ -335,12 +335,9 @@
             @php $byType = $data['requirements']->groupBy('requirement_type'); @endphp
             @foreach($byType as $type => $typeRequirements)
                 <h4>{{ ucfirst($type) }} Requirements ({{ $typeRequirements->count() }})</h4>
-                @foreach($typeRequirements->take(10) as $req)
+                @foreach($typeRequirements as $req)
                     <p>• <strong>[REQ-{{ $req->id }}]</strong> {{ $req->title }}</p>
                 @endforeach
-                @if($typeRequirements->count() > 10)
-                    <p><em>... and {{ $typeRequirements->count() - 10 }} more requirements</em></p>
-                @endif
             @endforeach
             
             <!-- Requirements by Priority -->
@@ -350,12 +347,9 @@
                 @if($byPriority->has($priority))
                     @php $priorityReqs = $byPriority[$priority]; @endphp
                     <h4>{{ ucfirst($priority) }} Priority ({{ $priorityReqs->count() }})</h4>
-                    @foreach($priorityReqs->take(5) as $req)
+                    @foreach($priorityReqs as $req)
                         <p>• <strong>[REQ-{{ $req->id }}]</strong> {{ $req->title }}</p>
                     @endforeach
-                    @if($priorityReqs->count() > 5)
-                        <p><em>... and {{ $priorityReqs->count() - 5 }} more requirements</em></p>
-                    @endif
                 @endif
             @endforeach
             
@@ -397,12 +391,9 @@
                 @if($bySeverity->has($severity))
                     @php $severityConflicts = $bySeverity[$severity]; @endphp
                     <h4>{{ ucfirst($severity) }} Severity ({{ $severityConflicts->count() }})</h4>
-                    @foreach($severityConflicts->take(5) as $conflict)
+                    @foreach($severityConflicts as $conflict)
                         <p>• <strong>REQ-{{ $conflict->requirement_id_1 }}</strong> ↔ <strong>REQ-{{ $conflict->requirement_id_2 }}</strong></p>
                     @endforeach
-                    @if($severityConflicts->count() > 5)
-                        <p><em>... and {{ $severityConflicts->count() - 5 }} more conflicts</em></p>
-                    @endif
                 @endif
             @endforeach
             

@@ -438,15 +438,12 @@ class ExportController extends Controller
         $byType = $requirements->groupBy('requirement_type');
         $byPriority = $requirements->groupBy('priority');
         
-        // Requirements by type
+        // Requirements by type (show all)
         $section->addText('2.1 Requirements by Type', ['size' => 14, 'bold' => true], ['spaceAfter' => 120]);
         foreach ($byType as $type => $typeRequirements) {
             $section->addText(ucfirst($type) . " Requirements ({$typeRequirements->count()})", ['bold' => true], ['spaceAfter' => 120]);
-            foreach ($typeRequirements->take(5) as $req) {
+            foreach ($typeRequirements as $req) {
                 $section->addText("• [{$req->id}] {$req->title}", [], ['leftIndent' => 360]);
-            }
-            if ($typeRequirements->count() > 5) {
-                $section->addText("... and " . ($typeRequirements->count() - 5) . " more", ['italic' => true], ['leftIndent' => 360]);
             }
             $section->addTextBreak();
         }
@@ -457,11 +454,8 @@ class ExportController extends Controller
             if ($byPriority->has($priority)) {
                 $priorityReqs = $byPriority[$priority];
                 $section->addText(ucfirst($priority) . " Priority ({$priorityReqs->count()})", ['bold' => true], ['spaceAfter' => 120]);
-                foreach ($priorityReqs->take(3) as $req) {
+                foreach ($priorityReqs as $req) {
                     $section->addText("• [{$req->id}] {$req->title}", [], ['leftIndent' => 360]);
-                }
-                if ($priorityReqs->count() > 3) {
-                    $section->addText("... and " . ($priorityReqs->count() - 3) . " more", ['italic' => true], ['leftIndent' => 360]);
                 }
                 $section->addTextBreak();
             }
@@ -497,17 +491,14 @@ class ExportController extends Controller
         // Group by severity
         $bySeverity = $conflicts->groupBy('severity');
         
-        // Conflicts by severity
+        // Conflicts by severity (show all)
         $section->addText("{$nextSection}.1 Conflicts by Severity", ['size' => 14, 'bold' => true], ['spaceAfter' => 120]);
         foreach (['high', 'medium', 'low'] as $severity) {
             if ($bySeverity->has($severity)) {
                 $severityConflicts = $bySeverity[$severity];
                 $section->addText(ucfirst($severity) . " Severity ({$severityConflicts->count()})", ['bold' => true], ['spaceAfter' => 120]);
-                foreach ($severityConflicts->take(3) as $conflict) {
+                foreach ($severityConflicts as $conflict) {
                     $section->addText("• REQ-{$conflict->requirement_id_1} ↔ REQ-{$conflict->requirement_id_2}", [], ['leftIndent' => 360]);
-                }
-                if ($severityConflicts->count() > 3) {
-                    $section->addText("... and " . ($severityConflicts->count() - 3) . " more", ['italic' => true], ['leftIndent' => 360]);
                 }
                 $section->addTextBreak();
             }
@@ -628,11 +619,8 @@ class ExportController extends Controller
         $markdown .= "### Requirements by Type\n\n";
         foreach ($byType as $type => $typeRequirements) {
             $markdown .= "#### " . ucfirst($type) . " Requirements ({$typeRequirements->count()})\n\n";
-            foreach ($typeRequirements->take(10) as $req) {
+            foreach ($typeRequirements as $req) {
                 $markdown .= "- **[REQ-{$req->id}]** {$req->title}\n";
-            }
-            if ($typeRequirements->count() > 10) {
-                $markdown .= "\n*... and " . ($typeRequirements->count() - 10) . " more requirements*\n";
             }
             $markdown .= "\n";
         }
@@ -643,11 +631,8 @@ class ExportController extends Controller
             if ($byPriority->has($priority)) {
                 $priorityReqs = $byPriority[$priority];
                 $markdown .= "#### " . ucfirst($priority) . " Priority ({$priorityReqs->count()})\n\n";
-                foreach ($priorityReqs->take(5) as $req) {
+                foreach ($priorityReqs as $req) {
                     $markdown .= "- **[REQ-{$req->id}]** {$req->title}\n";
-                }
-                if ($priorityReqs->count() > 5) {
-                    $markdown .= "\n*... and " . ($priorityReqs->count() - 5) . " more requirements*\n";
                 }
                 $markdown .= "\n";
             }
@@ -655,7 +640,7 @@ class ExportController extends Controller
         
         // Detailed requirements
         $markdown .= "### Detailed Requirements\n\n";
-        foreach ($requirements as $requirement) {
+                foreach ($requirements as $requirement) {
             $markdown .= "#### REQ-{$requirement->id}: {$requirement->title}\n\n";
             $markdown .= ($requirement->requirement_text ?: 'No detailed description available.') . "\n\n";
             
@@ -693,11 +678,8 @@ class ExportController extends Controller
             if ($bySeverity->has($severity)) {
                 $severityConflicts = $bySeverity[$severity];
                 $markdown .= "#### " . ucfirst($severity) . " Severity ({$severityConflicts->count()})\n\n";
-                foreach ($severityConflicts->take(5) as $conflict) {
+                foreach ($severityConflicts as $conflict) {
                     $markdown .= "- **REQ-{$conflict->requirement_id_1}** ↔ **REQ-{$conflict->requirement_id_2}**\n";
-                }
-                if ($severityConflicts->count() > 5) {
-                    $markdown .= "\n*... and " . ($severityConflicts->count() - 5) . " more conflicts*\n";
                 }
                 $markdown .= "\n";
             }
