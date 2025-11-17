@@ -304,6 +304,40 @@ class LLMService
     }
 
     /**
+     * Remove documents from the KB for a project.
+     * The LLM backend should accept a payload with filters or explicit document identifiers.
+     * Example payload: ['project_id' => '1', 'filters' => ['meta_conflict_ids' => ['123']]]
+     *
+     * @param int $projectId
+     * @param array $filters
+     * @return array
+     * @throws \Exception
+     */
+    public function removeFromKB(int $projectId, array $filters): array
+    {
+        try {
+            $payload = [
+                'project_id' => (string) $projectId,
+                'filters' => $filters,
+            ];
+
+            $response = Http::withHeaders($this->getHeaders())
+                ->timeout(30)
+                ->post("{$this->baseUrl}/kb/remove", $payload);
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+
+            // If endpoint not implemented on LLM side, log and return error array
+            throw new \Exception('LLM KB remove failed: ' . $response->body());
+        } catch (\Exception $e) {
+            Log::error('LLM KB remove failed', ['error' => $e->getMessage(), 'project_id' => $projectId, 'filters' => $filters]);
+            throw $e;
+        }
+    }
+
+    /**
      * Get async job status from LLM service.
      *
      * @param string $jobId

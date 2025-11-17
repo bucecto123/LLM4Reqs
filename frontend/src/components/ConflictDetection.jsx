@@ -96,6 +96,34 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
     }
   };
 
+  const handleResolve = async (conflict) => {
+    try {
+      if (!conflict || !conflict.id) return;
+
+      if (conflict.status === "resolved") {
+        alert("This conflict is already resolved");
+        return;
+      }
+
+      const notes = window.prompt("Enter resolution notes for this conflict:");
+      if (!notes || !notes.trim()) return;
+
+      setLoading(true);
+      await apiFetch(`/api/conflicts/${conflict.id}/resolve`, {
+        method: "PUT",
+        body: { resolution_notes: notes.trim() },
+      });
+
+      // Reload conflicts after resolve
+      await loadConflicts();
+    } catch (err) {
+      console.error("Failed to resolve conflict:", err);
+      setError(err.message || "Failed to resolve conflict");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Apply filters
   const filteredConflicts = conflicts.filter((conflict) => {
     // Filter by severity
@@ -378,6 +406,20 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
                               {conflict.confidence && (
                                 <span className={`text-xs ${confColor}`}>
                                   {conflict.confidence} confidence
+                                </span>
+                              )}
+
+                              {/* Resolve button - prompt for resolution notes and call API */}
+                              {conflict.status !== "resolved" ? (
+                                <button
+                                  onClick={() => handleResolve(conflict)}
+                                  className="ml-2 px-2 py-1 text-xs rounded bg-green-50 text-green-700 border border-green-200 hover:bg-green-100"
+                                >
+                                  Resolve
+                                </button>
+                              ) : (
+                                <span className="ml-2 text-xs text-slate-500">
+                                  Resolved
                                 </span>
                               )}
                             </div>

@@ -55,12 +55,54 @@ class ProcessConflictDetectionJob implements ShouldQueue
                     }
                     
                     $saved = $conflictService->saveConflicts($this->projectId, $status['conflicts']);
-                    
+
                     Log::info('ProcessConflictDetectionJob: Conflicts saved', [
                         'job_id' => $this->jobId,
                         'project_id' => $this->projectId,
                         'conflicts_saved' => $saved
                     ]);
+
+                    // Append conflicts to the LLM-managed KB (incremental update)
+                    try {
+                        $llmService = app(\App\Services\LLMService::class);
+
+                        $conflictDocs = [];
+                        foreach ($status['conflicts'] as $c) {
+                            $req1 = $c['req_id_1'] ?? ($c['requirement_id_1'] ?? '');
+                            $req2 = $c['req_id_2'] ?? ($c['requirement_id_2'] ?? '');
+                            $reason = $c['reason'] ?? ($c['conflict_description'] ?? 'No reason provided');
+                            $confidence = $c['confidence'] ?? null;
+
+                            $text = "Conflict between {$req1} and {$req2}: " . $reason;
+
+                            $conflictDocs[] = [
+                                'content' => $text,
+                                'type' => 'conflict',
+                                'meta' => [
+                                    'conflict_id' => $c['conflict_id'] ?? null,
+                                    'req_id_1' => $req1,
+                                    'req_id_2' => $req2,
+                                    'cluster_id' => $c['cluster_id'] ?? null,
+                                    'confidence' => $confidence,
+                                    'project_id' => $this->projectId,
+                                ],
+                            ];
+                        }
+
+                        if (!empty($conflictDocs)) {
+                            // Use incremental KB API to append conflict documents; do not fail job on KB update error
+                            $llmService->incrementalKBUpdate($this->projectId, $conflictDocs);
+                            Log::info('ProcessConflictDetectionJob: Appended conflicts to KB', [
+                                'project_id' => $this->projectId,
+                                'appended' => count($conflictDocs)
+                            ]);
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning('ProcessConflictDetectionJob: Failed to append conflicts to KB', [
+                            'project_id' => $this->projectId,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
 
                     // Mark as fully complete (100%)
                     if ($kb && $kb->status === 'building') {
