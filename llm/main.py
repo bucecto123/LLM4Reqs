@@ -33,13 +33,6 @@ try:
 except Exception:
     build_index_for_project = None
 
-# Import conflict detection router
-try:
-    from conflict_detection_api import router as conflict_router
-except Exception as e:
-    print(f"Warning: Conflict detection API not available: {e}")
-    conflict_router = None
-
 load_dotenv()
 
 app = FastAPI(
@@ -47,10 +40,6 @@ app = FastAPI(
     description="LLM-powered requirement extraction and generation using Groq",
     version="1.0.0",
 )
-
-# Register conflict detection router
-if conflict_router:
-    app.include_router(conflict_router)
 
 # CORS configuration for Laravel
 app.add_middleware(
@@ -206,8 +195,6 @@ class ChatRequest(BaseModel):
     # Avoid mutable default; normalize to an empty list in the endpoint
     conversation_history: Optional[List[ChatMessage]] = None
     context: Optional[str] = None
-    persona_id: Optional[int] = None  # NEW: Optional persona ID
-    persona_data: Optional[Dict[str, Any]] = None  # NEW: Persona profile data
 
 
 class ChatResponse(BaseModel):
@@ -312,6 +299,8 @@ class IncrementalKBResponse(BaseModel):
     message: str
     added_chunks: int
     total_chunks: int
+    skipped_chunks: Optional[int] = 0
+    new_version: Optional[int] = None
 
 
 class QueryKBRequest(BaseModel):
@@ -345,7 +334,7 @@ Text:
 
 Instructions:
 1. Extract clear, specific requirements
-2. Classify each as: functional, non-functional, constraint, or assumption
+2. Classify each as: functional, non-functional
 3. Assign priority: high, medium, or low
 4. Provide a confidence score (0.0 to 1.0)
 5. Return ONLY valid JSON, no markdown formatting, no explanations
@@ -543,71 +532,6 @@ def parse_json_response(content: str) -> Dict:
         )
 
 
-def _attempt_json_recovery(content: str) -> Dict:
-    """
-    Attempt to recover incomplete/truncated JSON from LLM response.
-    This handles cases where the response was cut off due to max_tokens limit.
-    """
-    content = content.strip()
-    
-    # Remove markdown code blocks
-    if content.startswith("```json"):
-        content = content[7:]
-    if content.startswith("```"):
-        content = content[3:]
-    if content.endswith("```"):
-        content = content[:-3]
-    content = content.strip()
-    
-    # Find the start of JSON
-    start = content.find("{")
-    if start == -1:
-        return None
-    
-    # Try to find the requirements array
-    req_start = content.find('"requirements"')
-    if req_start == -1:
-        return None
-    
-    # Find the array start
-    array_start = content.find("[", req_start)
-    if array_start == -1:
-        return None
-    
-    # Try to salvage complete requirement objects
-    requirements = []
-    current_pos = array_start + 1
-    brace_count = 0
-    obj_start = -1
-    
-    for i in range(current_pos, len(content)):
-        char = content[i]
-        
-        if char == '{':
-            if brace_count == 0:
-                obj_start = i
-            brace_count += 1
-        elif char == '}':
-            brace_count -= 1
-            if brace_count == 0 and obj_start != -1:
-                # We have a complete object
-                try:
-                    obj_str = content[obj_start:i+1]
-                    req_obj = json.loads(obj_str)
-                    # Validate it has required fields
-                    if "requirement_text" in req_obj:
-                        requirements.append(req_obj)
-                except:
-                    pass
-                obj_start = -1
-    
-    if requirements:
-        print(f"JSON recovery successful: salvaged {len(requirements)} requirements")
-        return {"requirements": requirements}
-    
-    return None
-
-
 def _get_rag_manager():
     """Get or create a RagManager instance."""
     if RagManager is None:
@@ -688,37 +612,21 @@ def health_check():
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """
-    Chat endpoint for conversational AI with optional persona context
+    Chat endpoint for conversational AI
 
     Usage:
     POST /api/chat
     {
         "message": "Explain functional requirements",
-        "conversation_history": [...],
-        "context": "Optional context about the project",
-        "persona_id": 1,  // Optional: ID of persona to use
-        "persona_data": {...}  // Optional: Full persona profile
+        "conversation_history": [
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hi! How can I help?"}
+        ],
+        "context": "Optional context about the project"
     }
     """
     try:
-        # Import persona manager
-        try:
-            from persona_manager import get_persona_prompt
-        except ImportError:
-            get_persona_prompt = None
-        
-        # Check if persona context is provided
-        if request.persona_data and get_persona_prompt:
-            # Use persona-enhanced system prompt
-            persona_context = get_persona_prompt(
-                request.persona_data,
-                request.message
-            )
-            system_prompt = persona_context['system_prompt']
-            messages = [{"role": "system", "content": system_prompt}]
-        else:
-            # Use default system prompt
-            messages = [{"role": "system", "content": CHAT_SYSTEM_PROMPT}]
+        messages = [{"role": "system", "content": CHAT_SYSTEM_PROMPT}]
 
         # Add context if provided
         if request.context:
@@ -796,33 +704,16 @@ async def extract_requirements(request: ExtractionRequest):
         messages = [
             {
                 "role": "system",
-                "content": "You are Fishy, a requirements extraction expert. Always return valid JSON. If the text is long, prioritize extracting the most important requirements within your response limit.",
+                "content": "You are Fishy, a requirements extraction expert. Always return valid JSON.",
             },
             {"role": "user", "content": prompt},
         ]
 
-        # Increase max_tokens significantly to handle large PDFs
-        # Most models can handle 4000-8000 tokens in responses
-        max_tokens_to_use = 6000
-        
         # Use lower temperature for more consistent JSON output
         response_text, tokens_used = call_groq_chat(
-            messages, max_tokens=max_tokens_to_use, temperature=0.3
+            messages, max_tokens=3000, temperature=0.3
         )
-        
-        # Try to parse the response
-        try:
-            parsed_data = parse_json_response(response_text)
-        except HTTPException as parse_error:
-            # If JSON parsing failed due to truncation, try to salvage what we can
-            print(f"Initial JSON parsing failed, attempting recovery: {parse_error.detail}")
-            
-            # Try to extract and fix incomplete JSON
-            parsed_data = _attempt_json_recovery(response_text)
-            
-            if not parsed_data or "requirements" not in parsed_data:
-                # If recovery failed, raise the original error
-                raise parse_error
+        parsed_data = parse_json_response(response_text)
 
         requirements = [
             Requirement(**req) for req in parsed_data.get("requirements", [])
@@ -1112,19 +1003,31 @@ async def incremental_kb_update(
         new_chunks = _prepare_document_chunks(request.documents)
 
         # Incremental add
-        index, updated_chunks = rag.incremental_add(
+        result = rag.incremental_add(
             index_path=index_path,
             meta_path=meta_path,
             new_chunks=new_chunks,
             project_id=request.project_id,
         )
 
+        # rag.incremental_add returns (index, updated_chunks, added_count, skipped_count, new_version)
+        if isinstance(result, tuple) and len(result) >= 5:
+            index, updated_chunks, added_count, skipped_count, new_version = result
+        else:
+            # Fallback for older implementations
+            index, updated_chunks = result
+            added_count = len(new_chunks)
+            skipped_count = 0
+            new_version = None
+
         return IncrementalKBResponse(
             project_id=request.project_id,
             status="completed",
-            message=f"Added {len(new_chunks)} chunks to project {request.project_id}",
-            added_chunks=len(new_chunks),
+            message=f"Added {added_count} chunks to project {request.project_id}",
+            added_chunks=added_count,
             total_chunks=len(updated_chunks),
+            skipped_chunks=skipped_count,
+            new_version=new_version,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
