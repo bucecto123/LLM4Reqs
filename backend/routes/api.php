@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\ProjectKBController;
+use App\Http\Controllers\Api\PasswordResetController;
 
 Route::get('/health', function () {
     return response()->json(['status' => 'ok', 'service' => 'backend']);
@@ -38,6 +39,11 @@ Route::prefix('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum')->name('auth.logout');
     Route::post('/logout-all', [AuthController::class, 'logoutAll'])->middleware('auth:sanctum')->name('auth.logout-all');
     Route::get('/me', [AuthController::class, 'me'])->middleware('auth:sanctum')->name('auth.me');
+    
+    // Password Reset routes
+    Route::post('/forgot-password', [PasswordResetController::class, 'sendResetCode'])->name('auth.forgot-password');
+    Route::post('/reset-password', [PasswordResetController::class, 'resetPassword'])->name('auth.reset-password');
+    Route::post('/verify-reset-code', [PasswordResetController::class, 'verifyCode'])->name('auth.verify-reset-code');
 });
 
 // Protected API routes

@@ -69,17 +69,15 @@ class ConflictDetectionService
 
             $data = $response->json();
             
-            $jobId = $data['job_id'] ?? null;
-
-            // Handle sync response (conflicts returned immediately)
-            if ($jobId === null && isset($data['conflicts'])) {
-                Log::info("Conflict detection completed synchronously", [
+            // LLM API returns conflicts directly (synchronous)
+            if (isset($data['conflicts'])) {
+                Log::info("Conflict detection completed", [
                     'project_id' => $projectId,
                     'conflicts_found' => count($data['conflicts']),
                     'requirements_count' => count($formattedRequirements)
                 ]);
                 
-                // Convert sync response format to match expected format
+                // Convert response format to match expected format
                 $conflicts = [];
                 foreach ($data['conflicts'] as $conflict) {
                     $conflicts[] = [
@@ -104,54 +102,22 @@ class ConflictDetectionService
                 ];
             }
             
-            // Handle async response (job_id returned)
-            if ($jobId === null) {
-                Log::warning("Conflict detection response missing both job_id and conflicts", [
-                    'project_id' => $projectId,
-                    'response' => $data,
-                    'requirements_count' => count($formattedRequirements)
-                ]);
-            } else {
-                Log::info("Conflict detection started asynchronously", [
-                    'project_id' => $projectId,
-                    'job_id' => $jobId,
-                    'requirements_count' => count($formattedRequirements)
-                ]);
-            }
+            // No conflicts found
+            Log::info("No conflicts detected", [
+                'project_id' => $projectId,
+                'requirements_count' => count($formattedRequirements)
+            ]);
 
-            return $data;
+            return [
+                'status' => 'completed',
+                'conflicts' => [],
+                'conflicts_saved' => 0,
+                'total_conflicts' => 0
+            ];
 
         } catch (Exception $e) {
             Log::error("Conflict detection failed", [
                 'project_id' => $projectId,
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
-        }
-    }
-
-    /**
-     * Check the status of a conflict detection job.
-     *
-     * @param string $jobId
-     * @return array
-     */
-    public function getJobStatus(string $jobId): array
-    {
-        try {
-            $response = Http::withHeaders([
-                'X-API-Key' => $this->apiKey,
-            ])->get("{$this->llmBaseUrl}/api/conflicts/status/{$jobId}");
-
-            if (!$response->successful()) {
-                throw new Exception("Failed to get job status: " . $response->body());
-            }
-
-            return $response->json();
-
-        } catch (Exception $e) {
-            Log::error("Failed to get conflict job status", [
-                'job_id' => $jobId,
                 'error' => $e->getMessage()
             ]);
             throw $e;
@@ -250,48 +216,6 @@ class ConflictDetectionService
         ]);
 
         return $saved;
-    }
-
-    /**
-     * Poll for job completion and save results.
-     *
-     * @param int $projectId
-     * @param string $jobId
-     * @param int $maxAttempts
-     * @param int $delaySeconds
-     * @return array
-     */
-    public function pollAndSaveConflicts(
-        int $projectId,
-        string $jobId,
-        int $maxAttempts = 60,
-        int $delaySeconds = 2
-    ): array {
-        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
-            $status = $this->getJobStatus($jobId);
-
-            if ($status['status'] === 'completed') {
-                // Save conflicts to database
-                $conflicts = $status['conflicts'] ?? [];
-                $saved = $this->saveConflicts($projectId, $conflicts);
-
-                return [
-                    'status' => 'completed',
-                    'conflicts_found' => count($conflicts),
-                    'conflicts_saved' => $saved,
-                    'metadata' => $status['metadata'] ?? null
-                ];
-            }
-
-            if ($status['status'] === 'failed') {
-                throw new Exception("Conflict detection failed: " . ($status['error'] ?? 'Unknown error'));
-            }
-
-            // Wait before next poll
-            sleep($delaySeconds);
-        }
-
-        throw new Exception("Conflict detection timed out after {$maxAttempts} attempts");
     }
 
     /**
