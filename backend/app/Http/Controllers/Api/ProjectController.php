@@ -102,8 +102,8 @@ class ProjectController extends Controller
             }
 
             // Sorting
-            $orderBy = request('order_by', 'created_at');
-            $orderDir = request('order_dir', 'desc');
+            $orderBy = request('order_by', 'requirement_number');
+            $orderDir = request('order_dir', 'asc');
             $query->orderBy($orderBy, $orderDir);
 
             // Get paginated results
@@ -159,6 +159,13 @@ class ProjectController extends Controller
         $project = Project::findOrFail($projectId);
         
         $conflicts = $project->requirementConflicts()
+            // Only show conflicts where both requirements exist (not soft-deleted)
+            ->whereHas('requirement1', function($query) {
+                $query->whereNull('deleted_at');
+            })
+            ->whereHas('requirement2', function($query) {
+                $query->whereNull('deleted_at');
+            })
             ->with([
                 'requirement1' => function($query) {
                     $query->select('id', 'title', 'requirement_text', 'requirement_type');

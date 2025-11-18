@@ -46,6 +46,14 @@ class Requirement extends Model
                 $requirement->requirement_number = $maxNumber + 1;
             }
         });
+
+        // Delete associated conflicts when requirement is soft-deleted
+        static::deleting(function ($requirement) {
+            // Delete conflicts where this requirement is involved
+            \App\Models\RequirementConflict::where('requirement_id_1', $requirement->id)
+                ->orWhere('requirement_id_2', $requirement->id)
+                ->delete();
+        });
     }
 
     public function project()

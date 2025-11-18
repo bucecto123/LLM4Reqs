@@ -121,7 +121,8 @@ class KBBuildJob implements ShouldQueue, ShouldBeUnique
                     $conflictResult = $conflictService->detectConflictsForProject($this->projectId);
                     
                     if (isset($conflictResult['job_id'])) {
-                        Log::info('KBBuildJob: Conflict detection initiated, dispatching processor', [
+                        // Async response - dispatch background job to poll for results
+                        Log::info('KBBuildJob: Conflict detection initiated (async), dispatching processor', [
                             'project_id' => $this->projectId,
                             'job_id' => $conflictResult['job_id']
                         ]);
@@ -134,8 +135,23 @@ class KBBuildJob implements ShouldQueue, ShouldBeUnique
                             $conflictResult['job_id'],
                             $this->projectId
                         )->delay(now()->addSeconds(5)); // Start checking after 5 seconds
+                    } elseif (isset($conflictResult['status']) && $conflictResult['status'] === 'completed') {
+                        // Sync response - conflicts already saved
+                        Log::info('KBBuildJob: Conflict detection completed (sync)', [
+                            'project_id' => $this->projectId,
+                            'conflicts_saved' => $conflictResult['conflicts_saved'] ?? 0
+                        ]);
+                        
+                        // Update progress: Conflicts saved (100%)
+                        $kb->updateProgress(100, 'completed');
+                        
+                        // Mark as ready
+                        $kb->markAsReady($result);
                     } else {
-                        // No conflicts to detect, mark as complete
+                        // No conflicts detected or unknown response format
+                        Log::info('KBBuildJob: No conflicts detected or empty response', [
+                            'project_id' => $this->projectId
+                        ]);
                         $kb->markAsReady($result);
                     }
                 } catch (\Exception $e) {

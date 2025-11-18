@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Mail,
   Lock,
@@ -67,6 +68,7 @@ const TypingText = ({ text, speed = 50, className = "" }) => {
 };
 
 export default function AuthPages() {
+  const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -546,11 +548,31 @@ export default function AuthPages() {
                         if (/[^A-Za-z0-9]/.test(pw)) strength++;
 
                         const colors = [
-                          { bg: "bg-red-500", text: "text-red-600", label: "Very Weak" },
-                          { bg: "bg-orange-500", text: "text-orange-600", label: "Weak" },
-                          { bg: "bg-yellow-500", text: "text-yellow-600", label: "Fair" },
-                          { bg: "bg-blue-500", text: "text-blue-600", label: "Good" },
-                          { bg: "bg-green-500", text: "text-green-600", label: "Strong" },
+                          {
+                            bg: "bg-red-500",
+                            text: "text-red-600",
+                            label: "Very Weak",
+                          },
+                          {
+                            bg: "bg-orange-500",
+                            text: "text-orange-600",
+                            label: "Weak",
+                          },
+                          {
+                            bg: "bg-yellow-500",
+                            text: "text-yellow-600",
+                            label: "Fair",
+                          },
+                          {
+                            bg: "bg-blue-500",
+                            text: "text-blue-600",
+                            label: "Good",
+                          },
+                          {
+                            bg: "bg-green-500",
+                            text: "text-green-600",
+                            label: "Strong",
+                          },
                         ];
 
                         const currentColor = colors[Math.max(0, strength - 1)];
@@ -569,7 +591,9 @@ export default function AuthPages() {
                                 ></div>
                               ))}
                             </div>
-                            <div className={`text-xs ${currentColor.text} font-medium`}>
+                            <div
+                              className={`text-xs ${currentColor.text} font-medium`}
+                            >
                               Password strength: {currentColor.label}
                             </div>
                           </div>
@@ -624,13 +648,14 @@ export default function AuthPages() {
                       />
                       <span className="text-sm text-gray-600">Remember me</span>
                     </label>
-                    <a
-                      href="#"
+                    <button
+                      type="button"
+                      onClick={() => navigate("/forgot-password")}
                       className="text-sm font-semibold hover:underline"
                       style={{ color: "#4A7BA7" }}
                     >
                       Forgot password?
-                    </a>
+                    </button>
                   </div>
                 )}
 

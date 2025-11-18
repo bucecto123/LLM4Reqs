@@ -456,6 +456,14 @@ class ConversationService
             $enhancedContext,
             $personaData,
             function($chunk) use ($conversationId, $tempMessageId) {
+                // DEBUG: Log what we're broadcasting
+                Log::info('💬 Broadcasting chunk', [
+                    'conversation_id' => $conversationId,
+                    'message_id' => $tempMessageId,
+                    'chunk_length' => mb_strlen($chunk),
+                    'chunk_preview' => mb_substr($chunk, 0, 50)
+                ]);
+                
                 // Broadcast each chunk via WebSocket
                 broadcast(new MessageChunk(
                     $conversationId,

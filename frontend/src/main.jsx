@@ -7,6 +7,8 @@ import LLMDashboard from "./pages/DashBoard";
 import ProjectsPage from "./pages/ProjectsPage";
 import ProjectDetailPage from "./pages/ProjectDetailPage";
 import AuthPages from "./pages/Login_SignUp";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import { AuthProvider, useAuth } from "./hooks/useAuth.jsx";
 import { isAuthenticated, getAccessToken } from "./utils/auth";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -65,7 +67,14 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <BrowserRouter>
-          <AppContent />
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+
+            {/* Protected Routes */}
+            <Route path="/*" element={<AppContent />} />
+          </Routes>
         </BrowserRouter>
       </AuthProvider>
     </ErrorBoundary>

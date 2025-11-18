@@ -1,6 +1,6 @@
 /**
  * Enhanced JWT Authentication System with Access & Refresh Tokens
-*/
+ */
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8001";
 
@@ -157,7 +157,7 @@ class AuthManager {
     try {
       const url = `${API_BASE}/api/auth/login`;
       console.log("🔐 Attempting login to:", url);
-      
+
       const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -428,6 +428,53 @@ class AuthManager {
   async forceRefresh() {
     return await this.refreshToken();
   }
+
+  /**
+   * Send password reset link to email
+   */
+  async forgotPassword(email) {
+    try {
+      const response = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      return await this.handleResponse(response);
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Reset password with token
+   */
+  async resetPassword(email, password, passwordConfirmation, token) {
+    try {
+      const response = await fetch(`${API_BASE}/api/auth/reset-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          password_confirmation: passwordConfirmation,
+          token,
+        }),
+      });
+
+      return await this.handleResponse(response);
+    } catch (error) {
+      console.error("Reset password error:", error);
+      throw error;
+    }
+  }
 }
 
 // Create singleton instance
@@ -446,6 +493,9 @@ export const isAuthenticated = () => authManager.isAuthenticated();
 export const clearAuth = () => authManager.clearAuth();
 export const getTokenExpiry = () => authManager.getTokenExpiry();
 export const forceRefresh = () => authManager.forceRefresh();
+export const forgotPassword = (email) => authManager.forgotPassword(email);
+export const resetPassword = (email, password, passwordConfirmation, token) =>
+  authManager.resetPassword(email, password, passwordConfirmation, token);
 
 // For backward compatibility with existing code
 export const saveAuth = (token, user) => {
@@ -482,6 +532,8 @@ export default {
   clearAuth,
   getTokenExpiry,
   forceRefresh,
+  forgotPassword,
+  resetPassword,
   saveAuth,
   getAuthToken,
   authManager,

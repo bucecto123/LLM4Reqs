@@ -71,14 +71,48 @@ class ConflictDetectionService
             
             $jobId = $data['job_id'] ?? null;
 
+            // Handle sync response (conflicts returned immediately)
+            if ($jobId === null && isset($data['conflicts'])) {
+                Log::info("Conflict detection completed synchronously", [
+                    'project_id' => $projectId,
+                    'conflicts_found' => count($data['conflicts']),
+                    'requirements_count' => count($formattedRequirements)
+                ]);
+                
+                // Convert sync response format to match expected format
+                $conflicts = [];
+                foreach ($data['conflicts'] as $conflict) {
+                    $conflicts[] = [
+                        'req_id_1' => $conflict['requirement_id_1'] ?? $conflict['req_id_1'] ?? null,
+                        'req_id_2' => $conflict['requirement_id_2'] ?? $conflict['req_id_2'] ?? null,
+                        'req_text_1' => $conflict['req_text_1'] ?? '',
+                        'req_text_2' => $conflict['req_text_2'] ?? '',
+                        'reason' => $conflict['conflict_description'] ?? $conflict['reason'] ?? '',
+                        'confidence' => $conflict['confidence'] ?? $this->mapSeverityToConfidence($conflict['severity'] ?? 'medium'),
+                        'cluster_id' => $conflict['cluster_id'] ?? 0,
+                    ];
+                }
+                
+                // Save conflicts immediately
+                $saved = $this->saveConflicts($projectId, $conflicts);
+                
+                return [
+                    'status' => 'completed',
+                    'conflicts' => $conflicts,
+                    'conflicts_saved' => $saved,
+                    'total_conflicts' => count($conflicts)
+                ];
+            }
+            
+            // Handle async response (job_id returned)
             if ($jobId === null) {
-                Log::warning("Conflict detection started but no job_id returned from LLM API", [
+                Log::warning("Conflict detection response missing both job_id and conflicts", [
                     'project_id' => $projectId,
                     'response' => $data,
                     'requirements_count' => count($formattedRequirements)
                 ]);
             } else {
-                Log::info("Conflict detection started", [
+                Log::info("Conflict detection started asynchronously", [
                     'project_id' => $projectId,
                     'job_id' => $jobId,
                     'requirements_count' => count($formattedRequirements)
@@ -269,6 +303,22 @@ class ConflictDetectionService
     protected function mapConfidenceToSeverity(string $confidence): string
     {
         return match($confidence) {
+            'high' => 'high',
+            'medium' => 'medium',
+            'low' => 'low',
+            default => 'medium'
+        };
+    }
+
+    /**
+     * Map severity level to confidence.
+     *
+     * @param string $severity
+     * @return string
+     */
+    protected function mapSeverityToConfidence(string $severity): string
+    {
+        return match($severity) {
             'high' => 'high',
             'medium' => 'medium',
             'low' => 'low',
