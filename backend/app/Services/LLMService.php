@@ -83,8 +83,8 @@ class LLMService
     }
 
     /**
-     * Chat with AI with streaming support (simulated)
-     * Streams response in chunks via callback for real-time display
+     * Chat with AI - returns full response immediately
+     * Callback receives complete response in one chunk for instant display
      */
     public function chatStream(
         string $message, 
@@ -106,27 +106,16 @@ class LLMService
                 $payload['persona_data'] = $personaData;
             }
             
-            // Get full response from LLM (TODO: implement true streaming when LLM backend supports it)
+            // Get full response from LLM
             $response = Http::timeout(120)->post("{$this->baseUrl}/api/chat", $payload);
 
             if ($response->successful()) {
                 $data = $response->json();
                 $fullResponse = $data['response'] ?? '';
                 
-                // Simulate streaming by breaking response into chunks
+                // Send complete response in one chunk for instant display
                 if ($onChunk && !empty($fullResponse)) {
-                    // Send in small batches for smooth streaming
-                    // Larger chunks = less network overhead = smoother display
-                    $length = mb_strlen($fullResponse);
-                    $charsPerChunk = 3; // Send 3-5 chars per chunk for smooth streaming
-                    
-                    for ($i = 0; $i < $length; $i += $charsPerChunk) {
-                        $chunk = mb_substr($fullResponse, $i, $charsPerChunk);
-                        $onChunk($chunk);
-                        // Small delay to control speed, but not per-character
-                        // This gives smooth flow without stuttering
-                        usleep(1000); // 10ms per chunk (3 chars) = ~30ms per char effective
-                    }
+                    $onChunk($fullResponse);
                 }
                 
                 return $data;

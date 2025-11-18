@@ -93,9 +93,10 @@ export default function LLMDashboard() {
     const channel = echo.channel(`conversation.${selectedConversation.id}`);
     const streamState = {
       tempMessageId: null,
-      buffer: "",
-      animationFrameId: null,
-      lastUpdateTime: 0,
+      startTime: null,
+      chunkCount: 0,
+      totalChars: 0,
+      lastChunkTime: null,
     };
 
     channel.listen(".message.chunk", (data) => {
@@ -103,6 +104,15 @@ export default function LLMDashboard() {
 
       if (metadata?.status === "started") {
         streamState.tempMessageId = message_id;
+        streamState.startTime = performance.now();
+        streamState.chunkCount = 0;
+        streamState.totalChars = 0;
+        streamState.lastChunkTime = performance.now();
+
+        console.log("🚀 [STREAMING STARTED]", {
+          messageId: message_id,
+          timestamp: new Date().toISOString(),
+        });
 
         const streamingMsg = {
           id: message_id,
@@ -120,27 +130,27 @@ export default function LLMDashboard() {
         setStreamingMessageId(message_id);
         setIsLoading(false);
       } else if (is_complete) {
-        if (streamState.animationFrameId) {
-          cancelAnimationFrame(streamState.animationFrameId);
-        }
+        const endTime = performance.now();
+        const totalTime = endTime - streamState.startTime;
+        const avgCharsPerSecond = (streamState.totalChars / totalTime) * 1000;
 
-        // Flush remaining buffer
-        if (streamState.buffer) {
-          const finalContent = streamState.buffer;
-          streamState.buffer = "";
-
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === streamState.tempMessageId
-                ? {
-                    ...msg,
-                    content: msg.content + finalContent,
-                    isStreaming: true,
-                  }
-                : msg
-            )
-          );
-        }
+        console.log("✅ [STREAMING COMPLETE]", {
+          totalTime: `${totalTime.toFixed(2)}ms (${(totalTime / 1000).toFixed(
+            2
+          )}s)`,
+          totalChunks: streamState.chunkCount,
+          totalChars: streamState.totalChars,
+          avgCharsPerSecond: avgCharsPerSecond.toFixed(2),
+          avgChunkSize: (
+            streamState.totalChars / streamState.chunkCount
+          ).toFixed(2),
+          performance:
+            avgCharsPerSecond > 100
+              ? "🚀 Fast"
+              : avgCharsPerSecond > 50
+              ? "⚡ Good"
+              : "🐌 Slow",
+        });
 
         // Replace with saved message or mark as complete
         if (metadata?.message) {
@@ -174,43 +184,40 @@ export default function LLMDashboard() {
             .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
         );
       } else {
-        // Add chunk to buffer
-        streamState.buffer += chunk;
+        // Track chunk performance
+        const now = performance.now();
+        const timeSinceLastChunk = streamState.lastChunkTime
+          ? now - streamState.lastChunkTime
+          : 0;
 
-        // Cancel previous animation frame
-        if (streamState.animationFrameId) {
-          cancelAnimationFrame(streamState.animationFrameId);
-        }
+        streamState.chunkCount++;
+        streamState.totalChars += chunk.length;
+        streamState.lastChunkTime = now;
 
-        const updateUI = (timestamp) => {
-          // Update immediately for smooth typewriter effect (no throttling)
-          const bufferedContent = streamState.buffer;
-          streamState.buffer = "";
-          streamState.lastUpdateTime = timestamp;
+        console.log(`📦 [CHUNK #${streamState.chunkCount}]`, {
+          chunkSize: chunk.length,
+          chunk: chunk.substring(0, 50) + (chunk.length > 50 ? "..." : ""),
+          timeSinceLastChunk: `${timeSinceLastChunk.toFixed(2)}ms`,
+          totalCharsReceived: streamState.totalChars,
+          elapsedTime: `${(now - streamState.startTime).toFixed(2)}ms`,
+        });
 
-          if (bufferedContent) {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === streamState.tempMessageId
-                  ? {
-                      ...msg,
-                      content: msg.content + bufferedContent,
-                      isStreaming: true,
-                    }
-                  : msg
-              )
-            );
-          }
-        };
-
-        streamState.animationFrameId = requestAnimationFrame(updateUI);
+        // Update UI immediately without batching for maximum speed
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === streamState.tempMessageId
+              ? {
+                  ...msg,
+                  content: msg.content + chunk,
+                  isStreaming: true,
+                }
+              : msg
+          )
+        );
       }
     });
 
     return () => {
-      if (streamState.animationFrameId) {
-        cancelAnimationFrame(streamState.animationFrameId);
-      }
       echo.leaveChannel(`conversation.${selectedConversation.id}`);
     };
   }, [selectedConversation?.id]);

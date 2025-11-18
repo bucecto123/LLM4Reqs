@@ -414,7 +414,9 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
                     <FileText className="w-5 h-5 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <div className="flex items-start justify-between mb-2">
-                        <h4 className="font-medium">Requirement #{req.id}</h4>
+                        <h4 className="font-medium">
+                          Requirement #{req.requirement_number || req.id}
+                        </h4>
                         <div className="flex items-center space-x-2">
                           <span
                             className={`text-xs px-2 py-1 rounded font-medium ${badgeColor}`}

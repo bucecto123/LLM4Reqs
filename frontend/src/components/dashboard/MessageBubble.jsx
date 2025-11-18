@@ -59,8 +59,6 @@ const MessageBubble = ({
   }, [content, isUser, shouldAnimate, isCurrentlyStreaming]);
 
   const finalContent = isUser ? content : displayedContent;
-  // Show cursor when: actively typing animation OR currently streaming from server
-  const showCursor = isTyping || isCurrentlyStreaming;
 
   const formatTime = (timestamp) => {
     try {
@@ -78,73 +76,21 @@ const MessageBubble = ({
   const aiMessageStyles =
     "max-w-full sm:max-w-[90%] md:max-w-[85%] lg:max-w-[80%] xl:max-w-[75%] px-4 py-3 rounded-lg shadow-sm bg-gray-100 text-gray-800 rounded-bl-none";
 
-  // Fish cursor component
-  const FishCursor = () => (
-    <span
-      className="fish-cursor-animate"
-      style={{
-        transform: "scaleX(-1)",
-        display: "inline-block",
-        marginLeft: "2px",
-        fontSize: "1em",
-        verticalAlign: "baseline",
-      }}
-    >
-      🐟
-    </span>
-  );
-
   const markdownComponents = {
-    p: ({ children, node, ...props }) => {
-      // Check if this is the last paragraph
-      const isLastParagraph =
-        node?.position?.end?.line ===
-          finalContent.split("\n").filter((l) => l.trim()).length ||
-        React.Children.toArray(children).some(
-          (child) =>
-            typeof child === "string" && finalContent.endsWith(child.trim())
-        );
-
-      return (
-        <p className="mb-2 inline" {...props}>
-          {children}
-          {showCursor && isLastParagraph && <FishCursor />}
-        </p>
-      );
-    },
-    ul: ({ children, node }) => {
-      const childArray = React.Children.toArray(children);
-      const lastChild = childArray[childArray.length - 1];
-
-      return (
-        <ul className="list-disc list-inside my-2 space-y-1">
-          {React.Children.map(children, (child, index) => {
-            if (index === childArray.length - 1 && showCursor) {
-              return React.cloneElement(child, { isLastItem: true });
-            }
-            return child;
-          })}
-        </ul>
-      );
-    },
-    ol: ({ children, node }) => {
-      const childArray = React.Children.toArray(children);
-
-      return (
-        <ol className="list-decimal list-inside my-2 space-y-1">
-          {React.Children.map(children, (child, index) => {
-            if (index === childArray.length - 1 && showCursor) {
-              return React.cloneElement(child, { isLastItem: true });
-            }
-            return child;
-          })}
-        </ol>
-      );
-    },
-    li: ({ children, isLastItem, ...props }) => (
+    p: ({ children, node, ...props }) => (
+      <p className="mb-2 inline" {...props}>
+        {children}
+      </p>
+    ),
+    ul: ({ children, node }) => (
+      <ul className="list-disc list-inside my-2 space-y-1">{children}</ul>
+    ),
+    ol: ({ children, node }) => (
+      <ol className="list-decimal list-inside my-2 space-y-1">{children}</ol>
+    ),
+    li: ({ children, ...props }) => (
       <li className="mb-1" {...props}>
         {children}
-        {isLastItem && <FishCursor />}
       </li>
     ),
     strong: ({ children }) => (
@@ -164,8 +110,11 @@ const MessageBubble = ({
     tbody: ({ children }) => (
       <tbody className="divide-y divide-gray-400 bg-gray-200">{children}</tbody>
     ),
-    tr: ({ children }) => (
-      <tr className="hover:bg-gray-300 transition-colors duration-150">
+    tr: ({ children, ...props }) => (
+      <tr
+        className="hover:bg-gray-300 transition-colors duration-150"
+        {...props}
+      >
         {children}
       </tr>
     ),
@@ -174,8 +123,11 @@ const MessageBubble = ({
         {children}
       </th>
     ),
-    td: ({ children }) => (
-      <td className="px-3 py-2 text-sm text-gray-800 border-r border-gray-500 last:border-r-0">
+    td: ({ children, ...props }) => (
+      <td
+        className="px-3 py-2 text-sm text-gray-800 border-r border-gray-500 last:border-r-0"
+        {...props}
+      >
         {children}
       </td>
     ),
@@ -256,21 +208,6 @@ const MessageBubble = ({
           </div>
         )}
       </div>
-
-      <style>{`
-        @keyframes fishBlink {
-          0%, 100% { 
-            opacity: 1;
-          }
-          50% { 
-            opacity: 0.3;
-          }
-        }
-        
-        .fish-cursor-animate {
-          animation: fishBlink 0.8s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   );
 };
