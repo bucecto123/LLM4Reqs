@@ -101,9 +101,13 @@ export default function ForgotPassword() {
       }
 
       setSuccess(
-        "Password reset link has been sent to your email. Please check your inbox."
+        "Password reset code has been sent to your email. Please check your inbox."
       );
-      setEmail("");
+      
+      // Redirect to reset password page after 2 seconds
+      setTimeout(() => {
+        navigate(`/reset-password?email=${encodeURIComponent(email.trim())}`);
+      }, 2000);
     } catch (err) {
       console.error("Forgot password error:", err);
       setError(err.message || "An error occurred. Please try again.");

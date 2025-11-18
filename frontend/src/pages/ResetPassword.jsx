@@ -51,11 +51,11 @@ const TypingText = ({ text, speed = 50, className = "" }) => {
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const token = searchParams.get("token");
-  const email = searchParams.get("email");
+  const emailFromUrl = searchParams.get("email");
 
   const [formData, setFormData] = useState({
-    email: email || "",
+    email: emailFromUrl || "",
+    code: "",
     password: "",
     confirmPassword: "",
   });
@@ -116,16 +116,16 @@ export default function ResetPassword() {
       newErrors.email = ["Email is required"];
     }
 
+    if (!formData.code) {
+      newErrors.code = ["Reset code is required"];
+    } else if (formData.code.length !== 6) {
+      newErrors.code = ["Reset code must be 6 digits"];
+    }
+
     if (!formData.password) {
       newErrors.password = ["Password is required"];
-    } else {
-      const strengthRegex =
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
-      if (!strengthRegex.test(formData.password)) {
-        newErrors.password = [
-          "Password must be at least 8 characters and include uppercase, lowercase, a number and a special character",
-        ];
-      }
+    } else if (formData.password.length < 8) {
+      newErrors.password = ["Password must be at least 8 characters"];
     }
 
     if (formData.password !== formData.confirmPassword) {
@@ -135,11 +135,6 @@ export default function ResetPassword() {
     if (Object.keys(newErrors).length > 0) {
       setFieldErrors(newErrors);
       setError("Please fix the highlighted fields");
-      return;
-    }
-
-    if (!token) {
-      setError("Invalid or missing reset token");
       return;
     }
 
@@ -154,9 +149,9 @@ export default function ResetPassword() {
         },
         body: JSON.stringify({
           email: formData.email,
+          code: formData.code,
           password: formData.password,
           password_confirmation: formData.confirmPassword,
-          token: token,
         }),
       });
 
@@ -343,7 +338,7 @@ export default function ResetPassword() {
                       style={{
                         borderColor: formData.email ? "#4A7BA7" : undefined,
                       }}
-                      readOnly={!!email}
+                      readOnly={!!emailFromUrl}
                     />
                   </div>
                   {fieldErrors.email && (
@@ -351,6 +346,39 @@ export default function ResetPassword() {
                       {fieldErrors.email[0]}
                     </div>
                   )}
+                </div>
+
+                {/* Reset Code */}
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-gray-700">
+                    Reset Code
+                  </label>
+                  <div className="relative">
+                    <Mail
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      size={20}
+                    />
+                    <input
+                      type="text"
+                      name="code"
+                      value={formData.code}
+                      onChange={handleChange}
+                      placeholder="Enter 6-digit code from email"
+                      maxLength={6}
+                      className="w-full pl-11 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none transition-all text-center text-2xl tracking-widest font-mono"
+                      style={{
+                        borderColor: formData.code ? "#4A7BA7" : undefined,
+                      }}
+                    />
+                  </div>
+                  {fieldErrors.code && (
+                    <div className="text-xs text-red-600 mt-1">
+                      {fieldErrors.code[0]}
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">
+                    Check your email for the 6-digit code
+                  </p>
                 </div>
 
                 {/* New Password */}
