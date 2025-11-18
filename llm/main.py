@@ -334,7 +334,7 @@ Text:
 
 Instructions:
 1. Extract clear, specific requirements
-2. Classify each as: functional, non-functional, constraint, or assumption
+2. Classify each as: functional, non-functional
 3. Assign priority: high, medium, or low
 4. Provide a confidence score (0.0 to 1.0)
 5. Return ONLY valid JSON, no markdown formatting, no explanations
