@@ -7,6 +7,8 @@ import threading
 
 import pandas as pd
 import numpy as np
+import hashlib
+import logging
 
 try:
     from sentence_transformers import SentenceTransformer
@@ -157,33 +159,79 @@ class RagManager:
                 # If no existing index, create new one
                 return self._build_new_index(index_path, meta_path, new_chunks)
             
-            # Generate new embeddings
-            new_texts = [c['text'] for c in new_chunks]
+            # Build fast lookup sets to deduplicate by stable metadata (requirement_id) and by text hash
+            logger = logging.getLogger(__name__)
+
+            existing_req_ids = set()
+            existing_text_hashes = set()
+            for c in existing_chunks:
+                try:
+                    meta = c.get('meta', {}) or {}
+                    rid = meta.get('requirement_id') or meta.get('req_id') or meta.get('requirement')
+                    if rid is not None:
+                        existing_req_ids.add(str(rid))
+                    # compute text hash
+                    th = hashlib.sha256((c.get('text') or '').encode('utf-8')).hexdigest()
+                    existing_text_hashes.add(th)
+                except Exception:
+                    continue
+
+            # Filter out duplicates from new_chunks
+            chunks_to_add = []
+            for chunk in new_chunks:
+                try:
+                    meta = chunk.get('meta', {}) or {}
+                    rid = meta.get('requirement_id') or meta.get('req_id') or meta.get('requirement')
+                    text = chunk.get('text') or ''
+                    th = hashlib.sha256(text.encode('utf-8')).hexdigest()
+
+                    if rid is not None and str(rid) in existing_req_ids:
+                        logger.info(f"Skipping duplicate chunk with requirement_id={rid}")
+                        continue
+                    if th in existing_text_hashes:
+                        logger.info("Skipping duplicate chunk based on text hash")
+                        continue
+
+                    chunks_to_add.append(chunk)
+                except Exception:
+                    # If any error occurs in checking, conservatively add the chunk
+                    chunks_to_add.append(chunk)
+
+            if not chunks_to_add:
+                logger.info('No new unique chunks to add; skipping incremental update')
+                return index, existing_chunks
+
+            # Generate embeddings only for chunks we're actually adding
+            new_texts = [c['text'] for c in chunks_to_add]
             new_embeddings = self.embed_texts(new_texts)
-            
+
             # Normalize and add to index
             faiss.normalize_L2(new_embeddings)
             index.add(new_embeddings)
-            
+
             # Update chunk IDs to avoid conflicts
             max_existing_id = max([c.get('id', 0) for c in existing_chunks], default=-1)
-            for i, chunk in enumerate(new_chunks):
+            for i, chunk in enumerate(chunks_to_add):
                 chunk['id'] = max_existing_id + i + 1
-            
+
             # Merge chunks
-            updated_chunks = existing_chunks + new_chunks
+            updated_chunks = existing_chunks + chunks_to_add
             
             # Save updated index and metadata
             faiss.write_index(index, index_path)
-            
+
             # Load old metadata to get version
             with open(meta_path, 'rb') as f:
                 old_metadata = pickle.load(f)
             old_version = old_metadata.get('version', 1) if isinstance(old_metadata, dict) else 1
-            
-            self.save_metadata(updated_chunks, meta_path, version=old_version + 1)
-            
-            return index, updated_chunks
+
+            new_version = old_version + 1
+            self.save_metadata(updated_chunks, meta_path, version=new_version)
+
+            added_count = len(chunks_to_add)
+            skipped_count = len(new_chunks) - added_count
+
+            return index, updated_chunks, added_count, skipped_count, new_version
 
     def _build_new_index(self, index_path: str, meta_path: str, chunks: List[Dict[str, Any]]) -> Tuple[Any, List[Dict[str, Any]]]:
         """Build a new index from scratch."""
@@ -191,7 +239,9 @@ class RagManager:
         embeddings = self.embed_texts(texts)
         index = self.build_faiss_index(embeddings, index_path)
         self.save_metadata(chunks, meta_path, version=1)
-        return index, chunks
+        added_count = len(chunks)
+        skipped_count = 0
+        return index, chunks, added_count, skipped_count, 1
 
     def get_project_paths(self, base_dir: str, project_id: str) -> Tuple[str, str]:
         """Get the index and metadata paths for a project."""

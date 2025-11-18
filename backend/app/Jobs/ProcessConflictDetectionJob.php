@@ -91,11 +91,21 @@ class ProcessConflictDetectionJob implements ShouldQueue
 
                         if (!empty($conflictDocs)) {
                             // Use incremental KB API to append conflict documents; do not fail job on KB update error
-                            $llmService->incrementalKBUpdate($this->projectId, $conflictDocs);
-                            Log::info('ProcessConflictDetectionJob: Appended conflicts to KB', [
-                                'project_id' => $this->projectId,
-                                'appended' => count($conflictDocs)
-                            ]);
+                            try {
+                                $res = $llmService->incrementalKBUpdate($this->projectId, $conflictDocs);
+                                $skipped = $res['skipped_chunks'] ?? $res['skipped'] ?? 0;
+
+                                Log::info('ProcessConflictDetectionJob: Appended conflicts to KB', [
+                                    'project_id' => $this->projectId,
+                                    'appended' => $res['added_chunks'] ?? count($conflictDocs),
+                                    'skipped' => $skipped
+                                ]);
+                            } catch (\Exception $e) {
+                                Log::warning('ProcessConflictDetectionJob: incremental KB update failed', [
+                                    'project_id' => $this->projectId,
+                                    'error' => $e->getMessage()
+                                ]);
+                            }
                         }
                     } catch (\Exception $e) {
                         Log::warning('ProcessConflictDetectionJob: Failed to append conflicts to KB', [

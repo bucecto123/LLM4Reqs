@@ -192,6 +192,10 @@ class ProjectKBController extends Controller
         try {
             // Call LLM service for incremental update
             $result = $this->llmService->incrementalKBUpdate($project->id, $documentsPayload);
+            $skipped = $result['skipped_chunks'] ?? $result['skipped'] ?? 0;
+            if ($skipped) {
+                Log::info('ProjectKBController: incrementalKBUpdate skipped duplicates', ['project_id' => $project->id, 'skipped' => $skipped]);
+            }
 
             // Update KB record
             $kb->update([
