@@ -8,7 +8,7 @@
 
 // Test configuration
 $baseUrl = 'http://localhost:8000';
-$testEmail = 'huskymudkipper1482004@gmail.com';
+$testEmail = 'test@example.com'; // Replace with your email when testing
 
 echo "=== Testing Password Reset API ===\n\n";
 
@@ -51,7 +51,7 @@ echo "   Look for a 6-digit code in the email body\n\n";
 echo "2. Test the reset password endpoint:\n";
 echo "   POST $baseUrl/api/auth/reset-password\n";
 echo "   Body: {\n";
-echo "     \"email\": \"$testEmail\",\n";
+echo "     \"email\": \"test@example.com\",\n";
 echo "     \"code\": \"YOUR_6_DIGIT_CODE\",\n";
 echo "     \"password\": \"newPassword123\",\n";
 echo "     \"password_confirmation\": \"newPassword123\"\n";
@@ -60,6 +60,6 @@ echo "   }\n\n";
 echo "3. Or use this curl command (replace CODE with actual code):\n";
 echo "   curl -X POST $baseUrl/api/auth/reset-password \\\n";
 echo "     -H \"Content-Type: application/json\" \\\n";
-echo "     -d '{\"email\":\"$testEmail\",\"code\":\"CODE\",\"password\":\"newPassword123\",\"password_confirmation\":\"newPassword123\"}'\n\n";
+echo "     -d '{\"email\":\"test@example.com\",\"code\":\"CODE\",\"password\":\"newPassword123\",\"password_confirmation\":\"newPassword123\"}'\n\n";
 
 echo "✅ Test completed!\n";
