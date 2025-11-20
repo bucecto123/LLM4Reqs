@@ -103,7 +103,7 @@ export default function ForgotPassword() {
       setSuccess(
         "Password reset code has been sent to your email. Please check your inbox."
       );
-      
+
       // Redirect to reset password page after 2 seconds
       setTimeout(() => {
         navigate(`/reset-password?email=${encodeURIComponent(email.trim())}`);

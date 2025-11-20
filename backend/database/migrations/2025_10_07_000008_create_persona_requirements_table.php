@@ -12,9 +12,9 @@ class CreatePersonaRequirementsTable extends Migration
             $table->id();
             $table->foreignId('requirement_id')->constrained('requirements')->onDelete('cascade');
             $table->foreignId('persona_id')->constrained('personas')->onDelete('cascade');
-            $table->longText('persona_view')->nullable();
-            $table->timestamp('generated_at')->nullable();
+            $table->string('action_type')->default('generated');
             $table->timestamps();
+            $table->unique(['requirement_id', 'persona_id', 'action_type'], 'persona_req_action_unique');
         });
     }
 

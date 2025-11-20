@@ -20,10 +20,18 @@ const MessageBubble = ({
     message.isStreaming === true || message.id === streamingMessageId;
 
   const hasAnimated = useRef(false);
+  const [isVisible, setIsVisible] = useState(false);
   const [displayedContent, setDisplayedContent] = useState(
     shouldAnimate && !isUser ? "" : content
   );
   const [isTyping, setIsTyping] = useState(false);
+
+  // Smooth entrance animation (fade + slight slide/scale) similar to Claude
+  useEffect(() => {
+    // Defer to next frame so initial styles apply before we toggle visible
+    const id = requestAnimationFrame(() => setIsVisible(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   useEffect(() => {
     // If streaming, show content directly and don't run typing animation
@@ -181,8 +189,22 @@ const MessageBubble = ({
     return finalContent;
   }, [finalContent, isUser]);
 
+  // Don't render an empty assistant bubble while streaming;
+  // the thinking indicator (fish) will represent this state instead.
+  if (!isUser && isCurrentlyStreaming && !content.trim()) {
+    return null;
+  }
+
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}>
+    <div
+      className={`flex ${
+        isUser ? "justify-end" : "justify-start"
+      } mb-4 transition-all duration-300 ease-out transform ${
+        isVisible
+          ? "opacity-100 translate-y-0 scale-100"
+          : "opacity-0 translate-y-2 scale-[0.98]"
+      }`}
+    >
       <div className={isUser ? userMessageStyles : aiMessageStyles}>
         <div className="text-sm leading-relaxed">
           {isUser ? (

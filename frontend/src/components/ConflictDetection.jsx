@@ -7,9 +7,132 @@ import {
   ChevronDown,
   Shield,
   Download,
+  Bot,
+  PenTool,
 } from "lucide-react";
 import { apiFetch } from "../utils/auth";
 import ExportModal from "./ExportModal.jsx";
+
+// Format resolution notes for better display
+const formatResolutionNotes = (text) => {
+  if (!text) return "";
+
+  let formatted = text;
+
+  // Handle bold text (**text** or **text**)
+  formatted = formatted.replace(
+    /\*\*([^\*]+)\*\*/g,
+    "<strong class='font-semibold text-blue-900'>$1</strong>"
+  );
+
+  // Handle italic text (*text* but not **text**)
+  formatted = formatted.replace(
+    /(?<!\*)\*([^\*]+)\*(?!\*)/g,
+    "<em class='italic'>$1</em>"
+  );
+
+  // Handle numbered lists with proper formatting (1., 2., etc.)
+  // First, ensure numbered items are on separate lines
+  formatted = formatted.replace(/(\d+\.)\s+/g, "\n$1 ");
+
+  // Handle bullet points (•, -, *)
+  formatted = formatted.replace(/^[\-\*]\s+/gm, "\n• ");
+
+  // Split by double newlines for paragraphs, or single newline for list items
+  const lines = formatted.split(/\n/);
+  const elements = [];
+  let currentParagraph = [];
+  let inList = false;
+
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      if (currentParagraph.length > 0) {
+        elements.push({
+          type: "paragraph",
+          content: currentParagraph.join(" "),
+        });
+        currentParagraph = [];
+      }
+      inList = false;
+      return;
+    }
+
+    // Check if it's a numbered list item
+    if (trimmed.match(/^\d+\.\s/)) {
+      if (currentParagraph.length > 0) {
+        elements.push({
+          type: "paragraph",
+          content: currentParagraph.join(" "),
+        });
+        currentParagraph = [];
+      }
+      elements.push({ type: "numbered", content: trimmed });
+      inList = true;
+      return;
+    }
+
+    // Check if it's a bullet point
+    if (trimmed.match(/^[\•\-\*]\s/)) {
+      if (currentParagraph.length > 0) {
+        elements.push({
+          type: "paragraph",
+          content: currentParagraph.join(" "),
+        });
+        currentParagraph = [];
+      }
+      elements.push({ type: "bullet", content: trimmed });
+      inList = true;
+      return;
+    }
+
+    // Regular text
+    if (inList && currentParagraph.length > 0) {
+      elements.push({ type: "paragraph", content: currentParagraph.join(" ") });
+      currentParagraph = [];
+    }
+    currentParagraph.push(trimmed);
+    inList = false;
+  });
+
+  // Add remaining paragraph
+  if (currentParagraph.length > 0) {
+    elements.push({ type: "paragraph", content: currentParagraph.join(" ") });
+  }
+
+  return elements.map((element, idx) => {
+    if (element.type === "numbered") {
+      return (
+        <div key={idx} className="mb-2 ml-4 pl-3 border-l-4 border-blue-300">
+          <div
+            className="text-sm"
+            dangerouslySetInnerHTML={{ __html: element.content }}
+          />
+        </div>
+      );
+    }
+
+    if (element.type === "bullet") {
+      return (
+        <div key={idx} className="mb-2 ml-4">
+          <div
+            className="text-sm"
+            dangerouslySetInnerHTML={{ __html: element.content }}
+          />
+        </div>
+      );
+    }
+
+    // Regular paragraph
+    return (
+      <p
+        key={idx}
+        className="mb-3 leading-relaxed"
+        dangerouslySetInnerHTML={{ __html: element.content }}
+      />
+    );
+  });
+};
 
 export const ConflictsDisplay = ({ projectId, onClose }) => {
   const [conflicts, setConflicts] = useState([]);
@@ -22,6 +145,12 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
   const [isSeverityDropdownOpen, setIsSeverityDropdownOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [projectName, setProjectName] = useState("");
+  const [resolveModal, setResolveModal] = useState({
+    isOpen: false,
+    conflict: null,
+    mode: null, // 'ai' or 'manual'
+    manualNotes: "",
+  });
 
   useEffect(() => {
     if (projectId) {
@@ -58,16 +187,29 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
         // Transform backend conflicts to UI format
         const formattedConflicts = data.data.map((conflict) => ({
           id: conflict.id,
-          title: `Requirements ${conflict.requirement1?.id} ↔ ${conflict.requirement2?.id}`,
+          conflictNumber: conflict.conflict_number,
+          title: conflict.conflict_number
+            ? `Conflict ${conflict.conflict_number}`
+            : `Conflict ${conflict.id}`,
           description: conflict.conflict_description,
           severity: conflict.severity,
           confidence: conflict.confidence || "medium",
           requirements: [
-            `[${conflict.requirement1?.id}] ${
-              conflict.requirement1?.title || conflict.requirement1?.description
+            `[${
+              conflict.requirement1?.requirement_number ||
+              conflict.requirement1?.id
+            }] ${
+              conflict.requirement1?.title ||
+              conflict.requirement1?.description ||
+              conflict.requirement1?.requirement_text
             }`,
-            `[${conflict.requirement2?.id}] ${
-              conflict.requirement2?.title || conflict.requirement2?.description
+            `[${
+              conflict.requirement2?.requirement_number ||
+              conflict.requirement2?.id
+            }] ${
+              conflict.requirement2?.title ||
+              conflict.requirement2?.description ||
+              conflict.requirement2?.requirement_text
             }`,
           ],
           suggestion: conflict.resolution_notes,
@@ -96,7 +238,7 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
     }
   };
 
-  const handleResolve = async (conflict) => {
+  const handleResolveWithAI = async (conflict) => {
     try {
       if (!conflict || !conflict.id) return;
 
@@ -105,16 +247,94 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
         return;
       }
 
-      const notes = window.prompt("Enter resolution notes for this conflict:");
-      if (!notes || !notes.trim()) return;
+      // Show confirmation modal
+      setResolveModal({
+        isOpen: true,
+        conflict: conflict,
+        mode: "ai",
+        manualNotes: "",
+      });
+    } catch (err) {
+      console.error("Failed to open resolve modal:", err);
+    }
+  };
 
+  const handleResolveManually = async (conflict) => {
+    try {
+      if (!conflict || !conflict.id) return;
+
+      if (conflict.status === "resolved") {
+        alert("This conflict is already resolved");
+        return;
+      }
+
+      // Show manual resolution modal
+      setResolveModal({
+        isOpen: true,
+        conflict: conflict,
+        mode: "manual",
+        manualNotes: "",
+      });
+    } catch (err) {
+      console.error("Failed to open resolve modal:", err);
+    }
+  };
+
+  const confirmResolveWithAI = async () => {
+    const { conflict } = resolveModal;
+    if (!conflict) return;
+
+    try {
       setLoading(true);
-      await apiFetch(`/api/conflicts/${conflict.id}/resolve`, {
-        method: "PUT",
-        body: { resolution_notes: notes.trim() },
+      setResolveModal({
+        isOpen: false,
+        conflict: null,
+        mode: null,
+        manualNotes: "",
       });
 
-      // Reload conflicts after resolve
+      const response = await apiFetch(
+        `/api/conflicts/${conflict.id}/resolve-ai`,
+        {
+          method: "POST",
+        }
+      );
+
+      if (response.success) {
+        await loadConflicts();
+      } else {
+        throw new Error(
+          response.message || "Failed to resolve conflict with AI"
+        );
+      }
+    } catch (err) {
+      console.error("Failed to resolve conflict with AI:", err);
+      setError(err.message || "Failed to resolve conflict with AI");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const confirmResolveManually = async () => {
+    const { conflict, manualNotes } = resolveModal;
+    if (!conflict || !manualNotes || !manualNotes.trim()) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setResolveModal({
+        isOpen: false,
+        conflict: null,
+        mode: null,
+        manualNotes: "",
+      });
+
+      await apiFetch(`/api/conflicts/${conflict.id}/resolve`, {
+        method: "PUT",
+        body: { resolution_notes: manualNotes.trim() },
+      });
+
       await loadConflicts();
     } catch (err) {
       console.error("Failed to resolve conflict:", err);
@@ -395,7 +615,10 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
                         <div className="flex-1">
                           <div className="flex items-start justify-between mb-2">
                             <h4 className="font-medium">
-                              {conflict.title || `Conflict ${index + 1}`}
+                              {conflict.title ||
+                                (conflict.conflictNumber
+                                  ? `Conflict ${conflict.conflictNumber}`
+                                  : `Conflict ${index + 1}`)}
                             </h4>
                             <div className="flex items-center space-x-2">
                               <span
@@ -409,14 +632,30 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
                                 </span>
                               )}
 
-                              {/* Resolve button - prompt for resolution notes and call API */}
+                              {/* Resolve buttons - AI or Manual */}
                               {conflict.status !== "resolved" ? (
-                                <button
-                                  onClick={() => handleResolve(conflict)}
-                                  className="ml-2 px-2 py-1 text-xs rounded bg-green-50 text-green-700 border border-green-200 hover:bg-green-100"
-                                >
-                                  Resolve
-                                </button>
+                                <div className="ml-2 flex items-center space-x-2">
+                                  <button
+                                    onClick={() =>
+                                      handleResolveWithAI(conflict)
+                                    }
+                                    disabled={loading}
+                                    className="px-2 py-1 text-xs rounded bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    title="Resolve automatically using AI"
+                                  >
+                                    Resolve with AI
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      handleResolveManually(conflict)
+                                    }
+                                    disabled={loading}
+                                    className="px-2 py-1 text-xs rounded bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    title="Resolve manually with your own notes"
+                                  >
+                                    Resolve by your own
+                                  </button>
+                                </div>
                               ) : (
                                 <span className="ml-2 text-xs text-slate-500">
                                   Resolved
@@ -445,13 +684,13 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
                             )}
 
                           {conflict.suggestion && (
-                            <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
-                              <p className="text-xs font-semibold mb-1 text-blue-900">
-                                💡 Suggestion:
+                            <div className="mt-3 p-4 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+                              <p className="text-xs font-semibold mb-3 text-blue-900">
+                                💡 Resolution Suggestion:
                               </p>
-                              <p className="text-sm text-blue-800">
-                                {conflict.suggestion}
-                              </p>
+                              <div className="text-sm text-blue-800 whitespace-pre-wrap leading-relaxed">
+                                {formatResolutionNotes(conflict.suggestion)}
+                              </div>
                             </div>
                           )}
 
@@ -478,6 +717,235 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
           isOpen={isExportModalOpen}
           onClose={() => setIsExportModalOpen(false)}
         />
+
+        {/* Resolve Conflict Modal */}
+        {resolveModal.isOpen && (
+          <>
+            {/* Backdrop */}
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 z-50"
+              onClick={() =>
+                setResolveModal({
+                  isOpen: false,
+                  conflict: null,
+                  mode: null,
+                  manualNotes: "",
+                })
+              }
+            ></div>
+
+            {/* Modal */}
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div
+                className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                  <div className="flex items-center space-x-3">
+                    <div
+                      className={`p-2 rounded-lg ${
+                        resolveModal.mode === "ai"
+                          ? "bg-blue-100"
+                          : "bg-green-100"
+                      }`}
+                    >
+                      {resolveModal.mode === "ai" ? (
+                        <Bot
+                          className={`w-6 h-6 ${
+                            resolveModal.mode === "ai"
+                              ? "text-blue-600"
+                              : "text-green-600"
+                          }`}
+                        />
+                      ) : (
+                        <PenTool
+                          className={`w-6 h-6 ${
+                            resolveModal.mode === "ai"
+                              ? "text-blue-600"
+                              : "text-green-600"
+                          }`}
+                        />
+                      )}
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-800">
+                      {resolveModal.mode === "ai"
+                        ? "Resolve with AI"
+                        : "Resolve Manually"}
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() =>
+                      setResolveModal({
+                        isOpen: false,
+                        conflict: null,
+                        mode: null,
+                        manualNotes: "",
+                      })
+                    }
+                    className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-600 hover:text-slate-900"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="p-6 overflow-y-auto flex-1">
+                  {resolveModal.mode === "ai" ? (
+                    <div className="space-y-4">
+                      <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                        <p className="text-sm text-blue-800">
+                          AI will automatically generate resolution notes for
+                          this conflict based on the conflicting requirements.
+                        </p>
+                      </div>
+
+                      {resolveModal.conflict && (
+                        <>
+                          <div>
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                              Conflict Description
+                            </p>
+                            <p className="text-sm text-slate-700">
+                              {resolveModal.conflict.description}
+                            </p>
+                          </div>
+
+                          {resolveModal.conflict.requirements &&
+                            resolveModal.conflict.requirements.length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                                  Conflicting Requirements
+                                </p>
+                                <div className="space-y-2">
+                                  {resolveModal.conflict.requirements.map(
+                                    (req, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm"
+                                      >
+                                        {req}
+                                      </div>
+                                    )
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                        <p className="text-sm text-green-800">
+                          Enter your own resolution notes for this conflict. Be
+                          specific about how to resolve the conflict between the
+                          requirements.
+                        </p>
+                      </div>
+
+                      {resolveModal.conflict && (
+                        <>
+                          <div>
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                              Conflict Description
+                            </p>
+                            <p className="text-sm text-slate-700">
+                              {resolveModal.conflict.description}
+                            </p>
+                          </div>
+
+                          {resolveModal.conflict.requirements &&
+                            resolveModal.conflict.requirements.length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                                  Conflicting Requirements
+                                </p>
+                                <div className="space-y-2">
+                                  {resolveModal.conflict.requirements.map(
+                                    (req, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm"
+                                      >
+                                        {req}
+                                      </div>
+                                    )
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                          <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                              Resolution Notes
+                            </label>
+                            <textarea
+                              value={resolveModal.manualNotes}
+                              onChange={(e) =>
+                                setResolveModal({
+                                  ...resolveModal,
+                                  manualNotes: e.target.value,
+                                })
+                              }
+                              placeholder="Enter detailed resolution notes explaining how to resolve this conflict..."
+                              className="w-full h-32 px-4 py-3 border-2 border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
+                              autoFocus
+                            />
+                            <p className="text-xs text-slate-500 mt-1">
+                              {resolveModal.manualNotes.length} characters
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-end space-x-3 px-6 py-4 border-t border-slate-200">
+                  <button
+                    onClick={() =>
+                      setResolveModal({
+                        isOpen: false,
+                        conflict: null,
+                        mode: null,
+                        manualNotes: "",
+                      })
+                    }
+                    className="px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 transition-colors font-medium text-slate-700"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={
+                      resolveModal.mode === "ai"
+                        ? confirmResolveWithAI
+                        : confirmResolveManually
+                    }
+                    disabled={
+                      loading ||
+                      (resolveModal.mode === "manual" &&
+                        (!resolveModal.manualNotes ||
+                          !resolveModal.manualNotes.trim()))
+                    }
+                    className={`px-4 py-2 rounded-lg font-medium text-white transition-colors ${
+                      resolveModal.mode === "ai"
+                        ? "bg-blue-600 hover:bg-blue-700"
+                        : "bg-green-600 hover:bg-green-700"
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    {loading
+                      ? "Processing..."
+                      : resolveModal.mode === "ai"
+                      ? "Resolve with AI"
+                      : "Resolve Conflict"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

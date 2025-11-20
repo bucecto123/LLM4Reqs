@@ -76,7 +76,7 @@ priorities (JSON), concerns (JSON), typical_requirements (JSON)
 communication_style, technical_level, focus_areas (JSON)
 example_questions (JSON), custom_attributes (JSON)
 prompt_template, is_active, user_id
-created_at, updated_at, deleted_at
+created_at, updated_at
 ```
 
 ### `persona_requirements` Table (Pivot)

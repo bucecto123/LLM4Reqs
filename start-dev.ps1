@@ -81,7 +81,7 @@ Start-WindowedProcess -Title 'Queue Worker' -ScriptBlock $queueScript
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Green
-Write-Host "✅ Started all dev services!" -ForegroundColor Green
+Write-Host "Lets Go Twin - Started all dev services!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Services running:" -ForegroundColor Cyan

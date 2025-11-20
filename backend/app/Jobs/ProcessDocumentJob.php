@@ -276,56 +276,9 @@ class ProcessDocumentJob implements ShouldQueue, ShouldBeUnique
                 ]);
             }
 
-            // ===== Incremental KB update: add newly extracted requirements to the project's KB =====
-            try {
-                $newRequirements = Requirement::where('document_id', $document->id)
-                    ->where('source', 'extracted')
-                    ->get();
-
-                $docsToAdd = [];
-                foreach ($newRequirements as $r) {
-                    $text = "Requirement: {$r->requirement_text}\nType: {$r->requirement_type}\nPriority: {$r->priority}";
-                    $docsToAdd[] = [
-                        'content' => $text,
-                        'type' => 'requirement',
-                        'meta' => [
-                            'requirement_id' => $r->id,
-                            'document_id' => $document->id,
-                            'project_id' => $r->project_id,
-                            'confidence_score' => $r->confidence_score,
-                            'requirement_type' => $r->requirement_type,
-                            'priority' => $r->priority,
-                        ],
-                    ];
-                }
-
-                if (!empty($docsToAdd)) {
-                    try {
-                        $res = $llmService->incrementalKBUpdate($document->project_id, $docsToAdd);
-
-                        $skipped = $res['skipped_chunks'] ?? $res['skipped'] ?? 0;
-                        $added = $res['added_chunks'] ?? count($docsToAdd);
-
-                        Log::info('ProcessDocumentJob: Incrementally updated KB with new requirements', [
-                            'document_id' => $document->id,
-                            'project_id' => $document->project_id,
-                            'added' => $added,
-                            'skipped' => $skipped
-                        ]);
-                    } catch (\Exception $e) {
-                        Log::warning('ProcessDocumentJob: incremental KB update failed', [
-                            'document_id' => $document->id,
-                            'project_id' => $document->project_id,
-                            'error' => $e->getMessage()
-                        ]);
-                    }
-                }
-            } catch (\Exception $e) {
-                Log::warning('ProcessDocumentJob: failed to prepare incremental KB documents', [
-                    'document_id' => $document->id,
-                    'error' => $e->getMessage()
-                ]);
-            }
+            // Note: KB update is now handled by full KB build after all files are uploaded
+            // This prevents individual incremental updates for each file, which is inefficient
+            // The KB will be rebuilt in batch with all documents after upload completes
 
             // ===== Trigger conflict detection for the project (re-run on full requirement set) =====
             try {

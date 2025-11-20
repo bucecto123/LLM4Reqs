@@ -96,11 +96,6 @@ class ProjectController extends Controller
                 });
             }
 
-            // Add withTrashed if requested
-            if (request('with_trashed', false)) {
-                $query->withTrashed();
-            }
-
             // Sorting
             $orderBy = request('order_by', 'requirement_number');
             $orderDir = request('order_dir', 'asc');
@@ -112,8 +107,8 @@ class ProjectController extends Controller
 
             // Get counts
             $totalCount = $requirements->total();
-            $activeCount = $query->withoutTrashed()->count();
-            $deletedCount = $totalCount - $activeCount;
+            $activeCount = $totalCount;
+            $deletedCount = 0;
 
             // Log the results
             Log::info('Requirements Query Results', [
@@ -160,12 +155,8 @@ class ProjectController extends Controller
         
         $conflicts = $project->requirementConflicts()
             // Only show conflicts where both requirements exist (not soft-deleted)
-            ->whereHas('requirement1', function($query) {
-                $query->whereNull('deleted_at');
-            })
-            ->whereHas('requirement2', function($query) {
-                $query->whereNull('deleted_at');
-            })
+            ->whereHas('requirement1')
+            ->whereHas('requirement2')
             ->with([
                 'requirement1' => function($query) {
                     $query->select('id', 'title', 'requirement_text', 'requirement_type');

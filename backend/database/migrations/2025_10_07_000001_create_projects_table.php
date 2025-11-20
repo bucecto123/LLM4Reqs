@@ -21,7 +21,6 @@ class CreateProjectsTable extends Migration
             $table->text('description')->nullable();
             $table->string('status')->default('active'); // active, archived, deleted
             $table->timestamps();
-            $table->softDeletes();
         });
     }
 

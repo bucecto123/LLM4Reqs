@@ -22,6 +22,8 @@ return new class extends Migration
             $table->timestamp('last_built_at')->nullable();
             $table->text('last_error')->nullable();
             $table->string('job_id')->nullable(); // Track async build job ID
+            $table->integer('build_progress')->default(0);
+            $table->string('build_stage')->default('not_started');
             $table->timestamps();
         });
     }

@@ -1,20 +1,56 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, User, Sparkles, AlertCircle, Check } from "lucide-react";
 import { apiFetch } from "../../utils/auth";
 
-const PersonaManager = ({ onClose, onPersonaCreated }) => {
-  const [formData, setFormData] = useState({
-    name: "",
-    role: "",
-    description: "",
-    technical_level: "medium",
-    priorities: [""],
-    concerns: [""],
-    focus_areas: [""],
-  });
+const defaultForm = {
+  name: "",
+  role: "",
+  description: "",
+  technical_level: "medium",
+  priorities: [""],
+  concerns: [""],
+  focus_areas: [""],
+};
+
+const PersonaManager = ({
+  onClose,
+  onPersonaCreated,
+  onPersonaUpdated,
+  persona = null,
+}) => {
+  const [formData, setFormData] = useState(defaultForm);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+
+  const isEditing = Boolean(persona);
+
+  useEffect(() => {
+    if (persona) {
+      setFormData({
+        name: persona.name || "",
+        role: persona.role || "",
+        description: persona.description || "",
+        technical_level: persona.technical_level || "medium",
+        priorities:
+          persona.priorities && persona.priorities.length > 0
+            ? persona.priorities
+            : [""],
+        concerns:
+          persona.concerns && persona.concerns.length > 0
+            ? persona.concerns
+            : [""],
+        focus_areas:
+          persona.focus_areas && persona.focus_areas.length > 0
+            ? persona.focus_areas
+            : [""],
+      });
+    } else {
+      setFormData(defaultForm);
+    }
+    setSuccess(false);
+    setError(null);
+  }, [persona]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -56,18 +92,29 @@ const PersonaManager = ({ onClose, onPersonaCreated }) => {
         focus_areas: formData.focus_areas.filter((f) => f.trim()),
       };
 
-      const response = await apiFetch("/api/personas", {
-        method: "POST",
+      const endpoint = isEditing
+        ? `/api/personas/${persona.id}`
+        : "/api/personas";
+      const method = isEditing ? "PUT" : "POST";
+
+      const response = await apiFetch(endpoint, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(cleanedData),
       });
 
       if (response.success) {
+        const savedPersona =
+          response.data || response.persona || response.result || null;
         setSuccess(true);
         setTimeout(() => {
-          onPersonaCreated(response.data);
+          if (isEditing) {
+              onPersonaUpdated?.(savedPersona || cleanedData);
+          } else {
+              onPersonaCreated(savedPersona || response);
+          }
           onClose();
-        }, 1500);
+        }, 1000);
       }
     } catch (err) {
       console.error("Error creating persona:", err);
@@ -88,10 +135,12 @@ const PersonaManager = ({ onClose, onPersonaCreated }) => {
             </div>
             <div>
               <h2 className="text-xl font-bold text-gray-900">
-                Create Custom Persona
+                {isEditing ? "Update Persona" : "Create Custom Persona"}
               </h2>
               <p className="text-sm text-gray-600">
-                Define a specialized perspective for requirement analysis
+                {isEditing
+                  ? "Update this persona's details or return to normal mode"
+                  : "Define a specialized perspective for requirement analysis"}
               </p>
             </div>
           </div>
@@ -237,8 +286,8 @@ const PersonaManager = ({ onClose, onPersonaCreated }) => {
             onAdd={() => addArrayItem("focus_areas")}
             onRemove={(index) => removeArrayItem("focus_areas", index)}
             placeholder="e.g., Regulatory Compliance"
-          />
-        </form>
+  />
+</form>
 
         {/* Footer */}
         <div className="px-6 py-4 border-t bg-gray-50 flex items-center justify-end space-x-3">
@@ -258,12 +307,12 @@ const PersonaManager = ({ onClose, onPersonaCreated }) => {
             {loading ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>Creating...</span>
+                <span>{isEditing ? "Saving..." : "Creating..."}</span>
               </>
             ) : (
               <>
                 <Sparkles className="w-4 h-4" />
-                <span>Create Persona</span>
+                <span>{isEditing ? "Save Changes" : "Create Persona"}</span>
               </>
             )}
           </button>

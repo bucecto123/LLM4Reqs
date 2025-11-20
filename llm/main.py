@@ -1,4 +1,7 @@
 # main.py - FastAPI Entry Point with Groq
+import warnings
+warnings.filterwarnings('ignore')
+
 from fastapi import (
     FastAPI,
     HTTPException,
@@ -11,15 +14,14 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from groq import Groq
 import os
-from dotenv import load_dotenv
 import json
-from typing import Tuple, List
 import uuid
-from datetime import datetime
 import asyncio
+from dotenv import load_dotenv
+from datetime import datetime
 
 # Lazy import of RagManager (may raise at runtime if deps missing)
 try:
@@ -32,6 +34,18 @@ try:
     from build_faiss import build_index_for_project
 except Exception:
     build_index_for_project = None
+
+# Import domain-agnostic conflict detection dependencies
+try:
+    from sentence_transformers import SentenceTransformer
+    import hdbscan
+    from sklearn.metrics.pairwise import cosine_similarity
+    CONFLICT_DETECTION_AVAILABLE = True
+except ImportError:
+    CONFLICT_DETECTION_AVAILABLE = False
+    SentenceTransformer = None
+    hdbscan = None
+    cosine_similarity = None
 
 load_dotenv()
 
@@ -176,11 +190,12 @@ RAG_KEYWORDS = os.getenv(
     "requirement,requirements,specification,standard,security,privacy,compliance,regulation,payment,billing",
 ).split(",")
 
-# internal lazy-loaded artifacts
+# Internal state for RAG and conflict detection
 _rag_manager = None
 _rag_index = None
 _rag_chunks = None
 _rag_available = False
+_embedding_model_cache = None
 
 # ==================== REQUEST/RESPONSE MODELS ====================
 
@@ -195,6 +210,8 @@ class ChatRequest(BaseModel):
     # Avoid mutable default; normalize to an empty list in the endpoint
     conversation_history: Optional[List[ChatMessage]] = None
     context: Optional[str] = None
+    persona_id: Optional[int] = None
+    persona_data: Optional[Dict[str, Any]] = None
 
 
 class ChatResponse(BaseModel):
@@ -235,6 +252,10 @@ class PersonaGenerationResponse(BaseModel):
 
 class ConflictDetectionRequest(BaseModel):
     requirements: List[Dict[str, Any]]
+    project_id: Optional[int] = None
+    min_cluster_size: Optional[int] = 2
+    max_batch_size: Optional[int] = 30
+    similarity_threshold: Optional[float] = 0.95
 
 
 class Conflict(BaseModel):
@@ -242,11 +263,32 @@ class Conflict(BaseModel):
     requirement_id_2: int
     conflict_description: str
     severity: str
+    req_text_1: Optional[str] = None
+    req_text_2: Optional[str] = None
+    confidence: Optional[str] = "medium"
+    cluster_id: Optional[int] = None
 
 
 class ConflictDetectionResponse(BaseModel):
     conflicts: List[Conflict]
     total_conflicts: int
+    total_requirements: Optional[int] = None
+    clusters_found: Optional[int] = None
+    method: Optional[str] = "semantic_clustering"
+
+
+class ConflictResolutionRequest(BaseModel):
+    requirement_id_1: int
+    requirement_id_2: int
+    req_text_1: str
+    req_text_2: str
+    conflict_description: str
+    confidence: str = "medium"
+
+
+class ConflictResolutionResponse(BaseModel):
+    resolution_notes: str
+    suggested_action: str
 
 
 # ==================== NEW KB API MODELS ====================
@@ -393,6 +435,27 @@ Return format (MUST be valid JSON):
 }}
 
 If no conflicts found, return: {{"conflicts": []}}"""
+
+CONFLICT_RESOLUTION_PROMPT = """You are Fishy, an expert at resolving requirement conflicts. Analyze the following conflict and provide a resolution.
+
+Conflict Details:
+- Requirement 1 (ID {req_id_1}): {req_text_1}
+- Requirement 2 (ID {req_id_2}): {req_text_2}
+- Conflict Description: {conflict_description}
+- Confidence Level: {confidence}
+
+Instructions:
+1. Analyze the root cause of the conflict
+2. Propose a practical resolution that addresses both requirements
+3. Suggest specific actions to resolve the conflict
+4. Consider if one requirement should take precedence, or if both can be reconciled
+5. Provide clear, actionable resolution notes
+
+Return format (MUST be valid JSON):
+{{
+  "resolution_notes": "Detailed explanation of how to resolve this conflict...",
+  "suggested_action": "Brief action item (e.g., 'Modify requirement 1 to allow batch processing', 'Prioritize requirement 2', 'Combine both requirements')"
+}}"""
 
 # ==================== HELPER FUNCTIONS ====================
 
@@ -542,6 +605,273 @@ def _get_rag_manager():
     return RagManager(model_name=KB_MODEL)
 
 
+async def _detect_conflicts_simple(request: ConflictDetectionRequest) -> ConflictDetectionResponse:
+    """
+    Simple LLM-only conflict detection (fallback when semantic libraries unavailable).
+    """
+    requirements_text = "\n".join(
+        [f"ID {req.get('id')}: {req.get('text')}" for req in request.requirements]
+    )
+
+    prompt = CONFLICT_DETECTION_PROMPT.format(requirements_text=requirements_text)
+
+    messages = [
+        {
+            "role": "system",
+            "content": "You are Fishy, an expert at detecting requirement conflicts. Always return valid JSON.",
+        },
+        {"role": "user", "content": prompt},
+    ]
+
+    response_text, tokens_used = call_groq_chat(
+        messages, max_tokens=2000, temperature=0.3
+    )
+    parsed_data = parse_json_response(response_text)
+
+    conflicts = []
+    for conflict in parsed_data.get("conflicts", []):
+        conflicts.append(Conflict(
+            requirement_id_1=conflict.get("requirement_id_1"),
+            requirement_id_2=conflict.get("requirement_id_2"),
+            conflict_description=conflict.get("conflict_description", ""),
+            severity=conflict.get("severity", "medium"),
+            confidence="medium"
+        ))
+
+    return ConflictDetectionResponse(
+        conflicts=conflicts,
+        total_conflicts=len(conflicts),
+        total_requirements=len(request.requirements),
+        clusters_found=0,
+        method="llm_only"
+    )
+
+
+async def _detect_conflicts_semantic(request: ConflictDetectionRequest) -> ConflictDetectionResponse:
+    """
+    Advanced semantic clustering + LLM verification conflict detection.
+    
+    Process:
+    1. Generate embeddings for all requirements
+    2. Cluster similar requirements using HDBSCAN
+    3. Remove near-duplicates within clusters
+    4. Check each cluster for conflicts using LLM
+    """
+    global _embedding_model_cache
+    
+    # Extract requirements data
+    req_ids = [str(req.get('id', f'REQ_{i}')) for i, req in enumerate(request.requirements)]
+    req_texts = [req.get('text', '') for req in request.requirements]
+    
+    # Step 1: Generate embeddings (with model caching)
+    print(f"🧮 Generating embeddings for {len(req_texts)} requirements...")
+    if _embedding_model_cache is None:
+        _embedding_model_cache = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+    embeddings = _embedding_model_cache.encode(req_texts, normalize_embeddings=True)
+    
+    # Step 2: Cluster requirements
+    print(f"🔍 Clustering requirements...")
+    clusterer = hdbscan.HDBSCAN(
+        min_cluster_size=request.min_cluster_size,
+        min_samples=1,
+        metric='euclidean',
+        cluster_selection_method='eom',
+        allow_single_cluster=False
+    )
+    cluster_labels = clusterer.fit_predict(embeddings)
+    
+    n_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
+    n_noise = list(cluster_labels).count(-1)
+    
+    print(f"✅ Found {n_clusters} clusters ({n_noise} outliers)")
+    
+    # Step 3: Detect conflicts within each cluster
+    all_conflicts = []
+    
+    for cluster_id in set(cluster_labels):
+        if cluster_id == -1:  # Skip noise/outliers
+            continue
+            
+        # Get requirements in this cluster
+        cluster_indices = [i for i, label in enumerate(cluster_labels) if label == cluster_id]
+        
+        if len(cluster_indices) < 2:
+            continue
+        
+        # Remove near-duplicates
+        cluster_indices = _remove_near_duplicates(
+            cluster_indices, 
+            embeddings, 
+            request.similarity_threshold
+        )
+        
+        if len(cluster_indices) < 2:
+            continue
+        
+        # Get requirements for this cluster
+        cluster_requirements = [
+            (req_ids[i], req_texts[i]) for i in cluster_indices
+        ]
+        
+        # Split into batches if needed
+        max_batch = request.max_batch_size
+        if len(cluster_requirements) <= max_batch:
+            conflicts = await _check_conflicts_in_batch(
+                cluster_requirements, 
+                cluster_id
+            )
+            all_conflicts.extend(conflicts)
+        else:
+            # Process in batches
+            for batch_start in range(0, len(cluster_requirements), max_batch):
+                batch = cluster_requirements[batch_start:batch_start + max_batch]
+                conflicts = await _check_conflicts_in_batch(batch, cluster_id)
+                all_conflicts.extend(conflicts)
+    
+    print(f"✅ Found {len(all_conflicts)} conflicts")
+    
+    return ConflictDetectionResponse(
+        conflicts=all_conflicts,
+        total_conflicts=len(all_conflicts),
+        total_requirements=len(request.requirements),
+        clusters_found=n_clusters,
+        method="semantic_clustering"
+    )
+
+
+def _remove_near_duplicates(
+    indices: List[int], 
+    embeddings, 
+    threshold: float = 0.95
+) -> List[int]:
+    """Remove near-duplicate requirements from a cluster."""
+    if len(indices) <= 1:
+        return indices
+    
+    cluster_embeddings = embeddings[indices]
+    sim_matrix = cosine_similarity(cluster_embeddings)
+    
+    # Keep first occurrence, remove duplicates
+    to_keep = set(range(len(indices)))
+    for i in range(len(indices)):
+        if i not in to_keep:
+            continue
+        for j in range(i + 1, len(indices)):
+            if j in to_keep and sim_matrix[i, j] > threshold:
+                to_keep.discard(j)
+    
+    kept_indices = [indices[i] for i in sorted(to_keep)]
+    removed = len(indices) - len(kept_indices)
+    if removed > 0:
+        print(f"   📝 Removed {removed} near-duplicate(s) from cluster")
+    
+    return kept_indices
+
+
+async def _check_conflicts_in_batch(
+    requirements: List[Tuple[str, str]], 
+    cluster_id: int
+) -> List[Conflict]:
+    """
+    Use LLM to check for conflicts in a batch of requirements.
+    
+    Args:
+        requirements: List of (req_id, req_text) tuples
+        cluster_id: Cluster ID for tracking
+        
+    Returns:
+        List of detected conflicts
+    """
+    if len(requirements) < 2:
+        return []
+    
+    # Build structured prompt
+    req_list = "\n".join([
+        f"{i+1}. [{req_id}] {text}"
+        for i, (req_id, text) in enumerate(requirements)
+    ])
+    
+    prompt = f"""You are analyzing requirements for logical conflicts.
+
+Requirements to analyze:
+{req_list}
+
+Task: Identify any pairs of requirements that CANNOT both be true or would create a logical contradiction.
+
+Return your analysis as a JSON array. For each conflict found, include:
+- req_a: ID of first requirement (use the exact ID from the brackets, e.g., "1", "REQ_0001")
+- req_b: ID of second requirement
+- reason: Brief explanation of the conflict
+- confidence: "high", "medium", or "low"
+- severity: "high", "medium", or "low"
+
+If no conflicts exist, return an empty array: []
+
+Response format:
+[
+  {{"req_a": "1", "req_b": "3", "reason": "...", "confidence": "high", "severity": "high"}},
+  ...
+]
+
+JSON output only:"""
+
+    try:
+        response = groq_client.chat.completions.create(
+            model=DEFAULT_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=2000,
+        )
+        
+        response_text = response.choices[0].message.content.strip()
+        
+        # Extract JSON from markdown code blocks if present
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0].strip()
+        
+        # Parse JSON response
+        conflicts_data = json.loads(response_text)
+        
+        if not isinstance(conflicts_data, list):
+            print(f"⚠️ Expected list of conflicts, got {type(conflicts_data)}")
+            return []
+        
+        # Create Conflict objects
+        req_map = {req_id: text for req_id, text in requirements}
+        conflicts = []
+        
+        for conflict in conflicts_data:
+            req_a = str(conflict.get("req_a", ""))
+            req_b = str(conflict.get("req_b", ""))
+            
+            # Convert ID to integer (handle both numeric and string IDs)
+            id_a = int(req_a) if req_a.isdigit() else abs(hash(req_a)) % 100000
+            id_b = int(req_b) if req_b.isdigit() else abs(hash(req_b)) % 100000
+            
+            conflicts.append(Conflict(
+                requirement_id_1=id_a,
+                requirement_id_2=id_b,
+                conflict_description=conflict.get("reason", "No reason provided"),
+                severity=conflict.get("severity", "medium"),
+                req_text_1=req_map.get(req_a, ""),
+                req_text_2=req_map.get(req_b, ""),
+                confidence=conflict.get("confidence", "medium"),
+                cluster_id=cluster_id
+            ))
+        
+        return conflicts
+        
+    except json.JSONDecodeError as e:
+        print(f"⚠️ JSON parsing error in conflict detection: {e}")
+        print(f"   Response preview: {response_text[:200]}...")
+        return []
+    except Exception as e:
+        print(f"⚠️ Error checking batch for conflicts: {str(e)}")
+        return []
+
+
 def _prepare_document_chunks(documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Convert documents to chunks format expected by RagManager."""
     chunks = []
@@ -626,7 +956,54 @@ async def chat(request: ChatRequest):
     }
     """
     try:
-        messages = [{"role": "system", "content": CHAT_SYSTEM_PROMPT}]
+        # Build system prompt with persona if provided
+        system_prompt = CHAT_SYSTEM_PROMPT
+        
+        # Apply persona context if provided
+        if request.persona_data and isinstance(request.persona_data, dict):
+            persona_name = request.persona_data.get('name', 'Unknown')
+            persona_role = request.persona_data.get('role', '')
+            persona_description = request.persona_data.get('description', '')
+            persona_priorities = request.persona_data.get('priorities', [])
+            persona_concerns = request.persona_data.get('concerns', [])
+            persona_comm_style = request.persona_data.get('communication_style', '')
+            persona_tech_level = request.persona_data.get('technical_level', '')
+            persona_focus_areas = request.persona_data.get('focus_areas', [])
+            
+            # Build enhanced system prompt with persona details
+            persona_context = f"\n\nYou are now responding as '{persona_name}'"
+            if persona_role:
+                persona_context += f", a {persona_role}"
+            persona_context += "."
+            
+            if persona_description:
+                persona_context += f"\n\nPersona Description: {persona_description}"
+            
+            if persona_priorities:
+                persona_context += f"\n\nYour Priorities: {', '.join(persona_priorities) if isinstance(persona_priorities, list) else persona_priorities}"
+            
+            if persona_concerns:
+                persona_context += f"\n\nYour Key Concerns: {', '.join(persona_concerns) if isinstance(persona_concerns, list) else persona_concerns}"
+            
+            if persona_focus_areas:
+                persona_context += f"\n\nYour Focus Areas: {', '.join(persona_focus_areas) if isinstance(persona_focus_areas, list) else persona_focus_areas}"
+            
+            if persona_tech_level:
+                persona_context += f"\n\nTechnical Level: {persona_tech_level}"
+            
+            if persona_comm_style:
+                persona_context += f"\n\nCommunication Style: {persona_comm_style}"
+            
+            persona_context += "\n\nRespond to all messages from this persona's perspective, focusing on their priorities, concerns, and expertise level."
+            
+            system_prompt += persona_context
+            
+            # Log persona usage
+            print(f"🎭 Using persona: {persona_name} (ID: {request.persona_id})")
+            print(f"   Role: {persona_role}")
+            print(f"   Tech Level: {persona_tech_level}")
+        
+        messages = [{"role": "system", "content": system_prompt}]
 
         # Add context if provided
         if request.context:
@@ -768,7 +1145,11 @@ async def generate_persona_view(request: PersonaGenerationRequest):
 @app.post("/api/conflicts/detect", response_model=ConflictDetectionResponse)
 async def detect_conflicts(request: ConflictDetectionRequest):
     """
-    Detect conflicts between requirements
+    Detect conflicts between requirements using semantic clustering + LLM verification.
+    
+    This endpoint uses a two-stage approach:
+    1. Semantic clustering to group similar requirements
+    2. LLM-based conflict verification within clusters
 
     Usage:
     POST /api/conflicts/detect
@@ -776,36 +1157,78 @@ async def detect_conflicts(request: ConflictDetectionRequest):
         "requirements": [
             {"id": 1, "text": "Must work offline"},
             {"id": 2, "text": "Requires real-time cloud sync"}
-        ]
+        ],
+        "min_cluster_size": 2,
+        "max_batch_size": 30,
+        "similarity_threshold": 0.95
     }
     """
     try:
-        # Format requirements for prompt (use .get to be resilient to missing keys)
-        requirements_text = "\n".join(
-            [f"ID {req.get('id')}: {req.get('text')}" for req in request.requirements]
-        )
+        if not request.requirements or len(request.requirements) < 2:
+            return ConflictDetectionResponse(
+                conflicts=[],
+                total_conflicts=0,
+                total_requirements=len(request.requirements or []),
+                clusters_found=0,
+                method="none_required"
+            )
+        
+        # Check if advanced conflict detection is available
+        if not CONFLICT_DETECTION_AVAILABLE:
+            print("ℹ️ Using simple LLM-only conflict detection (semantic libraries unavailable)")
+            return await _detect_conflicts_simple(request)
+        
+        # Use semantic clustering approach
+        print(f"🔍 Starting semantic conflict detection for {len(request.requirements)} requirements")
+        return await _detect_conflicts_semantic(request)
+        
+    except Exception as e:
+        print(f"❌ Conflict detection error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Conflict detection failed: {str(e)}")
 
-        prompt = CONFLICT_DETECTION_PROMPT.format(requirements_text=requirements_text)
+
+@app.post("/api/conflicts/resolve", response_model=ConflictResolutionResponse)
+async def resolve_conflict(request: ConflictResolutionRequest):
+    """
+    Generate automatic resolution for a conflict between requirements
+
+    Usage:
+    POST /api/conflicts/resolve
+    {
+        "requirement_id_1": 1,
+        "requirement_id_2": 2,
+        "req_text_1": "Must work offline",
+        "req_text_2": "Requires real-time cloud sync",
+        "conflict_description": "Offline mode conflicts with real-time sync",
+        "confidence": "high"
+    }
+    """
+    try:
+        prompt = CONFLICT_RESOLUTION_PROMPT.format(
+            req_id_1=request.requirement_id_1,
+            req_id_2=request.requirement_id_2,
+            req_text_1=request.req_text_1,
+            req_text_2=request.req_text_2,
+            conflict_description=request.conflict_description,
+            confidence=request.confidence
+        )
 
         messages = [
             {
                 "role": "system",
-                "content": "You are Fishy, an expert at detecting requirement conflicts. Always return valid JSON.",
+                "content": "You are Fishy, an expert at resolving requirement conflicts. Always return valid JSON.",
             },
             {"role": "user", "content": prompt},
         ]
 
         response_text, tokens_used = call_groq_chat(
-            messages, max_tokens=2000, temperature=0.3
+            messages, max_tokens=1500, temperature=0.4
         )
         parsed_data = parse_json_response(response_text)
 
-        conflicts = [
-            Conflict(**conflict) for conflict in parsed_data.get("conflicts", [])
-        ]
-
-        return ConflictDetectionResponse(
-            conflicts=conflicts, total_conflicts=len(conflicts)
+        return ConflictResolutionResponse(
+            resolution_notes=parsed_data.get("resolution_notes", "No resolution provided"),
+            suggested_action=parsed_data.get("suggested_action", "Review conflict manually")
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

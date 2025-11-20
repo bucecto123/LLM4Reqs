@@ -524,7 +524,7 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
                       Requirement ID
                     </span>
                     <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full font-bold">
-                      #{selectedRequirement.id}
+                      #{selectedRequirement.requirement_number || selectedRequirement.id}
                     </span>
                   </div>
                 </div>

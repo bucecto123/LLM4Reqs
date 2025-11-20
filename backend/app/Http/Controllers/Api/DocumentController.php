@@ -8,6 +8,7 @@ use App\Services\LLMService;
 use App\Models\Document;
 use App\Models\Requirement;
 use App\Models\Project;
+use App\Models\RequirementConflict;
 use App\Utils\TextCommons;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -425,12 +426,24 @@ class DocumentController extends Controller
             // Clear cache when document is deleted
             \Cache::forget("project_documents_{$document->project_id}");
 
-            // Delete associated requirements
-            $requirementsDeleted = Requirement::where('document_id', $document->id)->delete();
+            // Delete associated requirements (triggering model events so conflicts are also cleaned up)
+            $requirementsDeleted = 0;
+            $requirements = Requirement::where('document_id', $document->id)->get();
+            foreach ($requirements as $requirement) {
+                $requirement->delete();
+                $requirementsDeleted++;
+            }
+
+            // Renumber remaining requirements and conflicts for this project so numbering stays contiguous
+            if ($document->project_id) {
+                Requirement::renumberForProject((int) $document->project_id);
+                RequirementConflict::renumberForProject((int) $document->project_id);
+            }
             
-            Log::info('Deleted associated requirements', [
+            Log::info('Deleted associated requirements and renumbered identifiers', [
                 'document_id' => $documentId,
-                'requirements_deleted' => $requirementsDeleted
+                'requirements_deleted' => $requirementsDeleted,
+                'project_id' => $document->project_id
             ]);
 
             // Delete physical file if it exists

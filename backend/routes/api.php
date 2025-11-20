@@ -82,6 +82,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/conflicts/status/{jobId}', [ConflictController::class, 'getJobStatus']);
     Route::post('/conflicts/process/{jobId}', [ConflictController::class, 'processJob']);
     Route::get('/projects/{project}/conflicts', [ConflictController::class, 'getProjectConflicts']);
+    Route::post('/projects/{project}/conflicts/auto-resolve', [ConflictController::class, 'autoResolveConflicts']);
+    Route::post('/conflicts/{conflict}/resolve-ai', [ConflictController::class, 'resolveConflictWithAI']);
     Route::put('/conflicts/{conflict}/resolve', [ConflictController::class, 'resolveConflict']);
     Route::delete('/conflicts/{conflict}', [ConflictController::class, 'deleteConflict']);
 

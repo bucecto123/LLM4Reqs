@@ -83,6 +83,31 @@ class KBBuildJob implements ShouldQueue, ShouldBeUnique
                     ];
                 })->toArray();
 
+            // Also collect requirements for this project (batch process all at once)
+            $requirements = $project->requirements()
+                ->whereNotNull('requirement_text')
+                ->where('requirement_text', '!=', '')
+                ->get()
+                ->map(function ($req) {
+                    $text = "Requirement: {$req->requirement_text}\nType: {$req->requirement_type}\nPriority: {$req->priority}";
+                    return [
+                        'content' => $text,
+                        'type' => 'requirement',
+                        'meta' => [
+                            'requirement_id' => $req->id,
+                            'document_id' => $req->document_id,
+                            'project_id' => $req->project_id,
+                            'confidence_score' => $req->confidence_score,
+                            'requirement_type' => $req->requirement_type,
+                            'priority' => $req->priority,
+                            'requirement_number' => $req->requirement_number,
+                        ],
+                    ];
+                })->toArray();
+
+            // Combine documents and requirements for batch processing
+            $documents = array_merge($documents, $requirements);
+
             if (empty($documents)) {
                 Log::warning('KBBuildJob: No documents with content found for project', ['project_id' => $this->projectId]);
                 $kb->markAsFailed('No documents with content available to build knowledge base');

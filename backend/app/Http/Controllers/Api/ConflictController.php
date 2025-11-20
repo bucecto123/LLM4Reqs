@@ -139,6 +139,89 @@ class ConflictController extends Controller
     }
 
     /**
+     * Resolve a single conflict automatically using AI.
+     * POST /api/conflicts/{conflictId}/resolve-ai
+     */
+    public function resolveConflictWithAI(int $conflictId)
+    {
+        try {
+            $conflict = \App\Models\RequirementConflict::findOrFail($conflictId);
+
+            if ($conflict->resolution_status === 'resolved') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Conflict is already resolved',
+                ], 400);
+            }
+
+            // Generate resolution using LLM
+            $resolution = $this->conflictService->generateResolution($conflict);
+
+            if (!$resolution) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to generate AI resolution',
+                ], 500);
+            }
+
+            // Resolve the conflict
+            $conflict = $this->conflictService->resolveConflict(
+                $conflictId,
+                $resolution['resolution_notes']
+            );
+
+            // Append resolution marker to KB
+            try {
+                if ($conflict && $conflict->requirement1) {
+                    $projectId = $conflict->requirement1->project_id;
+                    $resolvedDoc = [
+                        'content' => "Conflict auto-resolved: {$conflict->id} - {$resolution['resolution_notes']}",
+                        'type' => 'conflict_resolution',
+                        'meta' => [
+                            'conflict_id' => (string) $conflict->id,
+                            'resolved' => true,
+                            'auto_resolved' => true,
+                            'project_id' => (string) $projectId,
+                        ],
+                    ];
+
+                    try {
+                        $res = $this->llmService->incrementalKBUpdate($projectId, [$resolvedDoc]);
+                        $skipped = $res['skipped_chunks'] ?? $res['skipped'] ?? 0;
+                        if ($skipped) {
+                            Log::info('ConflictController: incrementalKBUpdate skipped duplicates on AI resolve', [
+                                'project_id' => $projectId,
+                                'skipped' => $skipped,
+                            ]);
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning('Failed to append AI resolution marker to KB', [
+                            'conflict_id' => $conflictId,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('Failed to append AI resolution marker to KB', [
+                    'conflict_id' => $conflictId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $conflict,
+                'message' => 'Conflict resolved successfully with AI',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to resolve conflict with AI: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Resolve a conflict and optionally append a resolution marker into the KB.
      * PUT /api/conflicts/{conflictId}/resolve
      */
@@ -199,6 +282,75 @@ class ConflictController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to resolve conflict: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Automatically resolve all pending conflicts for a project.
+     * POST /api/projects/{projectId}/conflicts/auto-resolve
+     */
+    public function autoResolveConflicts(int $projectId)
+    {
+        try {
+            $resolved = $this->conflictService->autoResolveConflicts($projectId, true);
+
+            // Update KB with resolution markers for all auto-resolved conflicts
+            if ($resolved > 0) {
+                $resolvedConflicts = \App\Models\RequirementConflict::whereHas('requirement1', function ($q) use ($projectId) {
+                    $q->where('project_id', $projectId);
+                })
+                ->where('resolution_status', 'resolved')
+                ->whereNotNull('resolved_at')
+                ->where('resolved_at', '>=', now()->subMinutes(5)) // Recently resolved
+                ->get();
+
+                foreach ($resolvedConflicts as $conflict) {
+                    try {
+                        $resolvedDoc = [
+                            'content' => "Conflict auto-resolved: {$conflict->id} - {$conflict->resolution_notes}",
+                            'type' => 'conflict_resolution',
+                            'meta' => [
+                                'conflict_id' => (string) $conflict->id,
+                                'resolved' => true,
+                                'auto_resolved' => true,
+                                'project_id' => (string) $projectId,
+                            ],
+                        ];
+
+                        $res = $this->llmService->incrementalKBUpdate($projectId, [$resolvedDoc]);
+                        $skipped = $res['skipped_chunks'] ?? $res['skipped'] ?? 0;
+                        if ($skipped) {
+                            Log::info('ConflictController: incrementalKBUpdate skipped duplicates on auto-resolve', [
+                                'project_id' => $projectId,
+                                'conflict_id' => $conflict->id,
+                                'skipped' => $skipped,
+                            ]);
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning('Failed to append auto-resolution marker to KB', [
+                            'conflict_id' => $conflict->id,
+                            'project_id' => $projectId,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Auto-resolved {$resolved} conflict(s)",
+                'resolved_count' => $resolved,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Auto-resolve conflicts failed', [
+                'project_id' => $projectId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Auto-resolve failed: ' . $e->getMessage(),
             ], 500);
         }
     }

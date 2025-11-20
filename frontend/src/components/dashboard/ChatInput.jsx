@@ -1,14 +1,5 @@
 import React from "react";
-import { Send, Loader2, Grid3x3, Globe, Paperclip, Mic, X } from "lucide-react";
-
-const ActionButton = ({ icon, onClick }) => (
-  <button
-    onClick={onClick}
-    className="p-1.5 hover:bg-gray-100 rounded-md text-gray-600 transition-all duration-200"
-  >
-    {icon}
-  </button>
-);
+import { Send, Loader2, Paperclip, X } from "lucide-react";
 
 const ChatInput = ({
   message,
@@ -108,13 +99,6 @@ const ChatInput = ({
               )}
             </button>
           </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center justify-center space-x-2 mt-3">
-          <ActionButton icon={<Grid3x3 size={14} />} />
-          <ActionButton icon={<Globe size={14} />} />
-          <ActionButton icon={<Mic size={14} />} />
         </div>
       </div>
     </div>

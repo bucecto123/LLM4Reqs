@@ -28,6 +28,10 @@ export default function ProjectsPage() {
   const [error, setError] = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
+  // Delete project confirmation modal
+  const [projectToDelete, setProjectToDelete] = useState(null);
+  const [isDeletingProject, setIsDeletingProject] = useState(false);
+
   // Edit project state
   const [showEditProjectModal, setShowEditProjectModal] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
@@ -104,19 +108,17 @@ export default function ProjectsPage() {
     navigate(`/projects/${projectId}`);
   };
 
-  const deleteProject = async (projectId, e) => {
+  const deleteProject = (project, e) => {
     e.stopPropagation(); // Prevent opening the project when clicking delete
+    setProjectToDelete(project);
+  };
 
-    if (
-      !confirm(
-        "Are you sure you want to delete this project? This action cannot be undone."
-      )
-    ) {
-      return;
-    }
+  const confirmDeleteProject = async () => {
+    if (!projectToDelete) return;
 
+    setIsDeletingProject(true);
     try {
-      await apiFetch(`/api/projects/${projectId}`, {
+      await apiFetch(`/api/projects/${projectToDelete.id}`, {
         method: "DELETE",
       });
 
@@ -125,6 +127,9 @@ export default function ProjectsPage() {
     } catch (err) {
       console.error("Failed to delete project:", err);
       setError("Failed to delete project. Please try again.");
+    } finally {
+      setIsDeletingProject(false);
+      setProjectToDelete(null);
     }
   };
 
@@ -382,7 +387,7 @@ export default function ProjectsPage() {
                         <Edit2 size={18} className="text-blue-600" />
                       </button>
                       <button
-                        onClick={(e) => deleteProject(project.id, e)}
+                        onClick={(e) => deleteProject(project, e)}
                         className="p-2 rounded-lg hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
                         title="Delete project"
                       >
@@ -534,6 +539,43 @@ export default function ProjectsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Project Confirmation Modal */}
+      {projectToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="rounded-xl shadow-2xl max-w-md w-full p-6 border-2 border-red-200 bg-white">
+            <h2 className="text-2xl font-bold mb-3 text-slate-800">
+              Delete project?
+            </h2>
+            <p className="text-sm text-slate-600 mb-4">
+              You are about to permanently delete{" "}
+              <span className="font-semibold text-slate-900">
+                {projectToDelete.name}
+              </span>
+              . This will remove its documents, requirements, conflicts, and
+              conversations. This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setProjectToDelete(null)}
+                disabled={isDeletingProject}
+                className="px-4 py-2 rounded-lg font-medium transition-colors bg-gray-100 text-gray-600 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteProject}
+                disabled={isDeletingProject}
+                className="px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:shadow-lg bg-red-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeletingProject ? "Deleting..." : "Delete project"}
+              </button>
+            </div>
           </div>
         </div>
       )}

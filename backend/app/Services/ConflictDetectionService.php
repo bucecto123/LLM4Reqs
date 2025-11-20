@@ -94,11 +94,22 @@ class ConflictDetectionService
                 // Save conflicts immediately
                 $saved = $this->saveConflicts($projectId, $conflicts);
                 
+                // Automatically resolve conflicts if enabled
+                $autoResolved = 0;
+                if (env('AUTO_RESOLVE_CONFLICTS', false)) {
+                    $autoResolved = $this->autoResolveConflicts($projectId);
+                    Log::info("Auto-resolved conflicts", [
+                        'project_id' => $projectId,
+                        'auto_resolved' => $autoResolved
+                    ]);
+                }
+                
                 return [
                     'status' => 'completed',
                     'conflicts' => $conflicts,
                     'conflicts_saved' => $saved,
-                    'total_conflicts' => count($conflicts)
+                    'total_conflicts' => count($conflicts),
+                    'auto_resolved' => $autoResolved
                 ];
             }
             
@@ -188,6 +199,7 @@ class ConflictDetectionService
                 } else {
                     // Create new conflict
                     RequirementConflict::create([
+                        'project_id' => $projectId,
                         'requirement_id_1' => $req1->id,
                         'requirement_id_2' => $req2->id,
                         'conflict_description' => $conflict['reason'],
@@ -258,12 +270,9 @@ class ConflictDetectionService
      */
     public function getProjectConflicts(int $projectId)
     {
-        return RequirementConflict::whereHas('requirement1', function ($query) use ($projectId) {
-            $query->where('project_id', $projectId);
-        })
+        return RequirementConflict::where('project_id', $projectId)
         ->with(['requirement1', 'requirement2'])
-        ->orderBy('severity', 'desc')
-        ->orderBy('detected_at', 'desc')
+        ->orderBy('conflict_number', 'asc')
         ->get();
     }
 
@@ -285,5 +294,106 @@ class ConflictDetectionService
         ]);
 
         return $conflict;
+    }
+
+    /**
+     * Automatically resolve conflicts for a project using LLM.
+     *
+     * @param int $projectId
+     * @param bool $onlyPending Only resolve pending conflicts (default: true)
+     * @return int Number of conflicts auto-resolved
+     */
+    public function autoResolveConflicts(int $projectId, bool $onlyPending = true): int
+    {
+        $query = RequirementConflict::whereHas('requirement1', function ($q) use ($projectId) {
+            $q->where('project_id', $projectId);
+        })->with(['requirement1', 'requirement2']);
+
+        if ($onlyPending) {
+            $query->where('resolution_status', 'pending');
+        }
+
+        $conflicts = $query->get();
+        $resolved = 0;
+
+        foreach ($conflicts as $conflict) {
+            try {
+                $resolution = $this->generateResolution($conflict);
+                
+                if ($resolution) {
+                    $conflict->update([
+                        'resolution_status' => 'resolved',
+                        'resolution_notes' => $resolution['resolution_notes'],
+                        'resolved_at' => now(),
+                    ]);
+                    $resolved++;
+                    
+                    Log::info("Auto-resolved conflict", [
+                        'conflict_id' => $conflict->id,
+                        'project_id' => $projectId
+                    ]);
+                }
+            } catch (Exception $e) {
+                Log::error("Failed to auto-resolve conflict", [
+                    'conflict_id' => $conflict->id,
+                    'project_id' => $projectId,
+                    'error' => $e->getMessage()
+                ]);
+                // Continue with next conflict
+            }
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * Generate resolution for a conflict using LLM API.
+     *
+     * @param RequirementConflict $conflict
+     * @return array|null ['resolution_notes' => string, 'suggested_action' => string]
+     */
+    public function generateResolution(RequirementConflict $conflict): ?array
+    {
+        $req1 = $conflict->requirement1;
+        $req2 = $conflict->requirement2;
+
+        if (!$req1 || !$req2) {
+            Log::warning("Cannot generate resolution - requirements not found", [
+                'conflict_id' => $conflict->id
+            ]);
+            return null;
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'X-API-Key' => $this->apiKey,
+                'Content-Type' => 'application/json',
+            ])->timeout(120)->post("{$this->llmBaseUrl}/api/conflicts/resolve", [
+                'requirement_id_1' => $req1->id,
+                'requirement_id_2' => $req2->id,
+                'req_text_1' => $req1->requirement_text ?? $req1->text ?? $req1->description ?? '',
+                'req_text_2' => $req2->requirement_text ?? $req2->text ?? $req2->description ?? '',
+                'conflict_description' => $conflict->conflict_description,
+                'confidence' => $conflict->confidence ?? 'medium',
+            ]);
+
+            if (!$response->successful()) {
+                throw new Exception("LLM API error: " . $response->body());
+            }
+
+            $data = $response->json();
+            
+            return [
+                'resolution_notes' => $data['resolution_notes'] ?? 'Auto-resolved by system',
+                'suggested_action' => $data['suggested_action'] ?? 'Review conflict manually'
+            ];
+
+        } catch (Exception $e) {
+            Log::error("Failed to generate conflict resolution", [
+                'conflict_id' => $conflict->id,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
     }
 }

@@ -11,12 +11,14 @@ import {
   FolderOpen,
   FolderKanban,
   MessageSquare,
-  Settings,
   Edit2,
   Paperclip,
   Loader2,
   X,
   Database,
+  Sparkles,
+  ChevronDown,
+  Pencil,
 } from "lucide-react";
 import { apiFetch } from "../utils/auth.js";
 import { useAuth } from "../hooks/useAuth.jsx";
@@ -24,7 +26,9 @@ import Sidebar from "../components/dashboard/Sidebar.jsx";
 import MessageBubble from "../components/dashboard/MessageBubble.jsx";
 import FileUpload from "../components/FileUpload.jsx";
 import KBUploadModal from "../components/KBUploadModal.jsx";
-import PersonaSelector from "../components/dashboard/PersonaSelector.jsx";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import ThinkingIndicator from "../components/ThinkingIndicator.jsx";
+import PersonaManager from "../components/dashboard/PersonaManager.jsx";
 import echo from "../utils/echo.js";
 import {
   ProjectDetailSkeleton,
@@ -43,6 +47,84 @@ const ConflictsDisplay = lazy(() =>
   }))
 );
 
+const PERSONA_ROLE_ICONS = {
+  end_user: "👤",
+  business_analyst: "📊",
+  product_owner: "🎯",
+  developer: "👨‍💻",
+  qa_tester: "🧪",
+  security_expert: "🔒",
+  ux_designer: "🎨",
+  system_admin: "⚙️",
+};
+
+const getPersonaIcon = (persona) => {
+  if (!persona) return "👤";
+  if (persona.type && PERSONA_ROLE_ICONS[persona.type]) {
+    return PERSONA_ROLE_ICONS[persona.type];
+  }
+  return "👤";
+};
+
+const PersonaDropdownItem = ({
+  label,
+  description,
+  icon,
+  selected,
+  onClick,
+  showActions = false,
+  onEdit,
+  onDelete,
+}) => (
+  <div
+    className={`flex items-center px-4 py-2 transition-colors ${
+      selected && !showActions ? "bg-purple-50" : "hover:bg-gray-50"
+    }`}
+  >
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex-1 text-left flex items-start gap-3"
+    >
+      <span className="text-lg">{icon}</span>
+      <div className="flex-1 min-w-0">
+        <div className="font-medium text-sm text-gray-900 truncate">
+          {label}
+        </div>
+        {description && (
+          <div className="text-xs text-gray-500 line-clamp-2">
+            {description}
+          </div>
+        )}
+      </div>
+    </button>
+    <div className="ml-2 flex items-center gap-1">
+      {showActions ? (
+        <>
+          <button
+            type="button"
+            onClick={onEdit}
+            className="p-1.5 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-md"
+            title="Edit persona"
+          >
+            <Pencil size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md"
+            title="Delete persona"
+          >
+            <Trash2 size={14} />
+          </button>
+        </>
+      ) : (
+        selected && <div className="w-2 h-2 bg-purple-600 rounded-full" />
+      )}
+    </div>
+  </div>
+);
+
 export default function ProjectDetailPage() {
   const { projectId } = useParams();
   const navigate = useNavigate();
@@ -50,6 +132,9 @@ export default function ProjectDetailPage() {
 
   const [project, setProject] = useState(null);
   const [documents, setDocuments] = useState([]);
+  const [documentToDelete, setDocumentToDelete] = useState(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeletingDocument, setIsDeletingDocument] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("chat"); // 'chat' or 'documents'
@@ -98,6 +183,97 @@ export default function ProjectDetailPage() {
   const [selectedPersonaId, setSelectedPersonaId] = useState(null);
   const [personas, setPersonas] = useState([]);
   const [isLoadingPersonas, setIsLoadingPersonas] = useState(false);
+  const [isPersonaManagerOpen, setIsPersonaManagerOpen] = useState(false);
+  const [isPersonaDropdownOpen, setIsPersonaDropdownOpen] = useState(false);
+  const [showPersonaActions, setShowPersonaActions] = useState(false);
+  const [personaToEdit, setPersonaToEdit] = useState(null);
+
+  const isAssistantThinking = isSendingMessage || Boolean(streamingMessageId);
+  const personaList = Array.isArray(personas) ? personas : [];
+  const activePersona = selectedPersonaId
+    ? personaList.find((p) => p.id === selectedPersonaId)
+    : null;
+  const personaDropdownRef = useRef(null);
+
+  const handlePersonaCreated = (persona) => {
+    if (!persona) return;
+    setPersonas((prev) => [...prev, persona]);
+    if (persona.id) {
+      setSelectedPersonaId(persona.id);
+    }
+  };
+
+  const handlePersonaUpdated = (persona) => {
+    if (!persona) return;
+    setPersonas((prev) =>
+      prev.map((p) => (p.id === persona.id ? persona : p))
+    );
+    if (selectedPersonaId === persona.id) {
+      setSelectedPersonaId(persona.id);
+    }
+  };
+
+  const handleDeletePersona = async (personaId) => {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this persona? This cannot be undone."
+      )
+    ) {
+      return;
+    }
+    try {
+      await apiFetch(`/api/personas/${personaId}`, { method: "DELETE" });
+      setPersonas((prev) => prev.filter((p) => p.id !== personaId));
+      if (personaId === selectedPersonaId) {
+        setSelectedPersonaId(null);
+      }
+    } catch (err) {
+      console.error("Failed to delete persona:", err);
+      setError("Failed to delete persona. Please try again.");
+    }
+  };
+
+  const openPersonaManagerForCreate = () => {
+    setPersonaToEdit(null);
+    setShowPersonaActions(false);
+    setIsPersonaManagerOpen(true);
+    setIsPersonaDropdownOpen(false);
+  };
+
+  const openPersonaManagerForEdit = (persona) => {
+    setPersonaToEdit(persona);
+    setShowPersonaActions(false);
+    setIsPersonaManagerOpen(true);
+    setIsPersonaDropdownOpen(false);
+  };
+  
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        personaDropdownRef.current &&
+        !personaDropdownRef.current.contains(event.target)
+      ) {
+        setIsPersonaDropdownOpen(false);
+        setShowPersonaActions(false);
+      }
+    };
+
+    if (isPersonaDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isPersonaDropdownOpen]);
+  
+  useEffect(() => {
+    if (!isPersonaDropdownOpen) {
+      setShowPersonaActions(false);
+    }
+  }, [isPersonaDropdownOpen]);
 
   // Refs
   const messagesEndRef = useRef(null);
@@ -723,25 +899,37 @@ export default function ProjectDetailPage() {
     }
   };
 
-  const deleteDocument = async (documentId) => {
-    if (!confirm("Are you sure you want to delete this document?")) {
-      return;
-    }
+  const requestDocumentDeletion = (doc) => {
+    setDocumentToDelete(doc);
+    setIsDeleteModalOpen(true);
+  };
+
+  const closeDeleteModal = () => {
+    setIsDeleteModalOpen(false);
+    setDocumentToDelete(null);
+    setIsDeletingDocument(false);
+  };
+
+  const confirmDeleteDocument = async () => {
+    if (!documentToDelete) return;
+
+    setIsDeletingDocument(true);
 
     try {
-      await apiFetch(`/api/documents/${documentId}`, {
+      await apiFetch(`/api/documents/${documentToDelete.id}`, {
         method: "DELETE",
       });
 
       setDocuments((prev) => {
-        // Make sure prev is an array
         const currentDocs = Array.isArray(prev) ? prev : [];
-        return currentDocs.filter((doc) => doc.id !== documentId);
+        return currentDocs.filter((doc) => doc.id !== documentToDelete.id);
       });
       setError(null);
+      closeDeleteModal();
     } catch (err) {
       console.error("Failed to delete document:", err);
       setError("Failed to delete document. Please try again.");
+      setIsDeletingDocument(false);
     }
   };
 
@@ -828,17 +1016,126 @@ export default function ProjectDetailPage() {
             >
               <ArrowLeft size={20} className="text-gray-600" />
             </button>
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
-                <FolderOpen size={20} className="text-blue-600" />
+            <div className="flex items-center flex-wrap gap-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+                  <FolderOpen size={20} className="text-blue-600" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-800">
+                    {project?.name}
+                  </h1>
+                  {project?.description && (
+                    <p className="text-sm text-gray-500">{project.description}</p>
+                  )}
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-slate-800">
-                  {project?.name}
-                </h1>
-                {project?.description && (
-                  <p className="text-sm text-gray-500">{project.description}</p>
-                )}
+              <div className="flex items-center space-x-2" ref={personaDropdownRef}>
+                    <div className="flex items-center space-x-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <Sparkles size={14} className="text-purple-500" />
+                      <span>Personas</span>
+                    </div>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsPersonaDropdownOpen((prev) => !prev)}
+                    className="flex items-center justify-between min-w-[220px] px-4 py-2 rounded-lg border border-gray-200 bg-white text-left shadow-sm hover:border-purple-400 focus:outline-none"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <span>
+                        {selectedPersonaId ? getPersonaIcon(activePersona) : "✨"}
+                      </span>
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {selectedPersonaId
+                            ? activePersona?.name || "Persona"
+                            : "Normal Mode"}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {selectedPersonaId
+                            ? "Persona active"
+                            : "General conversation"}
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronDown
+                      size={16}
+                      className={`text-gray-500 transition-transform ${
+                        isPersonaDropdownOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {isPersonaDropdownOpen && (
+                    <div className="absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-72 overflow-y-auto">
+                      {isLoadingPersonas ? (
+                        <div className="p-4 text-center text-xs text-gray-500">
+                          Loading personas...
+                        </div>
+                      ) : (
+                        <>
+                            <PersonaDropdownItem
+                              label="Normal Mode"
+                              description="General conversation"
+                              icon="✨"
+                              selected={!selectedPersonaId}
+                              onClick={() => {
+                                setSelectedPersonaId(null);
+                                setIsPersonaDropdownOpen(false);
+                              }}
+                              showActions={false}
+                            />
+                          <div className="border-t border-gray-100">
+                            {personaList.length === 0 ? (
+                              <div className="p-4 text-xs text-gray-400">
+                                No personas yet
+                              </div>
+                            ) : (
+                              personaList.map((persona) => (
+                                <PersonaDropdownItem
+                                  key={persona.id}
+                                  label={persona.name}
+                                  description={persona.role}
+                                  icon={getPersonaIcon(persona)}
+                                  selected={selectedPersonaId === persona.id}
+                                  onClick={() => {
+                                    setSelectedPersonaId(persona.id);
+                                    setIsPersonaDropdownOpen(false);
+                                  }}
+                                    showActions={showPersonaActions}
+                                    onEdit={() => openPersonaManagerForEdit(persona)}
+                                    onDelete={() => handleDeletePersona(persona.id)}
+                                />
+                              ))
+                            )}
+                          </div>
+                          <div className="border-t border-gray-100 px-4 py-3 flex items-center justify-between">
+                            <button
+                              type="button"
+                                onClick={() =>
+                                  setShowPersonaActions((prev) => !prev)
+                                }
+                                className={`text-xs font-medium ${
+                                  showPersonaActions
+                                    ? "text-purple-800"
+                                    : "text-purple-600"
+                                } hover:text-purple-800`}
+                            >
+                                {showPersonaActions ? "Done" : "Manage personas"}
+                            </button>
+                            <button
+                              type="button"
+                                onClick={openPersonaManagerForCreate}
+                                className="text-xs font-medium text-purple-600 hover:text-purple-800"
+                            >
+                              + Add persona
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1030,6 +1327,8 @@ export default function ProjectDetailPage() {
                       ))
                     )}
 
+                    {isAssistantThinking && <ThinkingIndicator />}
+
                     {isLoadingMessages && messages.length > 0 && (
                       <div className="flex justify-center py-4">
                         <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
@@ -1043,16 +1342,6 @@ export default function ProjectDetailPage() {
 
               {/* Chat Input Area */}
               <div className="border-t pt-4">
-                {/* Persona Selector */}
-                <div className="mb-3">
-                  <PersonaSelector
-                    selectedPersonaId={selectedPersonaId}
-                    onPersonaChange={setSelectedPersonaId}
-                    personas={personas}
-                    onReloadPersonas={loadPersonas}
-                  />
-                </div>
-
                 {/* Attached Files */}
                 {attachedFiles.length > 0 && (
                   <div className="mb-3 flex flex-wrap gap-2">
@@ -1163,7 +1452,7 @@ export default function ProjectDetailPage() {
                         </div>
                         <div className="flex items-center space-x-2 ml-4">
                           <button
-                            onClick={() => deleteDocument(doc.id)}
+                            onClick={() => requestDocumentDeletion(doc)}
                             className="p-2 rounded-lg hover:bg-red-50 transition-colors"
                             title="Delete document"
                           >
@@ -1287,6 +1576,43 @@ export default function ProjectDetailPage() {
           </Suspense>
         </div>
       )}
+
+      {isPersonaManagerOpen && (
+        <PersonaManager
+          onClose={() => {
+            setIsPersonaManagerOpen(false);
+            setPersonaToEdit(null);
+          }}
+          persona={personaToEdit}
+          onPersonaCreated={(persona) => {
+            handlePersonaCreated(persona);
+            setIsPersonaManagerOpen(false);
+            setPersonaToEdit(null);
+          }}
+          onPersonaUpdated={(persona) => {
+            handlePersonaUpdated(persona);
+            setIsPersonaManagerOpen(false);
+            setPersonaToEdit(null);
+          }}
+        />
+      )}
+
+      <ConfirmDialog
+        open={isDeleteModalOpen && Boolean(documentToDelete)}
+        title="Delete document"
+        description={
+          documentToDelete
+            ? `Are you sure you want to delete "${
+                documentToDelete.original_filename || documentToDelete.filename
+              }"? This action cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={confirmDeleteDocument}
+        onCancel={closeDeleteModal}
+        loading={isDeletingDocument}
+      />
     </div>
   );
 }
