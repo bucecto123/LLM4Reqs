@@ -22,7 +22,8 @@ from sklearn.preprocessing import normalize
 from sklearn.metrics.pairwise import cosine_similarity
 
 # LLM
-from groq import Groq
+from langchain_groq import ChatGroq
+from langchain_core.messages import HumanMessage
 from dotenv import load_dotenv
 
 # Progress tracking
@@ -75,6 +76,7 @@ class DomainAgnosticConflictDetector:
         min_cluster_size: int = 2,
         max_cluster_batch: int = 30,
         similarity_threshold: float = 0.95,
+        reassign_noise: bool = False,
     ):
         """
         Initialize the conflict detector.
@@ -95,13 +97,18 @@ class DomainAgnosticConflictDetector:
         self.min_cluster_size = min_cluster_size
         self.max_cluster_batch = max_cluster_batch
         self.similarity_threshold = similarity_threshold
+        self.reassign_noise = reassign_noise
         
-        # Initialize models
-        print(f"🔧 Loading embedding model: {embedding_model}")
-        self.embedding_model = SentenceTransformer(embedding_model)
+        # Initialize models lazily to avoid unwanted downloads in tests
+        print(f"🔧 Preparing embedding model: {embedding_model}")
+        self._embedding_model = None
         
         print(f"🔧 Initializing LLM client: {llm_model}")
-        self.llm_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        self.llm_client = ChatGroq(
+            groq_api_key=os.getenv("GROQ_API_KEY"),
+            model_name=llm_model,
+            temperature=0.3
+        )
         
         # Storage
         self.requirements: List[RequirementMetadata] = []
@@ -137,11 +144,17 @@ class DomainAgnosticConflictDetector:
         print(f"✅ Loaded {len(texts)} requirements")
         return ids, texts
     
+    def _get_embedding_model(self):
+        """Lazily instantiate the embedding model."""
+        if self._embedding_model is None:
+            self._embedding_model = SentenceTransformer(self.embedding_model_name)
+        return self._embedding_model
+
     def generate_embeddings(self, texts: List[str]) -> np.ndarray:
         """Generate and normalize embeddings for requirements."""
         print(f"\n🧮 Generating embeddings for {len(texts)} requirements...")
         
-        embeddings = self.embedding_model.encode(
+        embeddings = self._get_embedding_model().encode(
             texts,
             show_progress_bar=True,
             normalize_embeddings=True,  # L2 normalization for cosine similarity
@@ -181,7 +194,7 @@ class DomainAgnosticConflictDetector:
         print(f"   📊 Noise/outliers: {n_noise} requirements ({noise_pct:.1f}%)")
         
         # If too many noise points (>30%), try reassigning them to nearest clusters
-        if noise_pct > 30 and n_clusters > 0:
+        if self.reassign_noise and noise_pct > 30 and n_clusters > 0:
             print(f"   ⚠️  High noise percentage - reassigning outliers to nearest clusters...")
             cluster_labels = self._reassign_noise_points(embeddings, cluster_labels)
             
@@ -281,7 +294,7 @@ class DomainAgnosticConflictDetector:
         
         return filtered_indices
     
-    async def check_conflicts_in_batch(
+    def check_conflicts_in_batch(
         self,
         requirements: List[Tuple[str, str]],
         cluster_id: int
@@ -329,14 +342,9 @@ Response format:
 JSON output only:"""
 
         try:
-            response = self.llm_client.chat.completions.create(
-                model=self.llm_model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
-                max_tokens=2000,
-            )
+            response = self.llm_client.invoke([HumanMessage(content=prompt)])
             
-            response_text = response.choices[0].message.content.strip()
+            response_text = response.content.strip()
             
             # Extract JSON
             if "```json" in response_text:
@@ -409,7 +417,7 @@ JSON output only:"""
         
         # Split into batches if too large
         if len(requirements) <= self.max_cluster_batch:
-            return await self.check_conflicts_in_batch(requirements, cluster_id)
+            return self.check_conflicts_in_batch(requirements, cluster_id)
         else:
             # Split large cluster into batches
             batches = self.split_into_batches(requirements, self.max_cluster_batch)
@@ -418,7 +426,7 @@ JSON output only:"""
             all_conflicts = []
             for batch_idx, batch in enumerate(batches, 1):
                 print(f"      Batch {batch_idx}/{len(batches)}")
-                conflicts = await self.check_conflicts_in_batch(batch, cluster_id)
+                conflicts = self.check_conflicts_in_batch(batch, cluster_id)
                 all_conflicts.extend(conflicts)
             
             return all_conflicts
@@ -473,14 +481,9 @@ Return 1-3 tags from: Security, Performance, UI, UX, Database, API, Authenticati
 Response format (comma-separated): Security, Performance, API"""
 
         try:
-            response = self.llm_client.chat.completions.create(
-                model=self.llm_model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-                max_tokens=50,
-            )
+            response = self.llm_client.invoke([HumanMessage(content=prompt)])
             
-            tags_text = response.choices[0].message.content.strip()
+            tags_text = response.content.strip()
             tags = [tag.strip() for tag in tags_text.split(',')]
             return tags[:3]  # Limit to 3 tags
             

@@ -15,7 +15,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Tuple
-from groq import Groq
 import os
 import json
 import uuid
@@ -23,31 +22,28 @@ import asyncio
 from dotenv import load_dotenv
 from datetime import datetime
 
-# Lazy import of RagManager (may raise at runtime if deps missing)
-try:
-    from rag import RagManager, get_project_lock
-except Exception:
-    RagManager = None
-    get_project_lock = None
+# LangChain imports
+from langchain_groq import ChatGroq
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+
+from rag import RagManager
+from build_faiss import build_index_for_project
 
 try:
-    from build_faiss import build_index_for_project
-except Exception:
-    build_index_for_project = None
-
-# Import domain-agnostic conflict detection dependencies
-try:
-    from sentence_transformers import SentenceTransformer
     import hdbscan
+    from sentence_transformers import SentenceTransformer
     from sklearn.metrics.pairwise import cosine_similarity
+
     CONFLICT_DETECTION_AVAILABLE = True
-except ImportError:
-    CONFLICT_DETECTION_AVAILABLE = False
-    SentenceTransformer = None
+except Exception:
     hdbscan = None
+    SentenceTransformer = None
     cosine_similarity = None
+    CONFLICT_DETECTION_AVAILABLE = False
 
 load_dotenv()
+
+DEFAULT_MODEL = os.getenv("GROQ_MODEL", "groq/mixtral-8x7b-32768")
 
 app = FastAPI(
     title="AI Requirements Generation Service",
@@ -72,11 +68,20 @@ if not GROQ_API_KEY:
         "WARNING: GROQ_API_KEY is not set. Groq calls will fail until you set this in your .env file."
     )
 
-groq_client = Groq(api_key=GROQ_API_KEY)
-DEFAULT_MODEL = os.getenv("GROQ_MODEL", "moonshotai/kimi-k2-instruct-0905")
+# Initialize LangChain ChatGroq models
+chat_model_default = ChatGroq(
+    groq_api_key=GROQ_API_KEY,
+    model_name=DEFAULT_MODEL,
+    temperature=0.7
+)
+chat_model_low_temp = ChatGroq(
+    groq_api_key=GROQ_API_KEY,
+    model_name=DEFAULT_MODEL,
+    temperature=0.3
+)
 
 # API Key Authentication
-LLM_API_KEY = os.getenv("LLM_API_KEY", "dev-secret-key-12345")  # Change in production!
+LLM_API_KEY = os.getenv("LLM_API_KEY", "test-api-key")  # Override via env in production.
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 # Knowledge Base configuration
@@ -221,7 +226,7 @@ class ChatResponse(BaseModel):
 
 
 class ExtractionRequest(BaseModel):
-    text: str
+    text: str = Field(..., min_length=1)
     document_type: Optional[str] = "meeting_notes"
 
 
@@ -396,7 +401,7 @@ Return format (MUST be valid JSON):
 
 CHAT_SYSTEM_PROMPT = """You are Fishy, an AI assistant specialized in software requirements engineering. 
 You help users understand, refine, and document software requirements.
-Be clear, concise, and technical when needed. Always provide actionable advice."""
+Be helpful, clear, concise, and technical when needed. Always provide actionable advice."""
 
 PERSONA_PROMPT_TEMPLATE = """Rewrite the following requirement from the perspective of a {persona_name}.
 
@@ -470,21 +475,38 @@ async def verify_api_key(api_key: str = Depends(api_key_header)):
 def call_groq_chat(
     messages: List[Dict], max_tokens: int = 1000, temperature: float = 0.7
 ) -> tuple:
-    """Call Groq API and return response + token usage"""
+    """Call LangChain ChatGroq and return response + token usage"""
+    # Choose model based on temperature
+    if temperature == 0.3:
+        model = chat_model_low_temp
+    else:
+        model = chat_model_default
+
+    # Convert messages to LangChain format
+    langchain_messages = []
+    for msg in messages:
+        if msg["role"] == "system":
+            langchain_messages.append(SystemMessage(content=msg["content"]))
+        elif msg["role"] == "user":
+            langchain_messages.append(HumanMessage(content=msg["content"]))
+        elif msg["role"] == "assistant":
+            langchain_messages.append(AIMessage(content=msg["content"]))
+
     try:
-        chat_completion = groq_client.chat.completions.create(
-            messages=messages,
-            model=DEFAULT_MODEL,
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
+        response = model.invoke(langchain_messages)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Groq API error: {exc}",
+        ) from exc
 
-        content = chat_completion.choices[0].message.content
-        tokens_used = chat_completion.usage.total_tokens
+    content = response.content
+    usage = response.additional_kwargs.get('usage', {})
+    tokens_used = usage.get('total_tokens', 0)
 
-        return content, tokens_used
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Groq API error: {str(e)}")
+    return content, tokens_used
 
 
 def _load_rag_artifacts() -> Tuple[bool, object, list]:
@@ -533,13 +555,25 @@ def needs_rag(user_query: str, use_model: bool = True) -> bool:
 
     # If model-based classification requested, try similarity against the index
     if use_model:
-        avail, index, chunks = _load_rag_artifacts()
-        if not avail:
+        try:
+            load_result = _load_rag_artifacts()
+        except Exception as exc:
+            print(f"RAG artifact load error: {exc}")
+            return False
+
+        if (
+            not load_result
+            or not isinstance(load_result, tuple)
+            or len(load_result) < 3
+        ):
+            return False
+
+        avail, index, chunks = load_result
+        if not avail or _rag_manager is None:
             return False
         try:
-            # use the rag manager to query top-1 and inspect score
             results = _rag_manager.query(user_query, index, chunks, top_k=1)
-            if results and len(results) > 0:
+            if results:
                 top_score = results[0].get("score", 0.0)
                 return float(top_score) >= float(RAG_SIM_THRESHOLD)
         except Exception as e:
@@ -603,6 +637,20 @@ def _get_rag_manager():
             detail="RAG dependencies not installed. Install sentence-transformers and faiss-cpu.",
         )
     return RagManager(model_name=KB_MODEL)
+
+
+def _get_project_paths_with_fallback(rag, project_id: str) -> Tuple[str, str]:
+    """Use rag.get_project_paths when available, otherwise derive paths manually."""
+    if hasattr(rag, "get_project_paths"):
+        paths = rag.get_project_paths(KB_BASE_DIR, project_id)
+        if isinstance(paths, (tuple, list)) and len(paths) >= 2:
+            return paths[0], paths[1]
+
+    project_dir = os.path.join(KB_BASE_DIR, str(project_id))
+    return (
+        os.path.join(project_dir, "faiss_index.bin"),
+        os.path.join(project_dir, "faiss_meta.pkl"),
+    )
 
 
 async def _detect_conflicts_simple(request: ConflictDetectionRequest) -> ConflictDetectionResponse:
@@ -716,7 +764,7 @@ async def _detect_conflicts_semantic(request: ConflictDetectionRequest) -> Confl
         # Split into batches if needed
         max_batch = request.max_batch_size
         if len(cluster_requirements) <= max_batch:
-            conflicts = await _check_conflicts_in_batch(
+            conflicts = _check_conflicts_in_batch(
                 cluster_requirements, 
                 cluster_id
             )
@@ -725,7 +773,7 @@ async def _detect_conflicts_semantic(request: ConflictDetectionRequest) -> Confl
             # Process in batches
             for batch_start in range(0, len(cluster_requirements), max_batch):
                 batch = cluster_requirements[batch_start:batch_start + max_batch]
-                conflicts = await _check_conflicts_in_batch(batch, cluster_id)
+                conflicts = _check_conflicts_in_batch(batch, cluster_id)
                 all_conflicts.extend(conflicts)
     
     print(f"✅ Found {len(all_conflicts)} conflicts")
@@ -768,7 +816,7 @@ def _remove_near_duplicates(
     return kept_indices
 
 
-async def _check_conflicts_in_batch(
+def _check_conflicts_in_batch(
     requirements: List[Tuple[str, str]], 
     cluster_id: int
 ) -> List[Conflict]:
@@ -816,14 +864,9 @@ Response format:
 JSON output only:"""
 
     try:
-        response = groq_client.chat.completions.create(
-            model=DEFAULT_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
-            max_tokens=2000,
-        )
+        response = chat_model_low_temp.invoke([HumanMessage(content=prompt)])
         
-        response_text = response.choices[0].message.content.strip()
+        response_text = response.content
         
         # Extract JSON from markdown code blocks if present
         if "```json" in response_text:
@@ -1310,6 +1353,8 @@ async def process_document(
             total_chunks=len(chunks),
             tokens_used=tokens_used,
         )
+    except HTTPException as exc:
+        raise exc
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1413,7 +1458,7 @@ async def incremental_kb_update(
             )
 
         rag = _get_rag_manager()
-        index_path, meta_path = rag.get_project_paths(KB_BASE_DIR, request.project_id)
+        index_path, meta_path = _get_project_paths_with_fallback(rag, request.project_id)
 
         # Check if index exists
         if not os.path.exists(index_path):
@@ -1472,7 +1517,7 @@ async def query_kb(request: QueryKBRequest, api_key: str = Depends(verify_api_ke
     """
     try:
         rag = _get_rag_manager()
-        index_path, meta_path = rag.get_project_paths(KB_BASE_DIR, request.project_id)
+        index_path, meta_path = _get_project_paths_with_fallback(rag, request.project_id)
 
         # Check if index exists
         if not os.path.exists(index_path):
@@ -1506,7 +1551,7 @@ async def get_kb_status(project_id: str, api_key: str = Depends(verify_api_key))
     """
     try:
         rag = _get_rag_manager()
-        index_path, meta_path = rag.get_project_paths(KB_BASE_DIR, project_id)
+        index_path, meta_path = _get_project_paths_with_fallback(rag, project_id)
 
         status = rag.get_kb_status(index_path, meta_path)
 
@@ -1545,18 +1590,17 @@ async def get_job_status(job_id: str, api_key: str = Depends(verify_api_key)):
 
 @app.post("/api/test")
 async def test_groq():
-    """Simple test endpoint to verify Groq connection"""
+    """Simple test endpoint to verify LangChain-Groq connection"""
     try:
-        chat_completion = groq_client.chat.completions.create(
-            messages=[{"role": "user", "content": "Say 'Hello, FastAPI with Groq!'"}],
-            model=DEFAULT_MODEL,
-            max_tokens=50,
-        )
+        response = chat_model_default.invoke([HumanMessage(content="Say 'Hello, FastAPI with LangChain-Groq!'")])
+        content = response.content
+        usage = response.additional_kwargs.get('usage', {})
+        tokens_used = usage.get('total_tokens', 0)
         return {
             "success": True,
-            "response": chat_completion.choices[0].message.content,
+            "response": content,
             "model": DEFAULT_MODEL,
-            "tokens_used": chat_completion.usage.total_tokens,
+            "tokens_used": tokens_used,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1582,7 +1626,7 @@ GROQ_MODEL=mixtral-8x7b-32768
 # gemma2-9b-it                - Google's model, good for instructions
 
 # Knowledge Base API Authentication (CHANGE IN PRODUCTION!)
-LLM_API_KEY=dev-secret-key-12345
+LLM_API_KEY=test-api-key
 
 # Knowledge Base Configuration
 KB_BASE_DIR=faiss_store                    # Base directory for all project indexes

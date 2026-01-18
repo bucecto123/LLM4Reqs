@@ -3,7 +3,8 @@ uvicorn
 requests
 python-dotenv
 pydantic
-groq
+langchain-groq
+langchain-core
 pandas
 numpy
 faiss-cpu
