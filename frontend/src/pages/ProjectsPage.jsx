@@ -122,7 +122,7 @@ export default function ProjectsPage() {
         method: "DELETE",
       });
 
-      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+      setProjects((prev) => prev.filter((p) => p.id !== projectToDelete.id));
       setError(null);
     } catch (err) {
       console.error("Failed to delete project:", err);

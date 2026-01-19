@@ -661,6 +661,7 @@ async def _detect_conflicts_semantic(request: ConflictDetectionRequest) -> Confl
     
     # Extract requirements data
     req_ids = [str(req.get('id', f'REQ_{i}')) for i, req in enumerate(request.requirements)]
+    req_numbers = [str(req.get('number', req.get('id', f'{i+1}'))) for i, req in enumerate(request.requirements)]
     req_texts = [req.get('text', '') for req in request.requirements]
     
     # Step 1: Generate embeddings (with model caching)
@@ -710,7 +711,7 @@ async def _detect_conflicts_semantic(request: ConflictDetectionRequest) -> Confl
         
         # Get requirements for this cluster
         cluster_requirements = [
-            (req_ids[i], req_texts[i]) for i in cluster_indices
+            (req_ids[i], req_numbers[i], req_texts[i]) for i in cluster_indices
         ]
         
         # Split into batches if needed
@@ -769,14 +770,14 @@ def _remove_near_duplicates(
 
 
 async def _check_conflicts_in_batch(
-    requirements: List[Tuple[str, str]], 
+    requirements: List[Tuple[str, str, str]], 
     cluster_id: int
 ) -> List[Conflict]:
     """
     Use LLM to check for conflicts in a batch of requirements.
     
     Args:
-        requirements: List of (req_id, req_text) tuples
+        requirements: List of (req_id, req_number, req_text) tuples
         cluster_id: Cluster ID for tracking
         
     Returns:
@@ -785,10 +786,10 @@ async def _check_conflicts_in_batch(
     if len(requirements) < 2:
         return []
     
-    # Build structured prompt
+    # Build structured prompt using requirement numbers for display
     req_list = "\n".join([
-        f"{i+1}. [{req_id}] {text}"
-        for i, (req_id, text) in enumerate(requirements)
+        f"{i+1}. [Requirement {req_number}] {text}"
+        for i, (req_id, req_number, text) in enumerate(requirements)
     ])
     
     prompt = f"""You are analyzing requirements for logical conflicts.
@@ -799,9 +800,9 @@ Requirements to analyze:
 Task: Identify any pairs of requirements that CANNOT both be true or would create a logical contradiction.
 
 Return your analysis as a JSON array. For each conflict found, include:
-- req_a: ID of first requirement (use the exact ID from the brackets, e.g., "1", "REQ_0001")
-- req_b: ID of second requirement
-- reason: Brief explanation of the conflict
+- req_a: Requirement number of first requirement (e.g., "10", "11")
+- req_b: Requirement number of second requirement
+- reason: Brief explanation of the conflict (use "Requirement X" format when referring to requirements)
 - confidence: "high", "medium", or "low"
 - severity: "high", "medium", or "low"
 
@@ -809,7 +810,7 @@ If no conflicts exist, return an empty array: []
 
 Response format:
 [
-  {{"req_a": "1", "req_b": "3", "reason": "...", "confidence": "high", "severity": "high"}},
+  {{"req_a": "10", "req_b": "11", "reason": "Requirement 10 mandates X while Requirement 11 forbids X", "confidence": "high", "severity": "high"}},
   ...
 ]
 
@@ -839,24 +840,30 @@ JSON output only:"""
             return []
         
         # Create Conflict objects
-        req_map = {req_id: text for req_id, text in requirements}
+        # Create maps: number -> (id, text)
+        req_number_to_id = {req_number: req_id for req_id, req_number, text in requirements}
+        req_id_to_text = {req_id: text for req_id, req_number, text in requirements}
         conflicts = []
         
         for conflict in conflicts_data:
-            req_a = str(conflict.get("req_a", ""))
-            req_b = str(conflict.get("req_b", ""))
+            req_a_num = str(conflict.get("req_a", ""))
+            req_b_num = str(conflict.get("req_b", ""))
+            
+            # Map requirement numbers back to database IDs
+            req_a_id = req_number_to_id.get(req_a_num, req_a_num)
+            req_b_id = req_number_to_id.get(req_b_num, req_b_num)
             
             # Convert ID to integer (handle both numeric and string IDs)
-            id_a = int(req_a) if req_a.isdigit() else abs(hash(req_a)) % 100000
-            id_b = int(req_b) if req_b.isdigit() else abs(hash(req_b)) % 100000
+            id_a = int(req_a_id) if str(req_a_id).isdigit() else abs(hash(req_a_id)) % 100000
+            id_b = int(req_b_id) if str(req_b_id).isdigit() else abs(hash(req_b_id)) % 100000
             
             conflicts.append(Conflict(
                 requirement_id_1=id_a,
                 requirement_id_2=id_b,
                 conflict_description=conflict.get("reason", "No reason provided"),
                 severity=conflict.get("severity", "medium"),
-                req_text_1=req_map.get(req_a, ""),
-                req_text_2=req_map.get(req_b, ""),
+                req_text_1=req_id_to_text.get(req_a_id, ""),
+                req_text_2=req_id_to_text.get(req_b_id, ""),
                 confidence=conflict.get("confidence", "medium"),
                 cluster_id=cluster_id
             ))

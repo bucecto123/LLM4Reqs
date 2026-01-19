@@ -1,15 +1,225 @@
 # 🚀 LLM4Reqs - AI-Powered Requirements Extraction
 
-**LLM4Reqs** is an intelligent system that uses Large Language Models to automatically analyze documents and extract software requirements. It features persona-based requirement generation, conflict detection, and real-time collaboration.
+**LLM4Reqs** is an intelligent system that uses Large Language Models to automatically analyze documents and extract software requirements. It features persona-based requirement generation, conflict detection, and interactive AI chat.
 
-## ✨ Features
+---
 
-- 📄 **Document Upload** - PDF, Word (DOC/DOCX), Text, and Markdown
-- 🤖 **AI Extraction** - Automated requirement identification and extraction
-- 👥 **Persona-Based Analysis** - 8 predefined personas (End User, Product Manager, Developer, etc.)
-- ⚔️ **Conflict Detection** - Domain-agnostic conflict detection using RAG
-- � **Real-time Chat** - WebSocket-powered streaming responses
-- 🔒 **Secure** - Token-based authentication
+## 🎯 Quick Start for New Users
+
+**First time here?** Get up and running in 3 simple steps:
+
+### Step 1: Install (15 minutes, one-time setup)
+
+```powershell
+git clone https://github.com/bucecto123/LLM4Reqs.git
+cd LLM4Reqs
+.\setup-all.ps1
+```
+
+### Step 2: Get Free API Key (2 minutes)
+
+1. Visit [console.groq.com](https://console.groq.com/) and sign up (free)
+2. Create an API key
+3. Add it to `llm\.env`: `GROQ_API_KEY=your_key_here`
+
+### Step 3: Start & Use (1 command)
+
+```powershell
+.\start-dev.ps1
+```
+
+Then open **http://localhost:5173** in your browser!
+
+**Already installed?** Just run `.\start-dev.ps1` and go to step 3!
+
+---
+
+## 📖 How to Use (Step-by-Step)
+
+### 1️⃣ Sign Up & Login
+
+- Open http://localhost:5173
+- Click "Sign Up" and create your account
+- You'll be logged in automatically
+
+### 2️⃣ Create Your First Project
+
+- Click **"+ New Project"** button
+- Enter a name (e.g., "Mobile Banking App")
+- Add a brief description
+- Click "Create"
+
+### 3️⃣ Upload Documents
+
+- Open your project
+- Go to **"Documents"** section
+- Drag & drop or click to upload files
+- Supported: PDF, Word (.doc/.docx), Text (.txt), Markdown (.md)
+
+### 4️⃣ Extract Requirements (AI Magic! ✨)
+
+- Click **"Process Document"** on your uploaded file
+- Watch the AI analyze your document in real-time
+- Requirements are automatically extracted and categorized
+- Review and edit as needed
+
+### 5️⃣ Use AI Personas (8 Different Perspectives)
+
+- Go to **"Personas"** tab in your project
+- Choose from 8 expert personas:
+  - 👤 End User - Usability & UX focus
+  - 📊 Product Manager - Business value
+  - 💻 Developer - Technical implementation
+  - 🧪 QA Tester - Testing & quality
+  - 📈 Business Analyst - Business processes
+  - 🏗️ System Architect - Architecture & scale
+  - 🔒 Security Expert - Security & compliance
+  - ⚙️ System Admin - Operations & maintenance
+- Click any persona to generate requirements from their viewpoint
+
+### 6️⃣ Detect Conflicts
+
+- Click **"Detect Conflicts"** in your project
+- AI finds contradictions and inconsistencies
+- Review conflicts with detailed explanations
+- Resolve by editing requirements
+
+### 7️⃣ Chat with AI
+
+- Click **"Chat"** in navigation
+- Select your project
+- Ask questions like:
+  - "What are the security requirements?"
+  - "Summarize authentication features"
+  - "Are there any missing mobile requirements?"
+- Get instant AI responses with context from your documents
+
+---
+
+## 🎓 Example: Your First Project in 5 Minutes
+
+Let's create a simple e-commerce project:
+
+```
+1. Sign up and login ✅
+
+2. Create Project:
+   Name: "Online Store"
+   Description: "E-commerce website with cart and checkout"
+
+3. Upload a document:
+   Create a text file with requirements like:
+   "Users should be able to browse products,
+   add items to cart, and checkout with payment"
+
+4. Click "Process Document" ✅
+   → AI extracts 10-20 requirements automatically
+
+5. Try Personas:
+   Click "Security Expert" persona
+   → Get security-focused requirements
+
+6. Chat:
+   Ask: "What payment features do we need?"
+   → Get AI suggestions
+
+7. Done! 🎉 You now have a structured requirements document
+```
+
+**That's it!** You've just used AI to analyze requirements in minutes.
+
+### 📑 Table of Contents
+
+**🆕 New Users - Start Here:**
+
+- [Quick Start (3 Steps)](#-quick-start-for-new-users) ⭐ **Start here!**
+- [How to Use (Step-by-Step)](#-how-to-use-step-by-step)
+- [Example: First Project in 5 Minutes](#-example-your-first-project-in-5-minutes)
+- [What Can It Do?](#-what-can-llm4reqs-do)
+- [FAQ](#-faq-frequently-asked-questions)
+
+**⚙️ Setup & Installation:**
+
+- [Prerequisites](#-prerequisites-check-these-first)
+- [Automated Installation](#-automated-installation-recommended)
+- [Manual Installation](#-manual-installation-step-by-step)
+- [Starting the Application](#-starting-the-application)
+
+**📚 Advanced Usage:**
+
+- [Usage Tips & Best Practices](#-usage-tips--best-practices)
+- [Common Tasks](#-common-tasks--quick-reference)
+- [Example Workflows](#-example-workflow)
+
+**🛠️ Technical Documentation:**
+
+- [Architecture](#-architecture)
+- [Project Structure](#-project-structure)
+- [API Documentation](#-complete-package-lists)
+- [Troubleshooting](#-common-issues--solutions)
+- [Useful Commands](#-useful-commands)
+
+---
+
+## ✨ What Can LLM4Reqs Do?
+
+### Core Features
+
+**📄 Document Upload & Processing**
+
+- Upload PDF, Word (DOC/DOCX), Text, and Markdown files
+- Automatic text extraction and parsing
+- Support for multiple documents per project
+- Example: Upload your product spec and get structured requirements instantly
+
+**🤖 AI-Powered Requirement Extraction**
+
+- Automatically identifies software requirements from documents
+- Categorizes into Functional, Non-Functional, and User Stories
+- Extracts key details like priority, dependencies, and acceptance criteria
+- Example: Paste "Users need secure login" → AI extracts full authentication requirements
+
+**👥 8 Expert AI Personas**
+Get requirements from different professional perspectives:
+
+- 👤 **End User** - "How easy is it to use?"
+- 📊 **Product Manager** - "What's the business value?"
+- 💻 **Developer** - "Can we build this?"
+- 🧪 **QA Tester** - "How do we test it?"
+- 📈 **Business Analyst** - "Does it fit the workflow?"
+- 🏗️ **System Architect** - "Will it scale?"
+- 🔒 **Security Expert** - "Is it secure?"
+- ⚙️ **System Admin** - "Can we maintain it?"
+
+**⚔️ Smart Conflict Detection**
+
+- AI finds contradictions between requirements
+- Domain-agnostic (works for any project type)
+- Uses RAG (Retrieval-Augmented Generation) for accuracy
+- Example: Detects "must respond in 2 seconds" vs "requires 5-second API call"
+
+**💬 Interactive AI Chat**
+
+- Ask questions about your requirements
+- Get instant answers with document context
+- Brainstorm missing requirements
+- Example: "What security requirements are we missing?"
+
+**📊 Project Management**
+
+- Organize multiple projects
+- Track requirements across documents
+- Tag and prioritize requirements
+- Export requirements as PDF/CSV/JSON
+
+**🔒 Secure & Private**
+
+- All data stored locally on your machine
+- Token-based authentication
+- No cloud storage required
+- Your documents never leave your computer
+
+---
 
 ## 🎯 Architecture
 
@@ -23,34 +233,61 @@
 
 ---
 
-## ⚡ Quick Start
+## 📥 Installation Guide
 
-### Prerequisites
+### ✅ Prerequisites (Check These First)
 
-Before you begin, ensure you have the following software installed:
+Before installing, verify you have these tools installed. **Don't worry if you don't have them** - we'll show you where to get them!
 
-| Software | Version | Check              | Download Link                                 |
-| -------- | ------- | ------------------ | --------------------------------------------- |
-| PHP      | 8.2+    | `php -v`           | https://www.php.net/downloads                 |
-| Composer | Latest  | `composer -V`      | https://getcomposer.org/download/             |
-| Node.js  | 18+     | `node -v`          | https://nodejs.org/ (LTS version recommended) |
-| npm      | 9+      | `npm -v`           | Included with Node.js                         |
-| Python   | 3.8+    | `python --version` | https://www.python.org/downloads/             |
-| Git      | Latest  | `git --version`    | https://git-scm.com/downloads                 |
+| Software     | Version Needed | How to Check                  | Where to Download                                      |
+| ------------ | -------------- | ----------------------------- | ------------------------------------------------------ |
+| **PHP**      | 8.2 or higher  | Open terminal, type: `php -v` | [Download PHP](https://www.php.net/downloads)          |
+| **Composer** | Latest         | Type: `composer -V`           | [Download Composer](https://getcomposer.org/download/) |
+| **Node.js**  | 18 or higher   | Type: `node -v`               | [Download Node.js](https://nodejs.org/) (choose LTS)   |
+| **Python**   | 3.8 or higher  | Type: `python --version`      | [Download Python](https://www.python.org/downloads/)   |
+| **Git**      | Any recent     | Type: `git --version`         | [Download Git](https://git-scm.com/downloads)          |
 
-**📋 Installation Tips:**
+**💡 Quick Check: Do I have everything?**
 
-- **PHP**: On Windows, use XAMPP, WAMP, or download PHP binaries directly
-- **Composer**: Run the installer and ensure it's in your PATH
-- **Node.js**: Use the LTS (Long Term Support) version for stability
-- **Python**: During installation, check "Add Python to PATH"
-
-### 1️⃣ Clone Repository
+Open your terminal/PowerShell and run these commands:
 
 ```powershell
+php -v && composer -V && node -v && python --version && git --version
+```
+
+If you see version numbers for all, you're ready to install! ✅
+
+**🔧 Installation Tips:**
+
+- **Windows users**: Use XAMPP, WAMP for PHP, or download PHP directly
+- **Python**: During install, CHECK the box "Add Python to PATH"
+- **Node.js**: Choose the LTS (Long Term Support) version
+- **Composer**: Make sure it's accessible from command line (in PATH)
+
+### 🚀 Automated Installation (Recommended)
+
+The fastest way to get started:
+
+```powershell
+# 1. Clone repository
 git clone https://github.com/bucecto123/LLM4Reqs.git
 cd LLM4Reqs
+
+# 2. Run automated setup (installs everything!)
+.\setup-all.ps1
+
+# 3. Get your FREE GROQ API key from https://console.groq.com/
+# 4. Edit llm\.env and add: GROQ_API_KEY=your_key_here
+
+# 5. Start all services
+.\start-dev.ps1
 ```
+
+**That's it!** Open http://localhost:5173 in your browser.
+
+### 📝 Manual Installation (Step-by-Step)
+
+If you prefer to install each component manually, follow the detailed steps below.
 
 ---
 
@@ -274,15 +511,30 @@ GROQ_API_KEY=gsk_your_actual_api_key_here
 
 **Only the GROQ_API_KEY needs to be updated!**
 
-### 5️⃣ Start All Services
+---
 
-**Option A - Automated (Recommended):**
+## 🎬 Starting the Application
+
+### ✨ Easy Method (One Command)
 
 ```powershell
+# From the project root directory
 .\start-dev.ps1
 ```
 
-**Option B - Manual (5 separate terminals):**
+This automatically opens **5 terminal windows** for:
+
+1. Backend API (Laravel)
+2. Frontend (React)
+3. LLM Service (Python/FastAPI)
+4. WebSocket Server (Reverb)
+5. Background Queue Worker
+
+**Wait 10-15 seconds** for all services to start, then open your browser to **http://localhost:5173**
+
+### 🔧 Manual Method (5 Terminals)
+
+If you prefer manual control, open 5 separate terminals:
 
 ```powershell
 # Terminal 1: LLM Service
@@ -296,7 +548,7 @@ npm run dev
 
 # Terminal 3: Backend
 cd backend
-php -d upload_max_filesize=20M -d post_max_size=25M artisan serve --port=8001
+php artisan serve --port=8001
 
 # Terminal 4: Reverb WebSocket
 cd backend
@@ -307,23 +559,845 @@ cd backend
 php artisan queue:work --tries=3
 ```
 
+### 🌐 Access Points
+
+Once running, you can access:
+
+| Service         | URL                        | What it does                     |
+| --------------- | -------------------------- | -------------------------------- |
+| **Frontend**    | http://localhost:5173      | Main web interface (start here!) |
+| **Backend API** | http://localhost:8001/api  | REST API for data                |
+| **LLM Service** | http://localhost:8000      | AI processing engine             |
+| **API Docs**    | http://localhost:8000/docs | Interactive API documentation    |
+| **WebSocket**   | ws://localhost:8080        | Real-time updates                |
+
 ---
 
-## � Access Points
+## 💼 Real-World Use Cases
 
-Once all services are running:
+### For Product Managers
 
-- **Frontend:** http://localhost:5173
-- **Backend API:** http://localhost:8001/api
-- **LLM Docs:** http://localhost:8000/docs
-- **Reverb WebSocket:** ws://localhost:8080
+**Scenario:** You have a 50-page product spec document.
 
-### First Time Setup
+✅ **With LLM4Reqs:**
 
-1. Navigate to http://localhost:5173
-2. Click **Register** → Create account
-3. **Login** with credentials
-4. Create a project and upload documents!
+1. Upload the PDF (30 seconds)
+2. AI extracts 100+ requirements automatically (2 minutes)
+3. Run conflict detection to find inconsistencies (1 minute)
+4. Use personas to ensure all perspectives covered (3 minutes)
+5. Export organized requirements (30 seconds)
+
+**Total Time:** ~7 minutes ⚡ (vs. days of manual work!)
+
+### For Developers
+
+**Scenario:** Client sends vague requirements via email.
+
+✅ **With LLM4Reqs:**
+
+1. Copy-paste email into a text file and upload
+2. AI extracts and structures requirements
+3. Use Developer persona to identify technical gaps
+4. Chat: "What are the technical dependencies?"
+5. Get clear, actionable requirements
+
+### For Business Analysts
+
+**Scenario:** Multiple stakeholders with conflicting needs.
+
+✅ **With LLM4Reqs:**
+
+1. Upload documents from each stakeholder
+2. Extract requirements from all sources
+3. Run conflict detection
+4. AI highlights contradictions with explanations
+5. Resolve conflicts with stakeholders
+
+### For Students
+
+**Scenario:** Requirements engineering course project.
+
+✅ **With LLM4Reqs:**
+
+1. Upload project documents
+2. Learn by comparing AI-extracted vs manual requirements
+3. Experiment with different personas
+4. Understand conflict detection patterns
+5. Export professional documentation
+
+---
+
+## 🎨 What the Interface Looks Like
+
+### Dashboard View
+
+When you first login, you'll see your project dashboard:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  🏠 LLM4Reqs                    [Projects] [Chat] [Profile]  │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  📊 My Projects                            [+ New Project] │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐ │
+│  │  📁 Mobile Banking App        Last updated: 2 hrs ago │ │
+│  │  Status: Active • 12 requirements • 3 documents       │ │
+│  │  [Open Project] [Chat] [Export]                       │ │
+│  └──────────────────────────────────────────────────────┘ │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐ │
+│  │  📁 E-Commerce Platform      Last updated: 1 day ago  │ │
+│  │  Status: Active • 28 requirements • 5 documents       │ │
+│  │  [Open Project] [Chat] [Export]                       │ │
+│  └──────────────────────────────────────────────────────┘ │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Inside a Project
+
+Click any project to see detailed requirements management:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  📁 Mobile Banking App                          [Export ⬇]  │
+├─────────────────────────────────────────────────────────────┤
+│  [📄 Documents] [📋 Requirements] [👥 Personas] [⚔️ Conflicts] │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  📄 Documents (3)                       [+ Upload Document] │
+│                                                             │
+│  ✅ Product_Requirements.pdf         [Process] [View]       │
+│     Status: Processed • 45 requirements extracted           │
+│                                                             │
+│  ✅ User_Stories.docx                [Process] [View]       │
+│     Status: Processed • 28 requirements extracted           │
+│                                                             │
+│  📄 Technical_Specs.md               [Process] [View]       │
+│     Status: Ready to process                               │
+│                                                             │
+│  ─────────────────────────────────────────────────────────  │
+│                                                             │
+│  📋 Requirements (73)               [Detect Conflicts]      │
+│                                                             │
+│  🟢 REQ-001: User Authentication                           │
+│     "Users must be able to login securely using email      │
+│      and password with two-factor authentication"          │
+│     Type: Functional • Priority: High                       │
+│     Tags: Security, Authentication, Core                    │
+│     [Edit] [Delete] [View Details]                         │
+│                                                             │
+│  🟢 REQ-002: Biometric Login                               │
+│     "System shall support fingerprint and face ID"          │
+│     Type: Functional • Priority: Medium                     │
+│     Tags: Biometric, Security, iOS, Android                 │
+│     [Edit] [Delete] [View Details]                         │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### AI Chat Interface
+
+Ask questions and get intelligent answers:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  💬 AI Chat Assistant                    Project: Banking App│
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  👤 You:                                                    │
+│  What security requirements do we have for user data?       │
+│                                                             │
+│  🤖 AI Assistant:                                           │
+│  Based on your project documents, here are the security     │
+│  requirements:                                              │
+│                                                             │
+│  1. User Authentication (REQ-001)                           │
+│     - Email/password with 2FA                               │
+│     - Session timeout after 15 minutes                      │
+│                                                             │
+│  2. Data Encryption (REQ-015)                               │
+│     - All data encrypted at rest using AES-256              │
+│     - TLS 1.3 for data in transit                           │
+│                                                             │
+│  3. Biometric Security (REQ-002)                            │
+│     - Fingerprint and Face ID support                       │
+│                                                             │
+│  Would you like me to check for any missing security        │
+│  requirements?                                              │
+│                                                             │
+│  [Type your question...]                          [Send →]  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 💡 Usage Tips & Best Practices
+
+### 📝 Document Tips for Better Results
+
+**✅ DO:**
+
+- Use clear headings and structure (helps AI understand context)
+- Include specific details and numbers ("response time < 200ms")
+- Upload multiple related documents (specs, user stories, mockups)
+- Use consistent terminology throughout documents
+
+**❌ AVOID:**
+
+- Extremely long documents without structure (break into sections)
+- Vague statements ("should be fast" → specify "< 200ms")
+- Mixing multiple unrelated topics in one document
+- Using lots of jargon without definitions
+
+**💡 Pro Tip:** The more structured your input, the better the AI extraction!
+
+### 🎯 Requirement Management Best Practices
+
+**Review AI Output (Always!)**
+
+- AI is very good, but not perfect
+- Check for accuracy and completeness
+- Edit requirements to match your exact needs
+- Think of AI as a smart assistant, not a replacement
+
+**Organize Effectively**
+
+- Use tags: `MVP`, `v2.0`, `Critical`, `Backend`, `Frontend`
+- Set clear priorities: High/Medium/Low
+- Group related requirements together
+- Add notes for context and rationale
+
+**Track Changes**
+
+- Document why requirements changed
+- Keep old versions for reference
+- Note stakeholder decisions
+- Track approval status
+
+### 👥 Using Personas Effectively
+
+**Recommended Workflow:**
+
+1. **Start with Product Manager** → Get business-focused requirements
+2. **Then Business Analyst** → Understand workflows and processes
+3. **Add Developer perspective** → Check technical feasibility
+4. **Include System Architect** → Ensure scalability and architecture
+5. **Check Security Expert** → Identify security needs (critical!)
+6. **Don't skip QA Tester** → Get testability requirements
+7. **Consider End User** → Validate usability
+8. **Finally System Admin** → Check operational requirements
+
+**💡 Pro Tip:** Not all personas needed for every project. Choose 3-4 most relevant!
+
+### ⚔️ Conflict Detection Strategy
+
+**When to Run:**
+
+- ✅ After uploading multiple documents
+- ✅ Before finalizing requirements
+- ✅ When merging requirements from different sources
+- ✅ During stakeholder review meetings
+
+**How to Use Results:**
+
+- Read conflict explanations carefully
+- Involve stakeholders in resolution
+- Document resolution decisions
+- Re-run detection after major changes
+
+**Common Conflicts:**
+
+- Performance vs. Feature complexity
+- Cost vs. Quality requirements
+- Security vs. Usability
+- Timeline vs. Scope
+
+### 💬 Getting the Most from AI Chat
+
+**Good Questions:**
+
+```
+✅ "List all requirements related to user authentication"
+✅ "What security requirements are we missing?"
+✅ "Summarize the performance requirements"
+✅ "Are there conflicts between REQ-001 and REQ-015?"
+```
+
+**Less Effective Questions:**
+
+```
+❌ "Tell me about login"  (too vague)
+❌ "What's good?"  (no context)
+❌ "Help"  (be specific)
+```
+
+**💡 Pro Tips:**
+
+- Reference specific requirement IDs
+- Mention document names for context
+- Ask follow-up questions to dig deeper
+- Use chat to brainstorm missing requirements
+- Ask "What if?" scenarios
+
+### 👤 Quick Start Guides by Role
+
+#### 🎨 Product Managers - Feature Planning
+
+**Your Goal:** Organize feature requests and ensure nothing is missed.
+
+**Quick Workflow:**
+
+```
+1. Upload: Product specs, stakeholder emails, meeting notes
+2. Process: Let AI extract all feature requirements
+3. Personas: Use Product Manager + Business Analyst
+4. Chat: "What features are missing from the MVP?"
+5. Export: Share organized requirements with team
+```
+
+**Time Saved:** Hours of manual organization → 10 minutes ⚡
+
+#### 💻 Developers - Understanding Requirements
+
+**Your Goal:** Get clear, technical requirements to build against.
+
+**Quick Workflow:**
+
+```
+1. Upload: Technical specs, API docs, architecture docs
+2. Process: Extract technical requirements
+3. Personas: Use Developer + System Architect
+4. Chat: "What are the technical dependencies?"
+5. Conflict Check: Find contradicting specs
+```
+
+**Benefit:** No more "wait, what did they mean by this?" 🤔
+
+#### 📊 Business Analysts - Requirements Documentation
+
+**Your Goal:** Create comprehensive, conflict-free requirements docs.
+
+**Quick Workflow:**
+
+```
+1. Upload: All stakeholder documents
+2. Process: Extract from each source
+3. Personas: Use ALL 8 personas for complete coverage
+4. Conflict Detection: Find and resolve contradictions
+5. Export: Professional requirements document
+```
+
+**Output:** Publication-ready requirements document 📄
+
+#### 🧪 QA Engineers - Test Planning
+
+**Your Goal:** Identify what needs testing and create test scenarios.
+
+**Quick Workflow:**
+
+```
+1. Upload: Requirements docs, user stories
+2. Process: Extract testable requirements
+3. Personas: Use QA Tester + End User
+4. Chat: "What edge cases should we test?"
+5. Export: Test case requirements list
+```
+
+**Result:** Comprehensive test coverage from day one ✅
+
+#### 🎓 Students - Learning & Projects
+
+**Your Goal:** Complete coursework and learn best practices.
+
+**Quick Workflow:**
+
+```
+1. Upload: Your project documents or case studies
+2. Process: See how AI structures requirements
+3. Experiment: Try different personas
+4. Learn: Compare AI output with manual extraction
+5. Submit: Export professional documentation
+```
+
+**Learn By Doing:** See requirements engineering in action! 📚
+
+#### 🔒 Security Teams - Risk Assessment
+
+**Your Goal:** Identify security requirements and risks.
+
+**Quick Workflow:**
+
+```
+1. Upload: System specs, data flow diagrams
+2. Process: Extract security-related requirements
+3. Personas: Use Security Expert + System Architect
+4. Chat: "What security risks are we missing?"
+5. Report: Security requirements checklist
+```
+
+**Find Gaps:** Discover security requirements others missed 🛡️
+
+---
+
+---
+
+## 🎥 Video Tutorial
+
+**Coming Soon!** We're preparing video tutorials to help you get started. For now, follow the step-by-step guide above.
+
+**What the interface looks like:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  LLM4Reqs                    [Projects] [Chat] [Profile]  │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  📊 Dashboard                              [+ New Project] │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐ │
+│  │  📁 Mobile Banking App        Last updated: 2 hrs ago │ │
+│  │  12 requirements • 3 documents • 2 conflicts          │ │
+│  │  [Open Project]                                       │ │
+│  └──────────────────────────────────────────────────────┘ │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐ │
+│  │  📁 E-Commerce Website       Last updated: 1 day ago  │ │
+│  │  28 requirements • 5 documents • 0 conflicts          │ │
+│  │  [Open Project]                                       │ │
+│  └──────────────────────────────────────────────────────┘ │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Inside a project:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  📁 Mobile Banking App                          [Export ⬇]  │
+├─────────────────────────────────────────────────────────────┤
+│  [Documents] [Requirements] [Personas] [Conflicts] [Chat]  │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  📄 Documents (3)                       [+ Upload Document] │
+│                                                             │
+│  ✅ Product_Requirements.pdf         [Process] [Delete]     │
+│  ✅ User_Stories.docx               [Process] [Delete]     │
+│  ✅ Technical_Specs.md              [Process] [Delete]     │
+│                                                             │
+│  ─────────────────────────────────────────────────────────  │
+│                                                             │
+│  📋 Requirements (12)               [Detect Conflicts]      │
+│                                                             │
+│  🟢 REQ-001: User must be able to login securely           │
+│     Priority: High • Tags: Security, Authentication         │
+│                                                             │
+│  🟢 REQ-002: System shall support fingerprint auth         │
+│     Priority: Medium • Tags: Biometric, Security            │
+│                                                             │
+│  🟡 REQ-003: Transaction history must be stored...         │
+│     Priority: High • Tags: Data, Storage                    │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🎓 Example Workflow
+
+Here's a complete workflow from start to finish:
+
+### Scenario: Building a E-Commerce Mobile App
+
+```
+1. Create Project: "E-Commerce Mobile App"
+2. Upload Documents:
+   - Product_Requirements_Document.pdf
+   - User_Stories.docx
+   - Technical_Specifications.md
+
+3. Extract Requirements (Auto-generates ~50-100 requirements)
+
+4. Generate Persona Requirements:
+   - Product Manager → Business requirements
+   - Developer → Technical implementation needs
+   - Security Expert → Authentication, payment security
+   - QA Tester → Test cases and quality criteria
+
+5. Run Conflict Detection:
+   - Found: "Payment must be processed within 2 seconds" conflicts with
+     "All transactions must be verified by external API (avg 3-5 seconds)"
+   - Resolved: Updated to "Payment must complete within 5 seconds"
+
+6. Chat with AI:
+   Q: "What are the requirements for offline mode?"
+   A: [AI lists 8 requirements related to offline functionality]
+
+   Q: "Are we missing any requirements for user notifications?"
+   A: [AI suggests push notifications, email alerts, in-app messages]
+
+7. Export & Share:
+   - Download requirements as PDF/Excel
+   - Share with team for review
+   - Continue iterating
+```
+
+---
+
+## 🛠️ Daily Usage
+
+### Starting Your Work Day
+
+```powershell
+# 1. Navigate to project
+cd LLM4Reqs
+
+# 2. Start all services
+.\start-dev.ps1
+
+# 3. Open browser to http://localhost:5173
+
+# 4. Login and start working!
+```
+
+### Stopping Services
+
+Press `Ctrl + C` in each terminal window, or:
+
+```powershell
+# Kill all at once
+taskkill /F /IM php.exe
+taskkill /F /IM node.exe
+taskkill /F /IM python.exe
+```
+
+---
+
+## 🚀 Common Tasks & Quick Reference
+
+### ✅ How Do I...?
+
+#### Add a New User to My Project?
+
+Currently single-user per project. Multi-user collaboration coming in future updates!
+
+#### Export My Requirements?
+
+1. Go to your project
+2. Click "Export" button (top right)
+3. Choose format: PDF, CSV, or JSON
+4. Download the file
+
+#### Edit a Requirement?
+
+1. Click on any requirement card
+2. Edit the text, priority, or tags
+3. Click "Save" or press `Enter`
+4. Changes are saved automatically!
+
+#### Delete a Document?
+
+1. Go to Documents section
+2. Click the "..." menu on any document
+3. Select "Delete"
+4. Confirm deletion
+
+#### Search Requirements?
+
+1. Use the search bar at the top of your project
+2. Search by keywords, tags, or requirement ID
+3. Results update in real-time
+
+#### Switch Between Projects?
+
+1. Click "Projects" in the navigation menu
+2. Click on any project to open it
+3. Or use the project dropdown in the header
+
+#### Get Help with AI?
+
+1. Open the Chat feature
+2. Type your question
+3. AI has context of all your project documents and requirements
+
+### 🔑 Keyboard Shortcuts
+
+| Action              | Shortcut              |
+| ------------------- | --------------------- |
+| Search requirements | `Ctrl + F` or `/`     |
+| New project         | `Ctrl + N`            |
+| Open chat           | `Ctrl + K`            |
+| Save changes        | `Ctrl + S` or `Enter` |
+| Close modal         | `Esc`                 |
+
+### 📊 Understanding AI Confidence Scores
+
+When requirements are extracted, you'll see confidence scores:
+
+- 🟢 **High (>80%)**: Very confident, likely accurate
+- 🟡 **Medium (50-80%)**: Fairly confident, review recommended
+- 🔴 **Low (<50%)**: Less confident, definitely review and edit
+
+Always review AI-generated content - the AI is a helpful assistant, not a replacement for human judgment!
+
+---
+
+## ❓ FAQ (Frequently Asked Questions)
+
+### 🆕 First-Time User Questions
+
+**Q: I've never used this before. Where do I start?**  
+A: Follow the [Quick Start](#-quick-start-for-new-users) at the top! Install → Get API key → Run. Takes about 20 minutes total.
+
+**Q: What's an API key and why do I need it?**  
+A: It's a free password that lets you use GROQ's AI models. Sign up at [console.groq.com](https://console.groq.com) - takes 2 minutes, no credit card needed.
+
+**Q: Do I need to be technical to use this?**  
+A: No! The interface is user-friendly. If you can upload a file and click buttons, you can use LLM4Reqs.
+
+**Q: How much does it cost?**  
+A: Free! GROQ provides free API access. You just need to sign up for a key.
+
+**Q: Can I try it without installing?**  
+A: Unfortunately no, you need to install it locally. But our automated setup makes it easy!
+
+### 🔒 Privacy & Security
+
+**Q: Is my data stored online?**  
+A: **No!** Everything runs locally on your computer. Your documents never leave your machine. Only anonymous API requests go to GROQ for AI processing.
+
+**Q: What data does GROQ see?**  
+A: Only the text you send for AI processing (requirement extraction, chat). Your documents stay local.
+
+**Q: Can others see my projects?**  
+A: No, only you. Everything is stored in your local database.
+
+**Q: How do I backup my data?**  
+A: Copy the file `backend/database/database.sqlite` - that's your entire database!
+
+### ⚡ Usage Questions
+
+**Q: How accurate is the AI?**  
+A: Very good! But always review AI output. Think of it as a smart assistant that does 80-90% of the work, you refine the rest.
+
+**Q: Can I edit AI-generated requirements?**  
+A: Absolutely! Click any requirement to edit. The AI gives you a starting point.
+
+**Q: How many documents can I upload?**  
+A: No hard limit, but best performance with <50 documents per project.
+
+**Q: What file size limit?**  
+A: 20MB per file. For larger files, split them or extract text separately.
+
+**Q: What file types are supported?**  
+A: PDF, Word (.doc/.docx), Plain Text (.txt), and Markdown (.md)
+
+**Q: Can I upload images/diagrams?**  
+A: You can upload PDFs with images, but AI only extracts text. For diagrams, describe them in text.
+
+**Q: Do I need internet?**  
+A: Yes, for AI API calls. But document upload and viewing works offline.
+
+### 🛠️ Technical Questions
+
+**Q: Can I use a different AI model?**  
+A: Yes! Edit `llm/.env` and change `GROQ_MODEL`. See options at console.groq.com
+
+**Q: Can I use MySQL instead of SQLite?**  
+A: Yes! Edit `backend/.env` database settings. Run `php artisan migrate` after.
+
+**Q: Can I run this on Mac/Linux?**  
+A: Yes! Use bash scripts instead of PowerShell. All commands are cross-platform.
+
+**Q: Why are there 5 terminals?**  
+A: Each service (Backend, Frontend, LLM, WebSocket, Queue) runs separately. This is normal for development.
+
+**Q: Can I close terminal windows?**  
+A: Closing a terminal stops that service. Keep all 5 open while using the app.
+
+**Q: How do I stop all services?**  
+A: Press Ctrl+C in each window, or run: `taskkill /F /IM php.exe && taskkill /F /IM node.exe && taskkill /F /IM python.exe`
+
+### 🎯 Performance Questions
+
+**Q: AI responses are slow. Why?**  
+A: Free GROQ API has rate limits. For faster responses, upgrade to a paid GROQ plan or use a local LLM.
+
+**Q: How long does requirement extraction take?**  
+A: Usually 30 seconds to 2 minutes depending on document size and AI load.
+
+**Q: Can I process multiple documents at once?**  
+A: Yes! Upload multiple files and process them one by one or together.
+
+**Q: The app feels slow. Help?**  
+A: Check all 5 services are running. Restart services if needed. Check internet connection for AI calls.
+
+### 🤝 Collaboration Questions
+
+**Q: Can multiple users work on the same project?**  
+A: Not currently. Each installation is single-user. Multi-user support is planned for future!
+
+**Q: How do I share my requirements with my team?**  
+A: Export as PDF/CSV/JSON and share the file. Or share your database file (contains everything).
+
+**Q: Can I import requirements from another tool?**  
+A: You can upload documents in supported formats (PDF, Word, Text, Markdown).
+
+### 📱 Platform Questions
+
+**Q: Does it work on Windows?**  
+A: Yes! That's our primary platform.
+
+**Q: Does it work on Mac?**  
+A: Yes! Use bash instead of PowerShell for commands.
+
+**Q: Does it work on Linux?**  
+A: Yes! Same as Mac, use bash commands.
+
+**Q: Is there a mobile app?**  
+A: Not yet. Use the web interface on mobile browsers (works but not optimized).
+
+---
+
+## ⚠️ Common Mistakes & How to Avoid Them
+
+### ❌ Mistake #1: Forgot to Add GROQ API Key
+
+**Symptom:** AI features don't work, errors about API key
+
+**Solution:**
+
+```powershell
+# Edit llm\.env and add your key:
+GROQ_API_KEY=gsk_your_actual_key_here
+```
+
+**Prevention:** Get your key from [console.groq.com](https://console.groq.com) during setup!
+
+### ❌ Mistake #2: Not Activating Python Virtual Environment
+
+**Symptom:** "Module 'fastapi' not found" error
+
+**Solution:**
+
+```powershell
+cd llm
+.\env\Scripts\Activate.ps1  # You should see (env) in prompt
+```
+
+**Prevention:** Always activate before running LLM service!
+
+### ❌ Mistake #3: Starting Services in Wrong Order
+
+**Symptom:** Services can't connect to each other
+
+**Solution:**
+Use the automated script:
+
+```powershell
+.\start-dev.ps1
+```
+
+**Or start manually in this order:** LLM → Frontend → Backend → Reverb → Queue
+
+### ❌ Mistake #4: Closed a Terminal Window
+
+**Symptom:** Part of the app stops working
+
+**Solution:**
+Restart that specific service or just run `.\start-dev.ps1` again.
+
+**Prevention:** Keep all 5 terminal windows open while using the app!
+
+### ❌ Mistake #5: Port Already in Use
+
+**Symptom:** "Address already in use" error
+
+**Solution:**
+
+```powershell
+# Find and kill the process:
+netstat -ano | findstr :8001  # Replace with your port
+taskkill /PID <PID> /F
+```
+
+**Prevention:** Close services properly with Ctrl+C before restarting.
+
+### ❌ Mistake #6: Didn't Run Migrations
+
+**Symptom:** Database errors, "table doesn't exist"
+
+**Solution:**
+
+```powershell
+cd backend
+php artisan migrate:fresh --seed
+```
+
+**Prevention:** Run migrations during initial setup!
+
+### ❌ Mistake #7: Uploading Unsupported Files
+
+**Symptom:** Upload fails or text not extracted
+
+**Solution:**
+Only use: PDF, Word (.doc/.docx), Text (.txt), Markdown (.md)
+
+**Prevention:** Convert other formats to supported types first.
+
+### ❌ Mistake #8: Expecting Perfect AI Output
+
+**Symptom:** Requirements seem wrong or incomplete
+
+**Solution:**
+AI is a smart assistant, not perfect. Always review and edit output.
+
+**Prevention:** Budget time to review and refine AI-generated requirements.
+
+---
+
+### Technical Questions
+
+**Q: Can I use MySQL instead of SQLite?**  
+A: Yes! Edit `backend/.env` and change the database settings. Run migrations afterward.
+
+**Q: How do I backup my data?**  
+A: Copy the `backend/database/database.sqlite` file. That's your entire database!
+
+**Q: Can I run this on Mac/Linux?**  
+A: Yes! The system works on all platforms. Use bash scripts instead of PowerShell.
+
+**Q: The AI responses are slow. Why?**  
+A: Free GROQ API has rate limits. Upgrade to a paid plan or switch to a local LLM.
+
+**Q: How do I update to the latest version?**
+
+```powershell
+git pull origin main
+cd backend && composer update
+cd ../frontend && npm update
+cd ../llm && pip install -r requirements.txt --upgrade
+```
+
+### Troubleshooting Questions
+
+**Q: I get "Port already in use" errors**  
+A: Another service is using the port. Kill it:
+
+```powershell
+netstat -ano | findstr :PORT
+taskkill /PID <PID> /F
+```
+
+**Q: The frontend won't connect to backend**  
+A: Check that all 5 services are running. Verify URLs in `frontend/.env` match your setup.
+
+**Q: AI extraction returns empty results**  
+A: Check your GROQ_API_KEY is valid. Test at http://localhost:8000/docs
+
+**Q: WebSocket connection fails**  
+A: Ensure Reverb is running and `REVERB_APP_KEY` matches in both backend and frontend .env files.
 
 ---
 
@@ -574,39 +1648,6 @@ All tests should pass ✅
 - [ ] Can create projects and upload documents
 
 ✅ **If all boxes are checked, your installation is complete!**
-
----
-
-## 📖 How to Use the System
-
-### 1. Create Your First Project
-
-1. Login to the web interface
-2. Click "New Project"
-3. Enter project name and description
-4. Click "Create"
-
-### 2. Upload a Document
-
-1. Open your project
-2. Click "Upload Document"
-3. Select a file (PDF, Word, Text, or Markdown)
-4. Click "Upload"
-
-The system will automatically extract the text content!
-
-### 3. Extract Requirements (AI Magic!)
-
-1. After uploading, click "Process Document"
-2. The AI will analyze your document
-3. Requirements are automatically extracted and listed
-4. Review, edit, and organize your requirements
-
-### 4. Chat with AI
-
-1. Click "Chat" in the navigation
-2. Type your question or request
-3. Get AI-powered responses about requirements
 
 ---
 
@@ -1222,6 +2263,67 @@ Laravel framework is licensed under the [MIT license](https://opensource.org/lic
 
 ---
 
+---
+
+## 🆘 Getting Help
+
+### Before Asking for Help
+
+1. **Check [Common Mistakes](#️-common-mistakes--how-to-avoid-them)** - Most issues are covered there!
+2. **Check [FAQ](#-faq-frequently-asked-questions)** - Your question might be answered
+3. **Check [Troubleshooting](#-common-issues--solutions)** - Detailed error solutions
+4. **Try the Quick Fix:**
+   ```powershell
+   # Clear caches and restart
+   cd backend && php artisan optimize:clear
+   cd .. && .\start-dev.ps1
+   ```
+
+### Still Stuck?
+
+**Gather this information:**
+
+- What were you trying to do?
+- What error message did you see? (copy exact text)
+- Which service is having issues? (Backend/Frontend/LLM)
+- Your OS and software versions (`php -v`, `node -v`, `python --version`)
+
+**Get Help:**
+
+- 📧 Check your course materials for support contact
+- 💬 Ask your instructor or TA
+- 📝 Check project documentation in the repo
+- 🐛 If it's a bug, document steps to reproduce it
+
+### Useful Debug Commands
+
+```powershell
+# Check if all services are running
+netstat -ano | findstr ":8001 :5173 :8000 :8080"
+
+# Check PHP/Composer versions
+php -v
+composer -V
+
+# Check Node/npm versions
+node -v
+npm -v
+
+# Check Python version
+python --version
+
+# Check backend logs
+Get-Content backend\storage\logs\laravel.log -Tail 50
+
+# Test backend health
+curl http://localhost:8001/api/health
+
+# Test LLM health
+curl http://localhost:8000/health
+```
+
+---
+
 ## 📋 Quick Reference Card
 
 ### Installation Commands (Copy-Paste Ready)
@@ -1402,6 +2504,120 @@ taskkill /F /IM python.exe
 
 ---
 
-**🚀 You're ready to go! Happy coding!**
+## 🎯 What's Next? (After Installation)
 
-**Need help?** Check the troubleshooting section above or review the [COMPLETE_KB_API_GUIDE.md](llm/COMPLETE_KB_API_GUIDE.md) for advanced features.
+### ✅ Just Installed? Here's Your Next Steps:
+
+**1. Verify Everything Works (2 minutes)**
+
+```powershell
+# Visit these URLs in your browser:
+http://localhost:5173       # Frontend - Should show login page
+http://localhost:8001/api/health  # Backend - Should show {"status":"healthy"}
+http://localhost:8000/docs   # LLM API - Should show API documentation
+```
+
+**2. Create Your Account (1 minute)**
+
+- Go to http://localhost:5173
+- Click "Sign Up"
+- Fill in username, email, password
+- Click "Create Account"
+
+**3. Create Your First Project (3 minutes)**
+
+- Click "+ New Project"
+- Name it something simple like "Test Project"
+- Add a description
+- Click "Create"
+
+**4. Upload a Test Document (2 minutes)**
+
+- Open your new project
+- Go to "Documents" tab
+- Create a simple text file on your computer:
+  ```
+  The system must allow users to login with username and password.
+  Users should be able to reset their password via email.
+  The system must encrypt all user data.
+  ```
+- Save as `test_requirements.txt`
+- Upload it to your project
+
+**5. Extract Requirements (2 minutes)**
+
+- Click "Process Document"
+- Watch the AI work!
+- Review the extracted requirements
+- Try editing one
+
+**6. Try AI Chat (2 minutes)**
+
+- Click "Chat" in navigation
+- Select your project
+- Ask: "What security requirements do we have?"
+- See the AI respond with context from your document
+
+**🎉 Congratulations!** You've just used AI to extract and analyze requirements!
+
+### 📚 Continue Learning
+
+**Next Steps to Explore:**
+
+1. **Try Personas** - See how different experts view your requirements
+2. **Upload More Documents** - Try PDF, Word documents
+3. **Detect Conflicts** - Upload documents with contradicting info
+4. **Experiment with Chat** - Ask different types of questions
+5. **Export Requirements** - Download as PDF/CSV
+
+**Want to Learn More?**
+
+- Read [Usage Tips](#-usage-tips--best-practices)
+- Check [Role-Specific Guides](#-quick-start-guides-by-role)
+- Review [Example Workflows](#-example-workflow)
+
+### 🚀 Advanced Features (Once You're Comfortable)
+
+- **RAG-Based Conflict Detection** - Find subtle contradictions
+- **Multi-Document Projects** - Combine specs from multiple sources
+- **Custom Tagging System** - Organize requirements your way
+- **Requirement Export** - Generate professional documentation
+- **API Integration** - Use the REST API for automation
+
+---
+
+## 🎓 For Instructors & Course Staff
+
+This tool is designed for **Computing Technology Project A (COS40005)** and similar courses.
+
+### Educational Value
+
+- **Teaches Requirements Engineering** - Hands-on experience with AI-assisted RE
+- **Introduces Modern Tools** - Full-stack development, AI integration, microservices
+- **Practical Application** - Students work with real documents and requirements
+- **Multiple Technologies** - PHP/Laravel, React, Python, FastAPI, WebSockets
+
+### Suggested Course Activities
+
+1. **Week 1-2:** Install and familiarize with the tool
+2. **Week 3-4:** Upload project documents and extract requirements
+3. **Week 5-6:** Compare manual vs AI extraction
+4. **Week 7-8:** Use personas to understand different perspectives
+5. **Week 9-10:** Conflict detection and resolution
+6. **Week 11-12:** Final project using the tool
+
+### Assessment Ideas
+
+- Compare AI-extracted requirements vs manual extraction
+- Analyze persona-based requirement differences
+- Document conflict resolution process
+- Evaluate AI accuracy and bias
+- Extend the tool with new features
+
+---
+
+**🚀 You're ready to go! Happy Requirements Engineering!**
+
+**Need help?** Check the [Getting Help](#-getting-help) section or review [Common Mistakes](#️-common-mistakes--how-to-avoid-them).
+
+**Want advanced features?** See [COMPLETE_KB_API_GUIDE.md](llm/COMPLETE_KB_API_GUIDE.md) for technical details.
