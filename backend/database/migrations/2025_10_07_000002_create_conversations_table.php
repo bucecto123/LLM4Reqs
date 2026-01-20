@@ -12,7 +12,7 @@ class CreateConversationsTable extends Migration
             $table->id();
             $table->foreignId('project_id')->nullable()->constrained('projects')->onDelete('cascade');
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-            $table->foreignId('requirement_id')->nullable()->constrained('requirements')->onDelete('set null');
+            $table->unsignedBigInteger('requirement_id')->nullable();
             $table->string('title')->nullable();
             $table->longText('context')->nullable();
             $table->string('status')->default('open'); // open, closed

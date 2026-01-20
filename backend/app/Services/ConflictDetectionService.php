@@ -24,9 +24,10 @@ class ConflictDetectionService
      * Detect conflicts for a project's requirements.
      *
      * @param int $projectId
+     * @param \App\Models\KnowledgeBase|null $kb Optional KB instance for progress updates
      * @return array ['job_id' => string, 'status' => string, 'message' => string]
      */
-    public function detectConflictsForProject(int $projectId): array
+    public function detectConflictsForProject(int $projectId, $kb = null): array
     {
         $project = Project::findOrFail($projectId);
         
@@ -38,9 +39,11 @@ class ConflictDetectionService
         }
 
         // Format requirements for the LLM API
+        // Use requirement_number for display, but keep track of actual database ID
         $formattedRequirements = $requirements->map(function ($req) {
             return [
-                'id' => (string)$req->id,
+                'id' => (string)$req->id,  // Use database ID for lookup
+                'number' => (string)($req->requirement_number ?? $req->id),  // Display number
                 'text' => $req->requirement_text ?? $req->text ?? ''
             ];
         })->toArray();
@@ -50,6 +53,11 @@ class ConflictDetectionService
             'requirement_ids' => array_column($formattedRequirements, 'id'),
             'count' => count($formattedRequirements)
         ]);
+        
+        // Update progress if KB instance provided
+        if ($kb) {
+            $kb->updateProgress(75, 'processing_conflicts');
+        }
 
         // Call LLM API to detect conflicts
         try {
@@ -68,6 +76,11 @@ class ConflictDetectionService
             }
 
             $data = $response->json();
+            
+            // Update progress after API call
+            if ($kb) {
+                $kb->updateProgress(80, 'processing_conflicts');
+            }
             
             // LLM API returns conflicts directly (synchronous)
             if (isset($data['conflicts'])) {
@@ -92,7 +105,7 @@ class ConflictDetectionService
                 }
                 
                 // Save conflicts immediately
-                $saved = $this->saveConflicts($projectId, $conflicts);
+                $saved = $this->saveConflicts($projectId, $conflicts, $kb);
                 
                 // Automatically resolve conflicts if enabled
                 $autoResolved = 0;
@@ -140,9 +153,10 @@ class ConflictDetectionService
      *
      * @param int $projectId
      * @param array $conflicts
+     * @param \App\Models\KnowledgeBase|null $kb Optional KB instance for progress updates
      * @return int Number of conflicts saved
      */
-    public function saveConflicts(int $projectId, array $conflicts): int
+    public function saveConflicts(int $projectId, array $conflicts, $kb = null): int
     {
         $saved = 0;
 
@@ -151,6 +165,11 @@ class ConflictDetectionService
             'conflicts_received' => count($conflicts),
             'conflicts_data' => $conflicts
         ]);
+        
+        // Update progress if KB instance provided
+        if ($kb) {
+            $kb->updateProgress(82, 'saving_conflicts');
+        }
 
         foreach ($conflicts as $conflict) {
             try {

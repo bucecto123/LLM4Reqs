@@ -7,8 +7,9 @@ import {
   ChevronDown,
   Shield,
   Download,
-  Bot,
-  PenTool,
+  Sparkles,
+  FileEdit,
+  Lightbulb,
 } from "lucide-react";
 import { apiFetch } from "../utils/auth";
 import ExportModal from "./ExportModal.jsx";
@@ -22,13 +23,13 @@ const formatResolutionNotes = (text) => {
   // Handle bold text (**text** or **text**)
   formatted = formatted.replace(
     /\*\*([^\*]+)\*\*/g,
-    "<strong class='font-semibold text-blue-900'>$1</strong>"
+    "<strong class='font-semibold text-blue-900'>$1</strong>",
   );
 
   // Handle italic text (*text* but not **text**)
   formatted = formatted.replace(
     /(?<!\*)\*([^\*]+)\*(?!\*)/g,
-    "<em class='italic'>$1</em>"
+    "<em class='italic'>$1</em>",
   );
 
   // Handle numbered lists with proper formatting (1., 2., etc.)
@@ -297,14 +298,14 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
         `/api/conflicts/${conflict.id}/resolve-ai`,
         {
           method: "POST",
-        }
+        },
       );
 
       if (response.success) {
         await loadConflicts();
       } else {
         throw new Error(
-          response.message || "Failed to resolve conflict with AI"
+          response.message || "Failed to resolve conflict with AI",
         );
       }
     } catch (err) {
@@ -362,7 +363,7 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
         ?.toLowerCase()
         .includes(searchLower);
       const matchesRequirements = conflict.requirements?.some((req) =>
-        req.toLowerCase().includes(searchLower)
+        req.toLowerCase().includes(searchLower),
       );
 
       if (!matchesTitle && !matchesDescription && !matchesRequirements) {
@@ -640,25 +641,28 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
                                       handleResolveWithAI(conflict)
                                     }
                                     disabled={loading}
-                                    className="px-2 py-1 text-xs rounded bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                    title="Resolve automatically using AI"
+                                    className="flex items-center space-x-1 px-3 py-1.5 text-xs rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                                    title="Generate resolution automatically"
                                   >
-                                    Resolve with AI
+                                    <Sparkles size={12} />
+                                    <span>Auto-Resolve</span>
                                   </button>
                                   <button
                                     onClick={() =>
                                       handleResolveManually(conflict)
                                     }
                                     disabled={loading}
-                                    className="px-2 py-1 text-xs rounded bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                    title="Resolve manually with your own notes"
+                                    className="flex items-center space-x-1 px-3 py-1.5 text-xs rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                                    title="Add custom resolution notes"
                                   >
-                                    Resolve by your own
+                                    <FileEdit size={12} />
+                                    <span>Manual Resolve</span>
                                   </button>
                                 </div>
                               ) : (
-                                <span className="ml-2 text-xs text-slate-500">
-                                  Resolved
+                                <span className="ml-2 flex items-center space-x-1 text-xs text-emerald-600">
+                                  <CheckCircle size={14} />
+                                  <span>Resolved</span>
                                 </span>
                               )}
                             </div>
@@ -685,9 +689,15 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
 
                           {conflict.suggestion && (
                             <div className="mt-3 p-4 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
-                              <p className="text-xs font-semibold mb-3 text-blue-900">
-                                💡 Resolution Suggestion:
-                              </p>
+                              <div className="flex items-center space-x-2 mb-3">
+                                <Lightbulb
+                                  size={16}
+                                  className="text-blue-600"
+                                />
+                                <p className="text-xs font-semibold text-blue-900">
+                                  Resolution Suggestion
+                                </p>
+                              </div>
                               <div className="text-sm text-blue-800 whitespace-pre-wrap leading-relaxed">
                                 {formatResolutionNotes(conflict.suggestion)}
                               </div>
@@ -746,32 +756,32 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
                     <div
                       className={`p-2 rounded-lg ${
                         resolveModal.mode === "ai"
-                          ? "bg-blue-100"
-                          : "bg-green-100"
+                          ? "bg-indigo-100"
+                          : "bg-emerald-100"
                       }`}
                     >
                       {resolveModal.mode === "ai" ? (
-                        <Bot
+                        <Sparkles
                           className={`w-6 h-6 ${
                             resolveModal.mode === "ai"
-                              ? "text-blue-600"
-                              : "text-green-600"
+                              ? "text-indigo-600"
+                              : "text-emerald-600"
                           }`}
                         />
                       ) : (
-                        <PenTool
+                        <FileEdit
                           className={`w-6 h-6 ${
                             resolveModal.mode === "ai"
-                              ? "text-blue-600"
-                              : "text-green-600"
+                              ? "text-indigo-600"
+                              : "text-emerald-600"
                           }`}
                         />
                       )}
                     </div>
                     <h3 className="text-lg font-bold text-slate-800">
                       {resolveModal.mode === "ai"
-                        ? "Resolve with AI"
-                        : "Resolve Manually"}
+                        ? "Auto-Generate Resolution"
+                        : "Custom Resolution Notes"}
                     </h3>
                   </div>
                   <button
@@ -793,11 +803,18 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
                 <div className="p-6 overflow-y-auto flex-1">
                   {resolveModal.mode === "ai" ? (
                     <div className="space-y-4">
-                      <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                        <p className="text-sm text-blue-800">
-                          AI will automatically generate resolution notes for
-                          this conflict based on the conflicting requirements.
-                        </p>
+                      <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
+                        <div className="flex items-start space-x-3">
+                          <Lightbulb
+                            size={18}
+                            className="text-indigo-600 flex-shrink-0 mt-0.5"
+                          />
+                          <p className="text-sm text-indigo-800">
+                            The system will automatically generate resolution
+                            notes for this conflict by analyzing the conflicting
+                            requirements and suggesting best practices.
+                          </p>
+                        </div>
                       </div>
 
                       {resolveModal.conflict && (
@@ -826,7 +843,7 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
                                       >
                                         {req}
                                       </div>
-                                    )
+                                    ),
                                   )}
                                 </div>
                               </div>
@@ -836,12 +853,18 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                        <p className="text-sm text-green-800">
-                          Enter your own resolution notes for this conflict. Be
-                          specific about how to resolve the conflict between the
-                          requirements.
-                        </p>
+                      <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-200">
+                        <div className="flex items-start space-x-3">
+                          <FileEdit
+                            size={18}
+                            className="text-emerald-600 flex-shrink-0 mt-0.5"
+                          />
+                          <p className="text-sm text-emerald-800">
+                            Enter your own resolution notes for this conflict.
+                            Be specific about how to resolve the conflict
+                            between the requirements.
+                          </p>
+                        </div>
                       </div>
 
                       {resolveModal.conflict && (
@@ -870,7 +893,7 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
                                       >
                                         {req}
                                       </div>
-                                    )
+                                    ),
                                   )}
                                 </div>
                               </div>
@@ -929,17 +952,28 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
                         (!resolveModal.manualNotes ||
                           !resolveModal.manualNotes.trim()))
                     }
-                    className={`px-4 py-2 rounded-lg font-medium text-white transition-colors ${
+                    className={`flex items-center space-x-2 px-5 py-2.5 rounded-lg font-medium text-white transition-colors ${
                       resolveModal.mode === "ai"
-                        ? "bg-blue-600 hover:bg-blue-700"
-                        : "bg-green-600 hover:bg-green-700"
+                        ? "bg-indigo-600 hover:bg-indigo-700"
+                        : "bg-emerald-600 hover:bg-emerald-700"
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
-                    {loading
-                      ? "Processing..."
-                      : resolveModal.mode === "ai"
-                      ? "Resolve with AI"
-                      : "Resolve Conflict"}
+                    {loading ? (
+                      <>
+                        <Clock size={16} className="animate-spin" />
+                        <span>Processing...</span>
+                      </>
+                    ) : resolveModal.mode === "ai" ? (
+                      <>
+                        <Sparkles size={16} />
+                        <span>Generate Resolution</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle size={16} />
+                        <span>Save Resolution</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

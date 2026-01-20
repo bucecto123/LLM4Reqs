@@ -11,7 +11,7 @@ class CreateDocumentsTable extends Migration
         Schema::create('documents', function (Blueprint $table) {
             $table->id();
             $table->foreignId('project_id')->nullable()->constrained('projects')->onDelete('cascade');
-            $table->foreignId('conversation_id')->nullable()->constrained('conversations')->onDelete('set null');
+            $table->unsignedBigInteger('conversation_id')->nullable();
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->string('filename');
             $table->string('original_filename')->nullable();

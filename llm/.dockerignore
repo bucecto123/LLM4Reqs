@@ -1,0 +1,4 @@
+__pycache__
+*.pyc
+faiss_store
+custom_output

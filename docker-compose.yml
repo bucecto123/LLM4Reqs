@@ -1,0 +1,108 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: llm4reqs
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1023maledeeptry
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql
+
+  llm:
+    build:
+      context: ./llm
+    env_file:
+      - ./llm/.env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./llm:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: db
+      LLM_SERVICE_URL: http://llm:8000
+      REVERB_SERVER_HOST: 0.0.0.0
+      REVERB_SERVER_PORT: 8081
+      REVERB_HOST: localhost
+      REVERB_PORT: 8081
+      REVERB_SCHEME: http
+      APP_URL: http://localhost:8001
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      - db
+      - llm
+    command: php -d upload_max_filesize=20M -d post_max_size=25M artisan serve --host 0.0.0.0 --port=8001
+
+  reverb:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: db
+      LLM_SERVICE_URL: http://llm:8000
+      REVERB_SERVER_HOST: 0.0.0.0
+      REVERB_SERVER_PORT: 8081
+      REVERB_HOST: localhost
+      REVERB_PORT: 8081
+      REVERB_SCHEME: http
+      APP_URL: http://localhost:8001
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      - backend
+    command: php artisan reverb:start
+
+  queue:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: db
+      LLM_SERVICE_URL: http://llm:8000
+      REVERB_SERVER_HOST: 0.0.0.0
+      REVERB_SERVER_PORT: 8081
+      REVERB_HOST: localhost
+      REVERB_PORT: 8081
+      REVERB_SCHEME: http
+      APP_URL: http://localhost:8001
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      - backend
+      - db
+    command: php artisan queue:work --tries=3
+
+  frontend:
+    build:
+      context: ./frontend
+    env_file:
+      - ./frontend/.env
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+    depends_on:
+      - backend
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+
+volumes:
+  db_data:

@@ -119,8 +119,15 @@ class KBBuildJob implements ShouldQueue, ShouldBeUnique
                 'documents_count' => count($documents),
             ]);
 
-            // Update progress: Starting KB build (0-50%)
+            // Update progress: Starting KB build
             $kb->updateProgress(10, 'building_index');
+            
+            // Simulate intermediate progress for better UX
+            usleep(200000); // 0.2s delay for smoother animation
+            $kb->updateProgress(20, 'building_index');
+            
+            usleep(200000);
+            $kb->updateProgress(30, 'building_index');
 
             // Call LLM service to build KB (use sync mode in job for immediate result)
             $result = $llmService->buildKnowledgeBase($this->projectId, $documents, 'sync');
@@ -130,7 +137,9 @@ class KBBuildJob implements ShouldQueue, ShouldBeUnique
                 'result' => $result,
             ]);
 
-            // Update progress: KB build complete, starting conflict detection (50%)
+            // Update progress: KB build complete, starting conflict detection
+            $kb->updateProgress(45, 'building_index');
+            usleep(200000);
             $kb->updateProgress(50, 'detecting_conflicts');
 
             // Update KB status
@@ -142,7 +151,14 @@ class KBBuildJob implements ShouldQueue, ShouldBeUnique
                 ]);
                 
                 try {
-                    $conflictResult = $conflictService->detectConflictsForProject($this->projectId);
+                    // Update progress during conflict detection
+                    usleep(200000);
+                    $kb->updateProgress(60, 'detecting_conflicts');
+                    
+                    usleep(200000);
+                    $kb->updateProgress(70, 'processing_conflicts');
+                    
+                    $conflictResult = $conflictService->detectConflictsForProject($this->projectId, $kb);
                     
                     // Conflicts are detected and saved synchronously
                     if (isset($conflictResult['status']) && $conflictResult['status'] === 'completed') {
@@ -151,7 +167,14 @@ class KBBuildJob implements ShouldQueue, ShouldBeUnique
                             'conflicts_saved' => $conflictResult['conflicts_saved'] ?? 0
                         ]);
                         
-                        // Update progress: Conflicts saved (100%)
+                        // Update progress through final stages
+                        $kb->updateProgress(85, 'saving_conflicts');
+                        usleep(200000);
+                        
+                        $kb->updateProgress(95, 'saving_conflicts');
+                        usleep(200000);
+                        
+                        // Update progress: Completed
                         $kb->updateProgress(100, 'completed');
                     }
                     

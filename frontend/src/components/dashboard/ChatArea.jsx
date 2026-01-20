@@ -155,7 +155,7 @@ const ChatArea = ({
                     key={msg.id}
                     message={msg}
                     streamingMessageId={streamingMessageId}
-                    shouldAnimate={msg.id === latestAIMessageId}
+                    shouldAnimate={false}
                   />
                 ))}
 

@@ -19,6 +19,9 @@ import {
   Sparkles,
   ChevronDown,
   Pencil,
+  BookOpen,
+  MessagesSquare,
+  Target,
 } from "lucide-react";
 import { apiFetch } from "../utils/auth.js";
 import { useAuth } from "../hooks/useAuth.jsx";
@@ -38,13 +41,13 @@ import {
 } from "../components/LoadingSkeleton.jsx";
 
 // Lazy load heavy components for better LCP
-const RequirementsViewer = lazy(() =>
-  import("../components/RequirementsViewer.jsx")
+const RequirementsViewer = lazy(
+  () => import("../components/RequirementsViewer.jsx"),
 );
 const ConflictsDisplay = lazy(() =>
   import("../components/ConflictDetection.jsx").then((module) => ({
     default: module.ConflictsDisplay,
-  }))
+  })),
 );
 
 const PERSONA_ROLE_ICONS = {
@@ -205,9 +208,7 @@ export default function ProjectDetailPage() {
 
   const handlePersonaUpdated = (persona) => {
     if (!persona) return;
-    setPersonas((prev) =>
-      prev.map((p) => (p.id === persona.id ? persona : p))
-    );
+    setPersonas((prev) => prev.map((p) => (p.id === persona.id ? persona : p)));
     if (selectedPersonaId === persona.id) {
       setSelectedPersonaId(persona.id);
     }
@@ -216,7 +217,7 @@ export default function ProjectDetailPage() {
   const handleDeletePersona = async (personaId) => {
     if (
       !window.confirm(
-        "Are you sure you want to delete this persona? This cannot be undone."
+        "Are you sure you want to delete this persona? This cannot be undone.",
       )
     ) {
       return;
@@ -246,7 +247,7 @@ export default function ProjectDetailPage() {
     setIsPersonaManagerOpen(true);
     setIsPersonaDropdownOpen(false);
   };
-  
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -268,7 +269,7 @@ export default function ProjectDetailPage() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isPersonaDropdownOpen]);
-  
+
   useEffect(() => {
     if (!isPersonaDropdownOpen) {
       setShowPersonaActions(false);
@@ -358,7 +359,7 @@ export default function ProjectDetailPage() {
       lastUpdateTime: 0,
     };
 
-    channel.listen(".message.chunk", (data) => {
+    const messageChunkHandler = (data) => {
       console.log("📨 Message chunk received:", data);
 
       if (data.metadata?.status === "started") {
@@ -392,8 +393,8 @@ export default function ProjectDetailPage() {
             prev.map((m) =>
               m.id === data.message_id
                 ? { ...m, content: streamState.buffer, isStreaming: false }
-                : m
-            )
+                : m,
+            ),
           );
           streamState.buffer = "";
         } else {
@@ -404,8 +405,8 @@ export default function ProjectDetailPage() {
             prev.map((m) =>
               m.id === data.message_id
                 ? { ...m, content: finalContent, isStreaming: false }
-                : m
-            )
+                : m,
+            ),
           );
         }
 
@@ -434,23 +435,26 @@ export default function ProjectDetailPage() {
           if (currentBuffer) {
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === data.message_id ? { ...m, content: currentBuffer } : m
-              )
+                m.id === data.message_id ? { ...m, content: currentBuffer } : m,
+              ),
             );
           }
         };
 
         streamState.animationFrameId = requestAnimationFrame(updateUI);
       }
-    });
+    };
+
+    channel.listen(".message.chunk", messageChunkHandler);
 
     return () => {
       console.log(
-        `🔌 Disconnecting from conversation.${selectedConversation.id}`
+        `🔌 Disconnecting from conversation.${selectedConversation.id}`,
       );
       if (streamState.animationFrameId) {
         cancelAnimationFrame(streamState.animationFrameId);
       }
+      channel.stopListening(".message.chunk", messageChunkHandler);
       echo.leaveChannel(`conversation.${selectedConversation.id}`);
     };
   }, [selectedConversation?.id]);
@@ -491,7 +495,7 @@ export default function ProjectDetailPage() {
     try {
       setIsLoadingMessages(true);
       const data = await apiFetch(
-        `/api/conversations/${conversationId}/messages`
+        `/api/conversations/${conversationId}/messages`,
       );
       const messagesList = data.messages || data;
       const msgs = Array.isArray(messagesList) ? messagesList : [];
@@ -563,12 +567,12 @@ export default function ProjectDetailPage() {
         const conversationTitle = message.trim()
           ? message.slice(0, 50)
           : attachedFiles.length > 0
-          ? `Files: ${attachedFiles[0].name}${
-              attachedFiles.length > 1
-                ? ` +${attachedFiles.length - 1} more`
-                : ""
-            }`
-          : "New Chat";
+            ? `Files: ${attachedFiles[0].name}${
+                attachedFiles.length > 1
+                  ? ` +${attachedFiles.length - 1} more`
+                  : ""
+              }`
+            : "New Chat";
 
         const newConversation = await apiFetch("/api/conversations", {
           method: "POST",
@@ -674,15 +678,15 @@ export default function ProjectDetailPage() {
         {
           method: "POST",
           body,
-        }
+        },
       );
 
       // Replace temp user message with the actual saved message from server
       if (response.user_message) {
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === tempUserMessage.id ? response.user_message : msg
-          )
+            msg.id === tempUserMessage.id ? response.user_message : msg,
+          ),
         );
       }
 
@@ -765,8 +769,8 @@ export default function ProjectDetailPage() {
         prev.map((conv) =>
           conv.id === conversationId
             ? { ...conv, title: editingTitle.trim() }
-            : conv
-        )
+            : conv,
+        ),
       );
 
       if (selectedConversation?.id === conversationId) {
@@ -792,7 +796,7 @@ export default function ProjectDetailPage() {
         method: "DELETE",
       });
       setConversations((prev) =>
-        prev.filter((conv) => conv.id !== conversationId)
+        prev.filter((conv) => conv.id !== conversationId),
       );
 
       if (selectedConversation?.id === conversationId) {
@@ -1026,15 +1030,20 @@ export default function ProjectDetailPage() {
                     {project?.name}
                   </h1>
                   {project?.description && (
-                    <p className="text-sm text-gray-500">{project.description}</p>
+                    <p className="text-sm text-gray-500">
+                      {project.description}
+                    </p>
                   )}
                 </div>
               </div>
-              <div className="flex items-center space-x-2" ref={personaDropdownRef}>
-                    <div className="flex items-center space-x-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      <Sparkles size={14} className="text-purple-500" />
-                      <span>Personas</span>
-                    </div>
+              <div
+                className="flex items-center space-x-2"
+                ref={personaDropdownRef}
+              >
+                <div className="flex items-center space-x-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <Sparkles size={14} className="text-purple-500" />
+                  <span>Personas</span>
+                </div>
                 <div className="relative">
                   <button
                     type="button"
@@ -1043,7 +1052,9 @@ export default function ProjectDetailPage() {
                   >
                     <div className="flex items-center space-x-2">
                       <span>
-                        {selectedPersonaId ? getPersonaIcon(activePersona) : "✨"}
+                        {selectedPersonaId
+                          ? getPersonaIcon(activePersona)
+                          : "✨"}
                       </span>
                       <div>
                         <div className="text-sm font-medium text-gray-900">
@@ -1074,17 +1085,17 @@ export default function ProjectDetailPage() {
                         </div>
                       ) : (
                         <>
-                            <PersonaDropdownItem
-                              label="Normal Mode"
-                              description="General conversation"
-                              icon="✨"
-                              selected={!selectedPersonaId}
-                              onClick={() => {
-                                setSelectedPersonaId(null);
-                                setIsPersonaDropdownOpen(false);
-                              }}
-                              showActions={false}
-                            />
+                          <PersonaDropdownItem
+                            label="Normal Mode"
+                            description="General conversation"
+                            icon="✨"
+                            selected={!selectedPersonaId}
+                            onClick={() => {
+                              setSelectedPersonaId(null);
+                              setIsPersonaDropdownOpen(false);
+                            }}
+                            showActions={false}
+                          />
                           <div className="border-t border-gray-100">
                             {personaList.length === 0 ? (
                               <div className="p-4 text-xs text-gray-400">
@@ -1102,9 +1113,13 @@ export default function ProjectDetailPage() {
                                     setSelectedPersonaId(persona.id);
                                     setIsPersonaDropdownOpen(false);
                                   }}
-                                    showActions={showPersonaActions}
-                                    onEdit={() => openPersonaManagerForEdit(persona)}
-                                    onDelete={() => handleDeletePersona(persona.id)}
+                                  showActions={showPersonaActions}
+                                  onEdit={() =>
+                                    openPersonaManagerForEdit(persona)
+                                  }
+                                  onDelete={() =>
+                                    handleDeletePersona(persona.id)
+                                  }
                                 />
                               ))
                             )}
@@ -1112,21 +1127,21 @@ export default function ProjectDetailPage() {
                           <div className="border-t border-gray-100 px-4 py-3 flex items-center justify-between">
                             <button
                               type="button"
-                                onClick={() =>
-                                  setShowPersonaActions((prev) => !prev)
-                                }
-                                className={`text-xs font-medium ${
-                                  showPersonaActions
-                                    ? "text-purple-800"
-                                    : "text-purple-600"
-                                } hover:text-purple-800`}
+                              onClick={() =>
+                                setShowPersonaActions((prev) => !prev)
+                              }
+                              className={`text-xs font-medium ${
+                                showPersonaActions
+                                  ? "text-purple-800"
+                                  : "text-purple-600"
+                              } hover:text-purple-800`}
                             >
-                                {showPersonaActions ? "Done" : "Manage personas"}
+                              {showPersonaActions ? "Done" : "Manage personas"}
                             </button>
                             <button
                               type="button"
-                                onClick={openPersonaManagerForCreate}
-                                className="text-xs font-medium text-purple-600 hover:text-purple-800"
+                              onClick={openPersonaManagerForCreate}
+                              className="text-xs font-medium text-purple-600 hover:text-purple-800"
                             >
                               + Add persona
                             </button>
@@ -1226,77 +1241,105 @@ export default function ProjectDetailPage() {
                 (messages.length === 0 &&
                   !isSendingMessage &&
                   !isLoadingMessages) ? (
-                  <div className="flex flex-col items-center justify-center h-full text-center py-12 px-4">
-                    {/* Icon with gradient background */}
-                    <div className="mb-6 relative">
-                      <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full blur-2xl opacity-20 animate-pulse"></div>
-                      <div className="relative bg-gradient-to-br from-blue-50 to-purple-50 p-6 rounded-full">
-                        <MessageSquare
-                          size={48}
-                          className="text-blue-600"
-                          strokeWidth={1.5}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Welcome Text */}
-                    <h2 className="text-3xl font-bold mb-3 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                      Welcome to {project?.name}
-                    </h2>
-                    <p className="text-lg text-gray-600 mb-8 max-w-2xl leading-relaxed">
-                      Start a conversation about this project. Your AI assistant
-                      has access to all project documents and knowledge base.
-                    </p>
-
-                    {/* Feature Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl w-full mb-8">
-                      <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-                        <div className="bg-blue-100 w-10 h-10 rounded-lg flex items-center justify-center mb-3 mx-auto">
-                          <FileText size={20} className="text-blue-600" />
-                        </div>
-                        <h4 className="font-semibold text-gray-800 mb-1">
-                          Document Access
-                        </h4>
-                        <p className="text-sm text-gray-600">
-                          Query and analyze all uploaded project documents
+                  <div className="flex flex-col py-12 px-6">
+                    {/* Welcome Section */}
+                    <div className="max-w-4xl mx-auto w-full">
+                      <div className="mb-8">
+                        <h3 className="text-3xl font-bold text-gray-900 mb-3">
+                          {project?.name || "Project Workspace"}
+                        </h3>
+                        <p className="text-gray-600 text-lg">
+                          Collaborate on requirements, analyze documents, and
+                          manage your project efficiently.
                         </p>
                       </div>
 
-                      <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-                        <div className="bg-purple-100 w-10 h-10 rounded-lg flex items-center justify-center mb-3 mx-auto">
-                          <MessageSquare
-                            size={20}
-                            className="text-purple-600"
-                          />
+                      {/* Feature Cards */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div className="bg-white rounded-xl p-6 border border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all">
+                          <div className="flex items-center space-x-3 mb-4">
+                            <div className="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center">
+                              <BookOpen size={24} className="text-blue-600" />
+                            </div>
+                            <h4 className="font-semibold text-gray-900 text-lg">
+                              Document Library
+                            </h4>
+                          </div>
+                          <p className="text-sm text-gray-600 leading-relaxed">
+                            Access and query all uploaded project documents with
+                            intelligent search capabilities.
+                          </p>
                         </div>
-                        <h4 className="font-semibold text-gray-800 mb-1">
-                          Context Aware
-                        </h4>
-                        <p className="text-sm text-gray-600">
-                          Maintains conversation context throughout the chat
-                        </p>
+
+                        <div className="bg-white rounded-xl p-6 border border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all">
+                          <div className="flex items-center space-x-3 mb-4">
+                            <div className="w-12 h-12 rounded-lg bg-indigo-50 flex items-center justify-center">
+                              <MessagesSquare
+                                size={24}
+                                className="text-indigo-600"
+                              />
+                            </div>
+                            <h4 className="font-semibold text-gray-900 text-lg">
+                              Conversation History
+                            </h4>
+                          </div>
+                          <p className="text-sm text-gray-600 leading-relaxed">
+                            Track discussions and decisions with full
+                            conversation context and history.
+                          </p>
+                        </div>
+
+                        <div className="bg-white rounded-xl p-6 border border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all">
+                          <div className="flex items-center space-x-3 mb-4">
+                            <div className="w-12 h-12 rounded-lg bg-emerald-50 flex items-center justify-center">
+                              <Target size={24} className="text-emerald-600" />
+                            </div>
+                            <h4 className="font-semibold text-gray-900 text-lg">
+                              Requirements Focus
+                            </h4>
+                          </div>
+                          <p className="text-sm text-gray-600 leading-relaxed">
+                            Organize and analyze project requirements with
+                            structured workflows.
+                          </p>
+                        </div>
                       </div>
 
-                      <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-                        <div className="bg-green-100 w-10 h-10 rounded-lg flex items-center justify-center mb-3 mx-auto">
-                          <FolderKanban size={20} className="text-green-600" />
+                      {/* Quick Start Section */}
+                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
+                        <div className="flex items-start space-x-3">
+                          <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+                            <MessageSquare size={18} className="text-white" />
+                          </div>
+                          <div>
+                            <h5 className="font-semibold text-gray-900 mb-2">
+                              Getting Started
+                            </h5>
+                            <p className="text-sm text-gray-700 mb-3">
+                              Start a conversation to work with your project.
+                              Here are some things you can do:
+                            </p>
+                            <ul className="space-y-1.5 text-sm text-gray-600">
+                              <li className="flex items-center space-x-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                <span>
+                                  Summarize project documents and requirements
+                                </span>
+                              </li>
+                              <li className="flex items-center space-x-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                <span>
+                                  Ask questions about specific requirements
+                                </span>
+                              </li>
+                              <li className="flex items-center space-x-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                <span>Analyze conflicts and dependencies</span>
+                              </li>
+                            </ul>
+                          </div>
                         </div>
-                        <h4 className="font-semibold text-gray-800 mb-1">
-                          Project Focused
-                        </h4>
-                        <p className="text-sm text-gray-600">
-                          All responses are tailored to your project needs
-                        </p>
                       </div>
-                    </div>
-
-                    {/* Quick Start Hint */}
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-2xl">
-                      <p className="text-sm text-blue-800">
-                        💡 <span className="font-semibold">Quick Start:</span>{" "}
-                        Try asking questions like "Summarize the project
-                        documents" or "What are the main requirements?"
-                      </p>
                     </div>
                   </div>
                 ) : (
@@ -1322,7 +1365,8 @@ export default function ProjectDetailPage() {
                         <MessageBubble
                           key={msg.id}
                           message={msg}
-                          isLatest={msg.id === latestAIMessageId}
+                          streamingMessageId={streamingMessageId}
+                          shouldAnimate={false}
                         />
                       ))
                     )}

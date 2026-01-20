@@ -96,20 +96,23 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
     setIsUploading(true);
     setError(null);
     setUploadProgress({ completed: 0, total: selectedFiles.length });
+    
+    // Start listening BEFORE upload to catch all progress updates
+    setBuildProgress(0);
+    setBuildStage("initializing");
+    setIsListening(true);
 
     try {
       await onUpload(selectedFiles, (completed) => {
         setUploadProgress({ completed, total: selectedFiles.length });
       });
-
-      // Start listening for build progress via WebSocket
-      setIsListening(true);
-      setBuildProgress(0);
-      setBuildStage("initializing");
+      
+      // Upload complete, WebSocket already listening
     } catch (err) {
       console.error("KB upload failed:", err);
       setError(err.message || "Failed to upload documents. Please try again.");
       setIsUploading(false);
+      setIsListening(false); // Stop listening on error
     }
   };
 

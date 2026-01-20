@@ -90,6 +90,7 @@ export default function LLMDashboard() {
   useEffect(() => {
     if (!selectedConversation?.id) return;
 
+    console.log(`🔌 Subscribing to conversation.${selectedConversation.id}`);
     const channel = echo.channel(`conversation.${selectedConversation.id}`);
     const streamState = {
       tempMessageId: null,
@@ -99,7 +100,7 @@ export default function LLMDashboard() {
       lastChunkTime: null,
     };
 
-    channel.listen(".message.chunk", (data) => {
+    const messageChunkHandler = (data) => {
       const { metadata, message_id, is_complete, chunk } = data;
 
       if (metadata?.status === "started") {
@@ -215,9 +216,15 @@ export default function LLMDashboard() {
           )
         );
       }
-    });
+    };
+
+    channel.listen(".message.chunk", messageChunkHandler);
 
     return () => {
+      console.log(
+        `🔌 Unsubscribing from conversation.${selectedConversation.id}`
+      );
+      channel.stopListening(".message.chunk", messageChunkHandler);
       echo.leaveChannel(`conversation.${selectedConversation.id}`);
     };
   }, [selectedConversation?.id]);
