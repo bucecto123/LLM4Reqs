@@ -559,6 +559,46 @@ cd backend
 php artisan queue:work --tries=3
 ```
 
+### 🐳 Docker (Compose)
+
+Run everything with Docker Compose from the project root:
+
+```powershell
+# Start all services in the background
+docker compose up -d
+
+# Stop all services
+docker compose down
+
+# Stop services and remove volumes (resets DB data)
+docker compose down -v
+
+# Tail logs
+docker compose logs -f
+```
+
+**When you update code:**
+
+- **App code changes** (backend/frontend/llm): no rebuild needed; containers see changes via bind mounts.
+- **Dependency changes** (composer.json / package.json / requirements.txt):
+
+```powershell
+docker compose build
+docker compose up -d
+```
+
+- **Database schema changes:**
+
+```powershell
+docker compose exec backend php artisan migrate
+```
+
+- **.env changes:** restart the affected service:
+
+```powershell
+docker compose restart backend
+```
+
 ### 🌐 Access Points
 
 Once running, you can access:
