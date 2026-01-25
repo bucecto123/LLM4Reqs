@@ -56,7 +56,7 @@ class StreamMessageJob implements ShouldQueue
                 '',
                 true,
                 ['error' => $e->getMessage()]
-            ))->toOthers();
+            ));
         }
     }
 }

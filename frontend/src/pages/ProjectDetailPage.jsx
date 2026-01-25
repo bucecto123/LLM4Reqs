@@ -639,12 +639,18 @@ export default function ProjectDetailPage() {
         const formData = new FormData();
         formData.append("file", file);
         formData.append("project_id", projectId);
+        formData.append("conversation_id", conversationId);
 
-        const doc = await apiFetch("/api/documents", {
+        const uploadResponse = await apiFetch("/api/documents", {
           method: "POST",
           body: formData,
           isFormData: true,
         });
+
+        const doc = uploadResponse?.document || uploadResponse;
+        if (!doc?.id) {
+          throw new Error("Document upload failed: missing document id");
+        }
 
         uploadedDocuments.push(doc);
 
@@ -657,7 +663,7 @@ export default function ProjectDetailPage() {
       let messageForAI = userMessage;
       if (uploadedDocuments.length > 0) {
         const docList = uploadedDocuments
-          .map((d) => `- ${d.filename}`)
+          .map((d) => `- ${d.original_filename || d.filename}`)
           .join("\n");
         messageForAI += messageForAI
           ? `\n\nUploaded documents:\n${docList}`

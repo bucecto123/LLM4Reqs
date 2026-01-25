@@ -65,9 +65,9 @@ class ConversationService
 
         // Get conversation with its documents
         $conversation = Conversation::with(['documents' => function($query) {
-            $query->where('status', 'uploaded')
-                    ->whereNotNull('content')
-                    ->where('content', '!=', '');
+            $query->whereNotIn('status', ['failed'])
+                ->whereNotNull('content')
+                ->where('content', '!=', '');
         }])->findOrFail($conversationId);
 
         // Get conversation history
@@ -447,7 +447,7 @@ class ConversationService
             '',
             false,
             ['status' => 'started']
-        ))->toOthers();
+        ));
 
         // Stream the response with callback
         $llmResponse = $this->llmService->chatStream(
@@ -470,7 +470,7 @@ class ConversationService
                     $tempMessageId,
                     $chunk,
                     false
-                ))->toOthers();
+                ));
             }
         );
 
@@ -490,10 +490,10 @@ class ConversationService
             '',
             true,
             ['message' => $aiMessage->toArray()]
-        ))->toOthers();
+        ));
 
         return [
-            'user_message' => $userMessage,
+            'user_message' => null,
             'ai_message' => $aiMessage,
             'success' => true,
             'streaming' => true
