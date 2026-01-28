@@ -22,6 +22,7 @@ import {
   BookOpen,
   MessagesSquare,
   Target,
+  Users,
 } from "lucide-react";
 import { apiFetch } from "../utils/auth.js";
 import { useAuth } from "../hooks/useAuth.jsx";
@@ -32,6 +33,8 @@ import KBUploadModal from "../components/KBUploadModal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import ThinkingIndicator from "../components/ThinkingIndicator.jsx";
 import PersonaManager from "../components/dashboard/PersonaManager.jsx";
+import MemberList from "../components/MemberList.jsx";
+import InviteForm from "../components/InviteForm.jsx";
 import echo from "../utils/echo.js";
 import {
   ProjectDetailSkeleton,
@@ -140,12 +143,18 @@ export default function ProjectDetailPage() {
   const [isDeletingDocument, setIsDeletingDocument] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState("chat"); // 'chat' or 'documents'
+  const [activeTab, setActiveTab] = useState("chat"); // 'chat', 'documents', 'sharing'
 
   // Edit project state
   const [showEditModal, setShowEditModal] = useState(false);
   const [editProjectName, setEditProjectName] = useState("");
   const [editProjectDescription, setEditProjectDescription] = useState("");
+  
+  // Sharing state
+  const [collaborators, setCollaborators] = useState([]);
+  const [isLoadingCollaborators, setIsLoadingCollaborators] = useState(false);
+  const [isInvitingMember, setIsInvitingMember] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState('viewer'); // Will be set from project data
 
   // Mobile and sidebar state
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -335,6 +344,13 @@ export default function ProjectDetailPage() {
     loadProjectConversations();
   }, [projectId]);
 
+  // Load collaborators when switching to sharing tab
+  useEffect(() => {
+    if (activeTab === 'sharing' && projectId) {
+      loadCollaborators();
+    }
+  }, [activeTab, projectId]);
+
   // Auto-scroll effect
   useEffect(() => {
     if (messagesEndRef.current && !isUserScrolling) {
@@ -488,6 +504,21 @@ export default function ProjectDetailPage() {
       setConversations(data || []);
     } catch (err) {
       console.error("Failed to load project conversations:", err);
+    }
+  };
+
+  const loadCollaborators = async () => {
+    setIsLoadingCollaborators(true);
+    try {
+      const { getProjectCollaborators } = await import('../services/sharingService');
+      const response = await getProjectCollaborators(projectId);
+      setCollaborators(response.collaborators || []);
+      // Set current user role (assume owner for now - backend will provide this)
+      setCurrentUserRole('owner');
+    } catch (err) {
+      console.error("Failed to load collaborators:", err);
+    } finally {
+      setIsLoadingCollaborators(false);
     }
   };
 
@@ -1224,6 +1255,19 @@ export default function ProjectDetailPage() {
                 </span>
               </div>
             </button>
+            <button
+              onClick={() => setActiveTab("sharing")}
+              className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === "sharing"
+                  ? "border-blue-600 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <Users size={18} />
+                <span>Sharing</span>
+              </div>
+            </button>
           </div>
         </div>
 
@@ -1514,6 +1558,70 @@ export default function ProjectDetailPage() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Sharing Tab */}
+          {activeTab === "sharing" && (
+            <div className="space-y-6">
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold text-slate-800 mb-2">
+                  Project Sharing
+                </h2>
+                <p className="text-gray-600">
+                  Invite team members to collaborate on this project
+                </p>
+              </div>
+
+              {/* Invite Form */}
+              <InviteForm
+                onInvite={async (data) => {
+                  setIsInvitingMember(true);
+                  const { addCollaborator } = await import('../services/sharingService');
+                  try {
+                    await addCollaborator(projectId, data);
+                    // Reload collaborators (when API ready)
+                    alert(`Invited ${data.email} as ${data.role}`);
+                  } catch (err) {
+                    throw err;
+                  } finally {
+                    setIsInvitingMember(false);
+                  }
+                }}
+                isLoading={isInvitingMember}
+              />
+
+              {/* Member List */}
+              <div>
+                <h3 className="text-lg font-semibold text-slate-800 mb-4">
+                  Team Members
+                </h3>
+                <MemberList
+                  collaborators={collaborators}
+                  currentUserRole={currentUserRole}
+                  onChangeRole={async (userId, newRole) => {
+                    const { updateCollaboratorRole } = await import('../services/sharingService');
+                    try {
+                      await updateCollaboratorRole(projectId, userId, newRole);
+                      alert(`Role updated to ${newRole}`);
+                    } catch (err) {
+                      alert('Failed to update role: ' + err.message);
+                    }
+                  }}
+                  onRemove={async (userId, memberName) => {
+                    if (!window.confirm(`Remove ${memberName} from this project?`)) {
+                      return;
+                    }
+                    const { removeCollaborator } = await import('../services/sharingService');
+                    try {
+                      await removeCollaborator(projectId, userId);
+                      alert(`${memberName} removed`);
+                    } catch (err) {
+                      alert('Failed to remove member: ' + err.message);
+                    }
+                  }}
+                />
+              </div>
             </div>
           )}
         </main>

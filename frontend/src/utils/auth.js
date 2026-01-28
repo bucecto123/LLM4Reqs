@@ -382,6 +382,7 @@ class AuthManager {
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(TOKEN_EXPIRY_KEY);
+    localStorage.removeItem('api_token'); // Remove legacy token
 
     // Clear the interval
     if (this.intervalId) {

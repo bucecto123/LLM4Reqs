@@ -12,6 +12,7 @@
   "dependencies": {
     "laravel-echo": "^2.2.6",
     "lucide-react": "^0.544.0",
+    "mermaid": "^11.12.2",
     "prismjs": "^1.30.0",
     "pusher-js": "^8.4.0",
     "react": "^19.1.1",
