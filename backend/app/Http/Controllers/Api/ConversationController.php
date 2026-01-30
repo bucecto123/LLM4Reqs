@@ -38,8 +38,16 @@ class ConversationController extends Controller
     /**
      * Get conversations for a specific project (project chat workflow)
      */
-    public function getProjectConversations($projectId)
+    public function getProjectConversations(\Illuminate\Http\Request $request, $projectId)
     {
+        // Check project access authorization
+        $project = \App\Models\Project::findOrFail($projectId);
+        if (!$request->user()->can('viewResources', $project)) {
+            return response()->json([
+                'message' => 'Unauthorized to access this project'
+            ], 403);
+        }
+
         // Cache conversations for 1 minute to improve LCP
         $cacheKey = "project_conversations_{$projectId}_" . Auth::id();
         $conversations = \Cache::remember($cacheKey, 60, function () use ($projectId) {
@@ -55,10 +63,10 @@ class ConversationController extends Controller
     /**
      * @deprecated Use getUserConversations or getProjectConversations instead
      */
-    public function index($projectId)
+    public function index(\Illuminate\Http\Request $request, $projectId)
     {
         // Keep for backward compatibility
-        return $this->getProjectConversations($projectId);
+        return $this->getProjectConversations($request, $projectId);
     }
 
     /**

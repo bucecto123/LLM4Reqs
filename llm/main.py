@@ -1613,6 +1613,123 @@ async def test_groq():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ==================== STORY GRAPH GENERATION ====================
+
+
+class StoryGraphRequest(BaseModel):
+    project_id: int
+    project_name: str
+    requirements: List[Dict[str, Any]]
+
+
+class StoryGraphResponse(BaseModel):
+    success: bool
+    mermaid_code: Optional[str] = None
+    nodes: List[Dict[str, Any]] = []
+    edges: List[Dict[str, Any]] = []
+    error: Optional[str] = None
+
+
+@app.post("/api/generate-story-graph", response_model=StoryGraphResponse)
+async def generate_story_graph(request: StoryGraphRequest):
+    """
+    Generate a user story graph from project requirements.
+    Returns both Mermaid.js code and structured node/edge data.
+    """
+    try:
+        if not request.requirements:
+            return StoryGraphResponse(
+                success=True,
+                mermaid_code="graph TD\n    A[No Requirements] -->|Add requirements to generate graph| B[End]",
+                nodes=[],
+                edges=[]
+            )
+
+        # Prepare requirement text for LLM
+        req_text = "\n".join([
+            f"{i+1}. {req.get('title', 'Untitled')} [{req.get('type', 'N/A')}] - Priority: {req.get('priority', 'N/A')}\n"
+            f"   Description: {req.get('text', 'No description')}\n"
+            f"   Status: {req.get('status', 'pending')}\n"
+            for i, req in enumerate(request.requirements)
+        ])
+
+        # Create system prompt for story graph generation
+        system_prompt = """You are an expert requirements analyst. Generate a user story dependency graph from the given requirements.
+
+Analyze the requirements and create a Mermaid.js flowchart that shows:
+1. User story nodes (each requirement as a node)
+2. Dependencies between stories (which stories must be completed before others)
+3. Logical groupings (e.g., by feature area or epic)
+
+Guidelines:
+- Use short, descriptive labels for nodes
+- Show clear dependency arrows
+- Group related stories using subgraphs if appropriate
+- Use different node shapes for different requirement types ([] for functional, () for non-functional)
+
+Output ONLY the Mermaid.js code, starting with "graph TD" or "graph LR"."""
+
+        user_prompt = f"""Project: {request.project_name}
+
+Requirements:
+{req_text}
+
+Generate a clear and well-structured Mermaid.js dependency graph."""
+
+        # Call LLM to generate graph
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt)
+        ]
+
+        response = chat_model_low_temp.invoke(messages)
+        mermaid_code = response.content.strip()
+
+        # Clean up the response (remove markdown code fences if present)
+        if mermaid_code.startswith("```mermaid"):
+            mermaid_code = mermaid_code.replace("```mermaid", "").replace("```", "").strip()
+        elif mermaid_code.startswith("```"):
+            mermaid_code = mermaid_code.replace("```", "").strip()
+
+        # Parse the mermaid code to extract nodes and edges (simplified)
+        nodes = []
+        edges = []
+        
+        for i, req in enumerate(request.requirements):
+            node_id = f"req_{req['id']}"
+            nodes.append({
+                "id": node_id,
+                "label": req.get('title', 'Untitled'),
+                "type": req.get('type', 'functional'),
+                "priority": req.get('priority', 'medium'),
+                "status": req.get('status', 'pending')
+            })
+
+        # Simple edge detection from mermaid code (arrow patterns)
+        import re
+        arrow_pattern = r'(\w+)\s*(?:-->|->)\s*(\w+)'
+        matches = re.findall(arrow_pattern, mermaid_code)
+        for source, target in matches:
+            edges.append({
+                "source": source,
+                "target": target,
+                "type": "dependency"
+            })
+
+        return StoryGraphResponse(
+            success=True,
+            mermaid_code=mermaid_code,
+            nodes=nodes,
+            edges=edges
+        )
+
+    except Exception as e:
+        return StoryGraphResponse(
+            success=False,
+            error=str(e)
+        )
+
+
 if __name__ == "__main__":
     import uvicorn
 

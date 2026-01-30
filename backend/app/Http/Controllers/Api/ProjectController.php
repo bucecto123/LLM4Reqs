@@ -30,33 +30,65 @@ class ProjectController extends Controller
         return response()->json($new_user, 201);
     }
 
-    public function show(string $id)
+    public function show(\Illuminate\Http\Request $request, string $id)
     {
         // Cache project data for 5 minutes to improve LCP
         $project = \Cache::remember("project_{$id}", 300, function () use ($id) {
             return Project::findOrFail($id);
         });
         
+        // Check authorization
+        if (!$request->user()->can('view', $project)) {
+            return response()->json([
+                'message' => 'Unauthorized to view this project'
+            ], 403);
+        }
+        
         return response()->json($project);
     }
 
     public function update(ProjectRequest $request, string $id)
     {
+        $project = Project::findOrFail($id);
+        
+        // Check authorization
+        if (!$request->user()->can('update', $project)) {
+            return response()->json([
+                'message' => 'Unauthorized to update this project'
+            ], 403);
+        }
+        
         $project = $this->project_service->updateProject($id, $request->validated());
         return response()->json($project, 200);
     }
 
-    public function destroy(string $id)
+    public function destroy(\Illuminate\Http\Request $request, string $id)
     {
+        $project = Project::findOrFail($id);
+        
+        // Check authorization
+        if (!$request->user()->can('delete', $project)) {
+            return response()->json([
+                'message' => 'Unauthorized to delete this project'
+            ], 403);
+        }
+        
         $this->project_service->deleteProject($id);
         return response()->json(null, 204);
     }
 
-    public function getRequirements(string $projectId)
+    public function getRequirements(\Illuminate\Http\Request $request, string $projectId)
     {
         try {
             // Find the project
             $project = Project::findOrFail($projectId);
+
+            // Check authorization
+            if (!$request->user()->can('viewResources', $project)) {
+                return response()->json([
+                    'message' => 'Unauthorized to view project requirements'
+                ], 403);
+            }
 
             // Log project information
             Log::info('Project Information', [

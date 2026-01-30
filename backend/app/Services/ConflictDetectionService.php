@@ -332,6 +332,7 @@ class ConflictDetectionService
             $query->where('resolution_status', 'pending');
         }
 
+        /** @var \Illuminate\Database\Eloquent\Collection<RequirementConflict> $conflicts */
         $conflicts = $query->get();
         $resolved = 0;
 

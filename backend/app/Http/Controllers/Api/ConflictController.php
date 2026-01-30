@@ -23,8 +23,17 @@ class ConflictController extends Controller
      * Start conflict detection for a project.
      * POST /api/projects/{projectId}/conflicts/detect
      */
-    public function detectConflicts(int $projectId)
+    public function detectConflicts(Request $request, int $projectId)
     {
+        // Check project access authorization
+        $project = \App\Models\Project::findOrFail($projectId);
+        if (!$request->user()->can('viewResources', $project)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to access this project'
+            ], 403);
+        }
+
         try {
             $result = $this->conflictService->detectConflictsForProject($projectId);
 
@@ -54,7 +63,7 @@ class ConflictController extends Controller
     public function getJobStatus(string $jobId)
     {
         try {
-            $status = $this->conflictService->getJobStatus($jobId);
+            $status = $this->llmService->getJobStatus($jobId);
 
             return response()->json([
                 'success' => true,
@@ -84,7 +93,7 @@ class ConflictController extends Controller
         }
 
         try {
-            $status = $this->conflictService->getJobStatus($jobId);
+            $status = $this->llmService->getJobStatus($jobId);
 
             if (($status['status'] ?? null) !== 'completed') {
                 return response()->json([
@@ -120,8 +129,17 @@ class ConflictController extends Controller
      * Get all conflicts for a project.
      * GET /api/projects/{projectId}/conflicts
      */
-    public function getProjectConflicts(int $projectId)
+    public function getProjectConflicts(Request $request, int $projectId)
     {
+        // Check project access authorization
+        $project = \App\Models\Project::findOrFail($projectId);
+        if (!$request->user()->can('viewResources', $project)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to access this project'
+            ], 403);
+        }
+
         try {
             $conflicts = $this->conflictService->getProjectConflicts($projectId);
 

@@ -4,6 +4,8 @@ use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\PersonaController;
 use App\Http\Controllers\Api\ConflictController;
 use App\Http\Controllers\Api\ExportController;
+use App\Http\Controllers\Api\ProjectCollaboratorController;
+use App\Http\Controllers\Api\StoryGraphController;
 use App\Models\Persona;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -53,6 +55,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/projects/{project}/requirements', [ProjectController::class, 'getRequirements']);
     Route::get('/projects/{project}/conflicts', [ProjectController::class, 'getConflicts']);
     Route::get('/users/{user}/projects', [ProjectController::class, 'getUserProjects']);
+
+    // Project Collaborators (Sharing) API
+    Route::get('/projects/{project}/collaborators', [ProjectCollaboratorController::class, 'index']);
+    Route::post('/projects/{project}/collaborators', [ProjectCollaboratorController::class, 'store']);
+    Route::put('/projects/{project}/collaborators/{collaborator}', [ProjectCollaboratorController::class, 'update']);
+    Route::delete('/projects/{project}/collaborators/{collaborator}', [ProjectCollaboratorController::class, 'destroy']);
+
+    // Story Graph API
+    Route::get('/projects/{project}/story-graph', [StoryGraphController::class, 'generate']);
+    Route::delete('/projects/{project}/story-graph/cache', [StoryGraphController::class, 'clearCache']);
 
     // Knowledge Base API
     Route::get('/projects/{project}/kb/status', [ProjectKBController::class, 'getStatus']);

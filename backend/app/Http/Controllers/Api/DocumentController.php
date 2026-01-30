@@ -59,6 +59,15 @@ class DocumentController extends Controller
             ], 422);
         }
 
+        // Check project access authorization
+        $project = Project::findOrFail($request->input('project_id'));
+        if (!$request->user()->can('modifyResources', $project)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to upload documents to this project'
+            ], 403);
+        }
+
         try {
             $file = $request->file('file');
             $projectId = $request->input('project_id');
@@ -428,6 +437,7 @@ class DocumentController extends Controller
 
             // Delete associated requirements (triggering model events so conflicts are also cleaned up)
             $requirementsDeleted = 0;
+            /** @var \Illuminate\Database\Eloquent\Collection<Requirement> $requirements */
             $requirements = Requirement::where('document_id', $document->id)->get();
             foreach ($requirements as $requirement) {
                 $requirement->delete();
