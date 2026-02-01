@@ -28,6 +28,7 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 from rag import RagManager
 from build_faiss import build_index_for_project
+from story_graph import UserStoryMap, STORY_MAP_PROMPT_TEMPLATE, generate_mermaid_chart
 
 try:
     import hdbscan
@@ -1620,113 +1621,119 @@ class StoryGraphRequest(BaseModel):
     project_id: int
     project_name: str
     requirements: List[Dict[str, Any]]
+    chat_context: Optional[str] = None
 
 
 class StoryGraphResponse(BaseModel):
     success: bool
     mermaid_code: Optional[str] = None
+    story_map: Optional[Dict[str, Any]] = None
     nodes: List[Dict[str, Any]] = []
     edges: List[Dict[str, Any]] = []
     error: Optional[str] = None
 
 
-@app.post("/api/generate-story-graph", response_model=StoryGraphResponse)
+@app.post("/api/story-graph/generate", response_model=StoryGraphResponse)
 async def generate_story_graph(request: StoryGraphRequest):
     """
-    Generate a user story graph from project requirements.
-    Returns both Mermaid.js code and structured node/edge data.
+    Generate a user story graph from project requirements using Strict JSON Schema.
+    Returns both Mermaid.js code and structured Story Map data.
     """
     try:
         if not request.requirements:
             return StoryGraphResponse(
                 success=True,
                 mermaid_code="graph TD\n    A[No Requirements] -->|Add requirements to generate graph| B[End]",
-                nodes=[],
-                edges=[]
             )
 
-        # Prepare requirement text for LLM
+        # Prepare requirements text
         req_text = "\n".join([
-            f"{i+1}. {req.get('title', 'Untitled')} [{req.get('type', 'N/A')}] - Priority: {req.get('priority', 'N/A')}\n"
-            f"   Description: {req.get('text', 'No description')}\n"
-            f"   Status: {req.get('status', 'pending')}\n"
+            f"{i+1}. {req.get('title', 'Untitled')}\n"
+            f"   Type: {req.get('type', 'N/A')}\n"
+            f"   Priority: {req.get('priority', 'N/A')}\n"
+            f"   Description: {req.get('text', '')}\n"
             for i, req in enumerate(request.requirements)
         ])
+        
+        # Add chat context if available
+        if request.chat_context:
+            req_text += f"\n\nAdditional Context from Chat:\n{request.chat_context}"
+        
+        # Prepare Schema
+        schema_json = json.dumps(UserStoryMap.model_json_schema(), indent=2)
 
-        # Create system prompt for story graph generation
-        system_prompt = """You are an expert requirements analyst. Generate a user story dependency graph from the given requirements.
+        # Format Prompt
+        prompt_content = STORY_MAP_PROMPT_TEMPLATE.format(
+            product_description=req_text,
+            json_schema=schema_json
+        )
 
-Analyze the requirements and create a Mermaid.js flowchart that shows:
-1. User story nodes (each requirement as a node)
-2. Dependencies between stories (which stories must be completed before others)
-3. Logical groupings (e.g., by feature area or epic)
-
-Guidelines:
-- Use short, descriptive labels for nodes
-- Show clear dependency arrows
-- Group related stories using subgraphs if appropriate
-- Use different node shapes for different requirement types ([] for functional, () for non-functional)
-
-Output ONLY the Mermaid.js code, starting with "graph TD" or "graph LR"."""
-
-        user_prompt = f"""Project: {request.project_name}
-
-Requirements:
-{req_text}
-
-Generate a clear and well-structured Mermaid.js dependency graph."""
-
-        # Call LLM to generate graph
+        # Call LLM
         messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=user_prompt)
+            HumanMessage(content=prompt_content)
         ]
-
+        
+        # Use low temp for strict JSON adherence
         response = chat_model_low_temp.invoke(messages)
-        mermaid_code = response.content.strip()
-
-        # Clean up the response (remove markdown code fences if present)
-        if mermaid_code.startswith("```mermaid"):
-            mermaid_code = mermaid_code.replace("```mermaid", "").replace("```", "").strip()
-        elif mermaid_code.startswith("```"):
-            mermaid_code = mermaid_code.replace("```", "").strip()
-
-        # Parse the mermaid code to extract nodes and edges (simplified)
+        content = response.content.strip()
+        
+        # Parse JSON (Handle markdown code blocks)
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0].strip()
+            
+        # Parse and Validate
+        try:
+            story_map_obj = UserStoryMap.model_validate_json(content)
+        except Exception as validation_error:
+            print(f"JSON Validation Error: {validation_error} \nContent: {content}")
+            raise validation_error
+        
+        # Generate Mermaid
+        mermaid_code = generate_mermaid_chart(story_map_obj)
+        
+        # Convert Pydantic model to Dict for response
+        story_map_dict = story_map_obj.model_dump()
+        
+        # Determine nodes/edges for backward compatibility or generic graph view if needed
         nodes = []
         edges = []
         
-        for i, req in enumerate(request.requirements):
-            node_id = f"req_{req['id']}"
-            nodes.append({
-                "id": node_id,
-                "label": req.get('title', 'Untitled'),
-                "type": req.get('type', 'functional'),
-                "priority": req.get('priority', 'medium'),
-                "status": req.get('status', 'pending')
-            })
-
-        # Simple edge detection from mermaid code (arrow patterns)
-        import re
-        arrow_pattern = r'(\w+)\s*(?:-->|->)\s*(\w+)'
-        matches = re.findall(arrow_pattern, mermaid_code)
-        for source, target in matches:
-            edges.append({
-                "source": source,
-                "target": target,
-                "type": "dependency"
-            })
+        # Add Activity Nodes
+        for act in story_map_obj.activities:
+            nodes.append({"id": act.id, "label": act.name, "type": "activity", "group": "activity", "order": act.order})
+            
+        # Add Task Nodes
+        for task in story_map_obj.tasks:
+            nodes.append({"id": task.id, "label": task.name, "type": "task", "group": "task", "priority": task.priority, "order": task.order})
+            
+        # Add Story Nodes
+        for story in story_map_obj.userStories:
+            nodes.append({"id": story.id, "label": story.text, "type": "story", "group": "story", "priority": story.priority})
+            edges.append({"source": story.taskId, "target": story.id, "type": "child"})
+            
+        # Infer task->activity link from stories
+        for task in story_map_obj.tasks:
+            related_stories = [s for s in story_map_obj.userStories if s.taskId == task.id]
+            if related_stories:
+                activity_id = related_stories[0].activityId
+                edges.append({"source": activity_id, "target": task.id, "type": "parent"})
 
         return StoryGraphResponse(
             success=True,
             mermaid_code=mermaid_code,
+            story_map=story_map_dict,
             nodes=nodes,
             edges=edges
         )
 
     except Exception as e:
+        print(f"Error generating story graph: {e}")
         return StoryGraphResponse(
             success=False,
-            error=str(e)
+            error=str(e),
+            mermaid_code=f"graph TD\n Error[\"Error generating graph: {str(e)}\"]"
         )
 
 
