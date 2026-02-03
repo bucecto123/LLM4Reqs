@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@xyflow/react": "^12.10.0",
     "laravel-echo": "^2.2.6",
     "lucide-react": "^0.544.0",
     "mermaid": "^11.12.2",
