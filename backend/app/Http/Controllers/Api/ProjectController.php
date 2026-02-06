@@ -18,16 +18,25 @@ class ProjectController extends Controller
         $this->project_service = $project_service;
     }
 
-    public function index()
+    public function index(\Illuminate\Http\Request $request)
     {
-        $projects = Project::all();
-        return response()->json($projects);
+        $userId = $request->user()->id;
+        
+        // Simplified query - just get owned projects for better performance
+        $projects = Project::where('owner_id', $userId)
+            ->select(['id', 'name', 'description', 'status', 'owner_id', 'created_at', 'updated_at'])
+            ->orderBy('updated_at', 'desc')
+            ->get();
+        
+        return response(json_encode($projects), 200)
+            ->header('Content-Type', 'application/json');
     }
 
     public function store(ProjectRequest $request)
     {
         $new_user = $this->project_service->createProject($request->validated());
-        return response()->json($new_user, 201);
+        return response(json_encode($new_user), 201)
+            ->header('Content-Type', 'application/json');
     }
 
     public function show(\Illuminate\Http\Request $request, string $id)
@@ -44,7 +53,8 @@ class ProjectController extends Controller
             ], 403);
         }
         
-        return response()->json($project);
+        return response(json_encode($project), 200)
+            ->header('Content-Type', 'application/json');
     }
 
     public function update(ProjectRequest $request, string $id)
@@ -59,7 +69,8 @@ class ProjectController extends Controller
         }
         
         $project = $this->project_service->updateProject($id, $request->validated());
-        return response()->json($project, 200);
+        return response(json_encode($project), 200)
+            ->header('Content-Type', 'application/json');
     }
 
     public function destroy(\Illuminate\Http\Request $request, string $id)

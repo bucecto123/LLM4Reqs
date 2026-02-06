@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 class CreateProjectsTable extends Migration
 {
@@ -22,6 +23,14 @@ class CreateProjectsTable extends Migration
             $table->string('status')->default('active'); // active, archived, deleted
             $table->timestamps();
         });
+
+        // Fix any existing projects without owner_id (for data consistency)
+        $firstUserId = DB::table('users')->first()?->id;
+        if ($firstUserId) {
+            DB::table('projects')
+                ->whereNull('owner_id')
+                ->update(['owner_id' => $firstUserId]);
+        }
     }
 
     /**
