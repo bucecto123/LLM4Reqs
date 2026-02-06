@@ -22,11 +22,30 @@ class ProjectController extends Controller
     {
         $userId = $request->user()->id;
         
-        // Simplified query - just get owned projects for better performance
+        // Get projects owned by user OR where user is a collaborator
         $projects = Project::where('owner_id', $userId)
+            ->orWhereHas('collaborators', function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })
+            ->with(['owner:id,name,email']) // Eager load owner details
+            ->withCount(['documents', 'requirements']) // Get statistics
             ->select(['id', 'name', 'description', 'status', 'owner_id', 'created_at', 'updated_at'])
             ->orderBy('updated_at', 'desc')
             ->get();
+        
+        // Add permission/role attribute
+        $projects->transform(function ($project) use ($userId) {
+            $project->role = $project->owner_id == $userId ? 'owner' : 'viewer'; // Default to viewer
+            
+            if ($project->owner_id != $userId) {
+                // Check specific collaborator role
+                $collaborator = $project->collaborators()->where('user_id', $userId)->first();
+                if ($collaborator) {
+                    $project->role = $collaborator->pivot->role ?? 'viewer';
+                }
+            }
+            return $project;
+        });
         
         return response(json_encode($projects), 200)
             ->header('Content-Type', 'application/json');

@@ -23,11 +23,14 @@ import {
   MessagesSquare,
   Target,
   Users,
+  Network,
 } from "lucide-react";
 import { apiFetch } from "../utils/auth.js";
 import { useAuth } from "../hooks/useAuth.jsx";
 import Sidebar from "../components/dashboard/Sidebar.jsx";
 import MessageBubble from "../components/dashboard/MessageBubble.jsx";
+import GraphRenderer from "../components/GraphRenderer";
+import { graphService } from "../services/graphService";
 import FileUpload from "../components/FileUpload.jsx";
 import KBUploadModal from "../components/KBUploadModal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
@@ -145,16 +148,57 @@ export default function ProjectDetailPage() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("chat"); // 'chat', 'documents', 'sharing'
 
+  // Story Graph State
+  const [graphData, setGraphData] = useState(null);
+  const [isLoadingGraph, setIsLoadingGraph] = useState(false);
+
+  // Fetch story graph when graph tab is active
+  useEffect(() => {
+    if (activeTab === "graph" && projectId) {
+      setIsLoadingGraph(true);
+      graphService
+        .getStoryGraph(projectId)
+        .then((data) => setGraphData(data))
+        .catch((err) => {
+          console.error("Failed to load graph:", err);
+          setError("Failed to load story graph. Please try again.");
+        })
+        .finally(() => setIsLoadingGraph(false));
+    }
+  }, [activeTab, projectId]);
+
+  const handleGenerateGraph = async () => {
+    setIsLoadingGraph(true);
+    setError(null);
+    try {
+      // Clear cache to force fresh generation
+      await graphService.clearCache(projectId);
+      
+      const data = await graphService.getStoryGraph(projectId);
+      setGraphData(data);
+      
+      if (!data) {
+        setError("No requirements found to generate graph. Please add requirements first.");
+      }
+    } catch (err) {
+      console.error("Failed to generate graph:", err);
+      setError("Failed to generate story graph. Please try again.");
+    } finally {
+      setIsLoadingGraph(false);
+    }
+  };
+
+
   // Edit project state
   const [showEditModal, setShowEditModal] = useState(false);
   const [editProjectName, setEditProjectName] = useState("");
   const [editProjectDescription, setEditProjectDescription] = useState("");
-  
+
   // Sharing state
   const [collaborators, setCollaborators] = useState([]);
   const [isLoadingCollaborators, setIsLoadingCollaborators] = useState(false);
   const [isInvitingMember, setIsInvitingMember] = useState(false);
-  const [currentUserRole, setCurrentUserRole] = useState('viewer'); // Will be set from project data
+  const [currentUserRole, setCurrentUserRole] = useState("viewer"); // Will be set from project data
 
   // Mobile and sidebar state
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -346,7 +390,7 @@ export default function ProjectDetailPage() {
 
   // Load collaborators when switching to sharing tab
   useEffect(() => {
-    if (activeTab === 'sharing' && projectId) {
+    if (activeTab === "sharing" && projectId) {
       loadCollaborators();
     }
   }, [activeTab, projectId]);
@@ -510,11 +554,12 @@ export default function ProjectDetailPage() {
   const loadCollaborators = async () => {
     setIsLoadingCollaborators(true);
     try {
-      const { getProjectCollaborators } = await import('../services/sharingService');
+      const { getProjectCollaborators } =
+        await import("../services/sharingService");
       const response = await getProjectCollaborators(projectId);
       setCollaborators(response.collaborators || []);
       // Set current user role (assume owner for now - backend will provide this)
-      setCurrentUserRole('owner');
+      setCurrentUserRole("owner");
     } catch (err) {
       console.error("Failed to load collaborators:", err);
     } finally {
@@ -1268,6 +1313,19 @@ export default function ProjectDetailPage() {
                 <span>Sharing</span>
               </div>
             </button>
+            <button
+              onClick={() => setActiveTab("graph")}
+              className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === "graph"
+                  ? "border-blue-600 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <Network size={18} />
+                <span>Story Graph</span>
+              </div>
+            </button>
           </div>
         </div>
 
@@ -1577,13 +1635,16 @@ export default function ProjectDetailPage() {
               <InviteForm
                 onInvite={async (data) => {
                   setIsInvitingMember(true);
-                  const { addCollaborator } = await import('../services/sharingService');
+                  const { addCollaborator } =
+                    await import("../services/sharingService");
                   try {
                     await addCollaborator(projectId, data);
                     // Reload collaborators (when API ready)
                     alert(`Invited ${data.email} as ${data.role}`);
                   } catch (err) {
-                    throw err;
+                    const errorMessage = err.response?.data?.message || err.response?.data?.errors?.email?.[0] || err.message || "Failed to invite member";
+                    alert(errorMessage);
+                    console.error(err);
                   } finally {
                     setIsInvitingMember(false);
                   }
@@ -1600,28 +1661,72 @@ export default function ProjectDetailPage() {
                   collaborators={collaborators}
                   currentUserRole={currentUserRole}
                   onChangeRole={async (userId, newRole) => {
-                    const { updateCollaboratorRole } = await import('../services/sharingService');
+                    const { updateCollaboratorRole } =
+                      await import("../services/sharingService");
                     try {
                       await updateCollaboratorRole(projectId, userId, newRole);
                       alert(`Role updated to ${newRole}`);
                     } catch (err) {
-                      alert('Failed to update role: ' + err.message);
+                      alert("Failed to update role: " + err.message);
                     }
                   }}
                   onRemove={async (userId, memberName) => {
-                    if (!window.confirm(`Remove ${memberName} from this project?`)) {
+                    if (
+                      !window.confirm(`Remove ${memberName} from this project?`)
+                    ) {
                       return;
+
+
                     }
-                    const { removeCollaborator } = await import('../services/sharingService');
+                    const { removeCollaborator } =
+                      await import("../services/sharingService");
                     try {
                       await removeCollaborator(projectId, userId);
                       alert(`${memberName} removed`);
                     } catch (err) {
-                      alert('Failed to remove member: ' + err.message);
+                      alert("Failed to remove member: " + err.message);
                     }
                   }}
                 />
               </div>
+            </div>
+          )}
+
+          {activeTab === "graph" && (
+            <div className="h-full bg-gray-50 rounded-xl border border-gray-200 overflow-hidden min-h-[600px]">
+              {isLoadingGraph ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                  <span className="ml-2 text-gray-600">
+                    Generating Story Graph...
+                  </span>
+                </div>
+              ) : graphData ? (
+                <GraphRenderer
+                  type="storymap"
+                  storyMap={graphData}
+                  interactive={true}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full space-y-4">
+                  <div className="p-4 bg-blue-50 rounded-full">
+                    <Network size={48} className="text-blue-500" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-800">
+                    No Story Graph Generated
+                  </h3>
+                  <p className="text-gray-500 max-w-md text-center">
+                    Generate a visual story map from your project requirements to see the big picture.
+                  </p>
+                  <button
+                    onClick={handleGenerateGraph}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center shadow-lg transition-transform transform hover:-translate-y-0.5"
+                  >
+                    <Sparkles size={20} className="mr-2" />
+                    Generate Graph
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </main>

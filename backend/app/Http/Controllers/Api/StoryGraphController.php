@@ -71,7 +71,7 @@ class StoryGraphController extends Controller
                 'requirements_count' => $requirements->count()
             ]);
 
-            $response = Http::timeout(60)->post("{$llmServiceUrl}/api/generate-story-graph", [
+            $response = Http::timeout(60)->post("{$llmServiceUrl}/api/story-graph/generate", [
                 'project_id' => $projectId,
                 'project_name' => $project->name,
                 'requirements' => $requirementsData

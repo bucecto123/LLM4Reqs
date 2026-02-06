@@ -386,13 +386,15 @@ export default function ProjectsPage() {
                       >
                         <Edit2 size={18} className="text-blue-600" />
                       </button>
-                      <button
-                        onClick={(e) => deleteProject(project, e)}
-                        className="p-2 rounded-lg hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
-                        title="Delete project"
-                      >
-                        <Trash2 size={18} className="text-red-600" />
-                      </button>
+                      {project.role === "owner" && (
+                        <button
+                          onClick={(e) => deleteProject(project, e)}
+                          className="p-2 rounded-lg hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                          title="Delete project"
+                        >
+                          <Trash2 size={18} className="text-red-600" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -410,6 +412,24 @@ export default function ProjectsPage() {
                     <span>{project.documents_count || 0} documents</span>
                     <span>•</span>
                     <span>{project.requirements_count || 0} requirements</span>
+                  </div>
+
+                  {/* Role Badge & Owner Info */}
+                  <div className="mt-4 pt-3 border-t border-purple-100 flex items-center justify-between">
+                    <span
+                      className={`text-xs px-2 py-1 rounded-full font-medium uppercase tracking-wide ${
+                        project.role === "owner"
+                          ? "bg-indigo-100 text-indigo-700"
+                          : "bg-orange-100 text-orange-700"
+                      }`}
+                    >
+                      {project.role}
+                    </span>
+                    {project.role !== "owner" && project.owner && (
+                      <span className="text-xs text-gray-500 truncate max-w-[120px]" title={`Owner: ${project.owner.email}`}>
+                        by {project.owner.email.split("@")[0]}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}

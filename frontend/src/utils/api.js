@@ -7,7 +7,7 @@ export async function apiFetch(path, options = {}) {
   headers['Accept'] = headers['Accept'] || 'application/json';
   headers['Content-Type'] = headers['Content-Type'] || 'application/json';
 
-  const token = localStorage.getItem('api_token');
+  const token = localStorage.getItem('api_token') || localStorage.getItem('access_token');
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   // If body is a plain object, stringify it (but don't stringify FormData)

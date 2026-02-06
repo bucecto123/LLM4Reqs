@@ -73,6 +73,8 @@ class ProjectCollaboratorController extends Controller
         $validator = Validator::make($request->all(), [
             'email' => 'required|email|exists:users,email',
             'role' => ['required', Rule::in(['owner', 'editor', 'viewer'])]
+        ], [
+            'email.exists' => 'User with this email address was not found. Please ask them to sign up first.'
         ]);
 
         if ($validator->fails()) {
