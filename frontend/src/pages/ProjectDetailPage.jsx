@@ -24,6 +24,7 @@ import {
   Target,
   Users,
   Network,
+  Eye,
 } from "lucide-react";
 import { apiFetch } from "../utils/auth.js";
 import { useAuth } from "../hooks/useAuth.jsx";
@@ -38,6 +39,7 @@ import ThinkingIndicator from "../components/ThinkingIndicator.jsx";
 import PersonaManager from "../components/dashboard/PersonaManager.jsx";
 import MemberList from "../components/MemberList.jsx";
 import InviteForm from "../components/InviteForm.jsx";
+import { canEdit } from "../services/sharingService";
 import echo from "../utils/echo.js";
 import {
   ProjectDetailSkeleton,
@@ -173,12 +175,14 @@ export default function ProjectDetailPage() {
     try {
       // Clear cache to force fresh generation
       await graphService.clearCache(projectId);
-      
+
       const data = await graphService.getStoryGraph(projectId);
       setGraphData(data);
-      
+
       if (!data) {
-        setError("No requirements found to generate graph. Please add requirements first.");
+        setError(
+          "No requirements found to generate graph. Please add requirements first.",
+        );
       }
     } catch (err) {
       console.error("Failed to generate graph:", err);
@@ -187,7 +191,6 @@ export default function ProjectDetailPage() {
       setIsLoadingGraph(false);
     }
   };
-
 
   // Edit project state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -249,6 +252,9 @@ export default function ProjectDetailPage() {
   const activePersona = selectedPersonaId
     ? personaList.find((p) => p.id === selectedPersonaId)
     : null;
+
+  // Role-based access control
+  const canUserEdit = canEdit(currentUserRole);
   const personaDropdownRef = useRef(null);
 
   const handlePersonaCreated = (persona) => {
@@ -1195,7 +1201,9 @@ export default function ProjectDetailPage() {
                                     setSelectedPersonaId(persona.id);
                                     setIsPersonaDropdownOpen(false);
                                   }}
-                                  showActions={showPersonaActions}
+                                  showActions={
+                                    showPersonaActions && canUserEdit
+                                  }
                                   onEdit={() =>
                                     openPersonaManagerForEdit(persona)
                                   }
@@ -1207,26 +1215,37 @@ export default function ProjectDetailPage() {
                             )}
                           </div>
                           <div className="border-t border-gray-100 px-4 py-3 flex items-center justify-between">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setShowPersonaActions((prev) => !prev)
-                              }
-                              className={`text-xs font-medium ${
-                                showPersonaActions
-                                  ? "text-purple-800"
-                                  : "text-purple-600"
-                              } hover:text-purple-800`}
-                            >
-                              {showPersonaActions ? "Done" : "Manage personas"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={openPersonaManagerForCreate}
-                              className="text-xs font-medium text-purple-600 hover:text-purple-800"
-                            >
-                              + Add persona
-                            </button>
+                            {canUserEdit && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setShowPersonaActions((prev) => !prev)
+                                  }
+                                  className={`text-xs font-medium ${
+                                    showPersonaActions
+                                      ? "text-purple-800"
+                                      : "text-purple-600"
+                                  } hover:text-purple-800`}
+                                >
+                                  {showPersonaActions
+                                    ? "Done"
+                                    : "Manage personas"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={openPersonaManagerForCreate}
+                                  className="text-xs font-medium text-purple-600 hover:text-purple-800"
+                                >
+                                  + Add persona
+                                </button>
+                              </>
+                            )}
+                            {!canUserEdit && (
+                              <div className="text-xs text-gray-400 italic w-full text-center">
+                                View-only: Cannot manage personas
+                              </div>
+                            )}
                           </div>
                         </>
                       )}
@@ -1240,21 +1259,43 @@ export default function ProjectDetailPage() {
           <div className="flex items-center space-x-3">
             <button
               onClick={() => setShowEditModal(true)}
-              className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:shadow-lg bg-gray-100 text-slate-800"
+              disabled={!canUserEdit}
+              title={
+                !canUserEdit
+                  ? "You don't have permission to edit this project"
+                  : "Edit project"
+              }
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:shadow-lg ${
+                !canUserEdit
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-60"
+                  : "bg-gray-100 text-slate-800"
+              }`}
             >
               <Edit2 size={18} />
               <span className="hidden md:inline">Edit</span>
             </button>
             <button
               onClick={() => setIsKBUploadOpen(true)}
-              className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:shadow-lg bg-indigo-600 text-white"
+              disabled={!canUserEdit}
+              title={
+                !canUserEdit
+                  ? "You don't have permission to build KB"
+                  : "Build Knowledge Base"
+              }
+              className={`flex items-center space-x-2 px-4 py-2 rounded-md font-medium transition-colors ${
+                !canUserEdit
+                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                  : "text-white hover:opacity-90"
+              }`}
+              style={!canUserEdit ? {} : { backgroundColor: "#4A7BA7" }}
             >
               <Database size={18} />
               <span className="hidden md:inline">Build KB</span>
             </button>
             <button
               onClick={() => setShowRequirements((v) => !v)}
-              className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:shadow-lg bg-blue-600 text-white"
+              className="flex items-center space-x-2 px-4 py-2 rounded-md font-medium transition-colors hover:opacity-90"
+              style={{ backgroundColor: "#112D4E", color: "white" }}
             >
               <FileText size={18} />
               <span className="hidden md:inline">Requirements</span>
@@ -1268,6 +1309,24 @@ export default function ProjectDetailPage() {
             </button>
           </div>
         </header>
+
+        {/* Read-Only Banner for Viewers */}
+        {!canUserEdit && (
+          <div className="bg-amber-50 border-b border-amber-200 px-6 py-3">
+            <div className="flex items-center space-x-2 text-amber-800">
+              <Eye size={18} />
+              <span className="text-sm font-medium">
+                View-Only Mode: You can view this project but cannot make
+                changes.
+                <span className="ml-1 text-amber-600">
+                  Role:{" "}
+                  {currentUserRole.charAt(0).toUpperCase() +
+                    currentUserRole.slice(1)}
+                </span>
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="border-b border-gray-200 bg-white px-6">
@@ -1352,24 +1411,36 @@ export default function ProjectDetailPage() {
                   <div className="flex flex-col py-12 px-6">
                     {/* Welcome Section */}
                     <div className="max-w-4xl mx-auto w-full">
-                      <div className="mb-8">
-                        <h3 className="text-3xl font-bold text-gray-900 mb-3">
+                      <div className="mb-10">
+                        <h3
+                          className="text-4xl font-bold mb-4"
+                          style={{ color: "#112D4E" }}
+                        >
                           {project?.name || "Project Workspace"}
                         </h3>
-                        <p className="text-gray-600 text-lg">
+                        <p className="text-gray-600 text-lg leading-relaxed">
                           Collaborate on requirements, analyze documents, and
                           manage your project efficiently.
                         </p>
                       </div>
 
                       {/* Feature Cards */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                        <div className="bg-white rounded-xl p-6 border border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all">
-                          <div className="flex items-center space-x-3 mb-4">
-                            <div className="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center">
-                              <BookOpen size={24} className="text-blue-600" />
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                        <div
+                          className="group bg-white rounded-xl p-6 border-2 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer"
+                          style={{ borderColor: "#DBE2EF" }}
+                        >
+                          <div className="mb-5">
+                            <div
+                              className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-transform duration-300 group-hover:scale-110"
+                              style={{ backgroundColor: "#4A7BA7" }}
+                            >
+                              <BookOpen size={24} className="text-white" />
                             </div>
-                            <h4 className="font-semibold text-gray-900 text-lg">
+                            <h4
+                              className="font-bold text-lg mb-2"
+                              style={{ color: "#112D4E" }}
+                            >
                               Document Library
                             </h4>
                           </div>
@@ -1379,15 +1450,24 @@ export default function ProjectDetailPage() {
                           </p>
                         </div>
 
-                        <div className="bg-white rounded-xl p-6 border border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all">
-                          <div className="flex items-center space-x-3 mb-4">
-                            <div className="w-12 h-12 rounded-lg bg-indigo-50 flex items-center justify-center">
+                        <div
+                          className="group bg-white rounded-xl p-6 border-2 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer"
+                          style={{ borderColor: "#DBE2EF" }}
+                        >
+                          <div className="mb-5">
+                            <div
+                              className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-transform duration-300 group-hover:scale-110"
+                              style={{ backgroundColor: "#4A7BA7" }}
+                            >
                               <MessagesSquare
                                 size={24}
-                                className="text-indigo-600"
+                                className="text-white"
                               />
                             </div>
-                            <h4 className="font-semibold text-gray-900 text-lg">
+                            <h4
+                              className="font-bold text-lg mb-2"
+                              style={{ color: "#112D4E" }}
+                            >
                               Conversation History
                             </h4>
                           </div>
@@ -1397,12 +1477,21 @@ export default function ProjectDetailPage() {
                           </p>
                         </div>
 
-                        <div className="bg-white rounded-xl p-6 border border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all">
-                          <div className="flex items-center space-x-3 mb-4">
-                            <div className="w-12 h-12 rounded-lg bg-emerald-50 flex items-center justify-center">
-                              <Target size={24} className="text-emerald-600" />
+                        <div
+                          className="group bg-white rounded-xl p-6 border-2 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer"
+                          style={{ borderColor: "#DBE2EF" }}
+                        >
+                          <div className="mb-5">
+                            <div
+                              className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-transform duration-300 group-hover:scale-110"
+                              style={{ backgroundColor: "#4A7BA7" }}
+                            >
+                              <Target size={24} className="text-white" />
                             </div>
-                            <h4 className="font-semibold text-gray-900 text-lg">
+                            <h4
+                              className="font-bold text-lg mb-2"
+                              style={{ color: "#112D4E" }}
+                            >
                               Requirements Focus
                             </h4>
                           </div>
@@ -1414,34 +1503,61 @@ export default function ProjectDetailPage() {
                       </div>
 
                       {/* Quick Start Section */}
-                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
-                        <div className="flex items-start space-x-3">
-                          <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-                            <MessageSquare size={18} className="text-white" />
+                      <div
+                        className="rounded-xl p-6 border-2"
+                        style={{
+                          backgroundColor: "#DBE2EF",
+                          borderColor: "#4A7BA7",
+                        }}
+                      >
+                        <div className="flex items-start space-x-4">
+                          <div
+                            className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center"
+                            style={{ backgroundColor: "#112D4E" }}
+                          >
+                            <MessageSquare size={20} className="text-white" />
                           </div>
-                          <div>
-                            <h5 className="font-semibold text-gray-900 mb-2">
+                          <div className="flex-1">
+                            <h5
+                              className="font-bold text-lg mb-2"
+                              style={{ color: "#112D4E" }}
+                            >
                               Getting Started
                             </h5>
-                            <p className="text-sm text-gray-700 mb-3">
+                            <p
+                              className="text-sm mb-4"
+                              style={{ color: "#112D4E" }}
+                            >
                               Start a conversation to work with your project.
                               Here are some things you can do:
                             </p>
-                            <ul className="space-y-1.5 text-sm text-gray-600">
-                              <li className="flex items-center space-x-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                            <ul
+                              className="space-y-2 text-sm"
+                              style={{ color: "#112D4E" }}
+                            >
+                              <li className="flex items-start space-x-3">
+                                <span
+                                  className="flex-shrink-0 w-1.5 h-1.5 rounded-full mt-1.5"
+                                  style={{ backgroundColor: "#4A7BA7" }}
+                                ></span>
                                 <span>
                                   Summarize project documents and requirements
                                 </span>
                               </li>
-                              <li className="flex items-center space-x-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                              <li className="flex items-start space-x-3">
+                                <span
+                                  className="flex-shrink-0 w-1.5 h-1.5 rounded-full mt-1.5"
+                                  style={{ backgroundColor: "#4A7BA7" }}
+                                ></span>
                                 <span>
                                   Ask questions about specific requirements
                                 </span>
                               </li>
-                              <li className="flex items-center space-x-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                              <li className="flex items-start space-x-3">
+                                <span
+                                  className="flex-shrink-0 w-1.5 h-1.5 rounded-full mt-1.5"
+                                  style={{ backgroundColor: "#4A7BA7" }}
+                                ></span>
                                 <span>Analyze conflicts and dependencies</span>
                               </li>
                             </ul>
@@ -1521,28 +1637,49 @@ export default function ProjectDetailPage() {
                 <div className="flex items-end space-x-2">
                   <button
                     onClick={() => setIsFileUploadOpen(true)}
-                    className="p-3 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors flex-shrink-0"
-                    title="Attach files"
+                    disabled={!canUserEdit}
+                    title={
+                      !canUserEdit
+                        ? "You don't have permission to upload files"
+                        : "Attach files"
+                    }
+                    className={`p-3 rounded-lg transition-colors flex-shrink-0 ${
+                      !canUserEdit
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-60"
+                        : "bg-gray-100 hover:bg-gray-200 text-gray-600"
+                    }`}
                   >
-                    <Paperclip size={20} className="text-gray-600" />
+                    <Paperclip size={20} />
                   </button>
 
                   <textarea
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     onKeyDown={handleKeyPress}
-                    placeholder="Ask about this project..."
+                    placeholder={
+                      !canUserEdit
+                        ? "View-only mode: You can read but not send messages"
+                        : "Ask about this project..."
+                    }
                     className="flex-1 px-4 py-3 rounded-lg border-2 border-gray-200 focus:border-blue-400 focus:outline-none resize-none"
                     rows={3}
-                    disabled={isSendingMessage || isLoadingMessages}
+                    disabled={
+                      !canUserEdit || isSendingMessage || isLoadingMessages
+                    }
                   />
 
                   <button
                     onClick={handleSendMessage}
                     disabled={
+                      !canUserEdit ||
                       (!message.trim() && attachedFiles.length === 0) ||
                       isSendingMessage ||
                       isLoadingMessages
+                    }
+                    title={
+                      !canUserEdit
+                        ? "You don't have permission to send messages"
+                        : "Send message"
                     }
                     className="p-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                   >
@@ -1572,7 +1709,9 @@ export default function ProjectDetailPage() {
                     No documents yet
                   </h3>
                   <p className="mb-6 text-gray-500">
-                    Use the "Build KB" button in the header to upload documents
+                    {canUserEdit
+                      ? 'Use the "Build KB" button in the header to upload documents'
+                      : "No documents have been uploaded to this project yet"}
                   </p>
                 </div>
               ) : (
@@ -1603,13 +1742,15 @@ export default function ProjectDetailPage() {
                           </div>
                         </div>
                         <div className="flex items-center space-x-2 ml-4">
-                          <button
-                            onClick={() => requestDocumentDeletion(doc)}
-                            className="p-2 rounded-lg hover:bg-red-50 transition-colors"
-                            title="Delete document"
-                          >
-                            <Trash2 size={18} className="text-red-600" />
-                          </button>
+                          {canUserEdit && (
+                            <button
+                              onClick={() => requestDocumentDeletion(doc)}
+                              className="p-2 rounded-lg hover:bg-red-50 transition-colors"
+                              title="Delete document"
+                            >
+                              <Trash2 size={18} className="text-red-600" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1642,7 +1783,11 @@ export default function ProjectDetailPage() {
                     // Reload collaborators (when API ready)
                     alert(`Invited ${data.email} as ${data.role}`);
                   } catch (err) {
-                    const errorMessage = err.response?.data?.message || err.response?.data?.errors?.email?.[0] || err.message || "Failed to invite member";
+                    const errorMessage =
+                      err.response?.data?.message ||
+                      err.response?.data?.errors?.email?.[0] ||
+                      err.message ||
+                      "Failed to invite member";
                     alert(errorMessage);
                     console.error(err);
                   } finally {
@@ -1675,8 +1820,6 @@ export default function ProjectDetailPage() {
                       !window.confirm(`Remove ${memberName} from this project?`)
                     ) {
                       return;
-
-
                     }
                     const { removeCollaborator } =
                       await import("../services/sharingService");
@@ -1716,15 +1859,22 @@ export default function ProjectDetailPage() {
                     No Story Graph Generated
                   </h3>
                   <p className="text-gray-500 max-w-md text-center">
-                    Generate a visual story map from your project requirements to see the big picture.
+                    Generate a visual story map from your project requirements
+                    to see the big picture.
                   </p>
-                  <button
-                    onClick={handleGenerateGraph}
-                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center shadow-lg transition-transform transform hover:-translate-y-0.5"
-                  >
-                    <Sparkles size={20} className="mr-2" />
-                    Generate Graph
-                  </button>
+                  {canUserEdit ? (
+                    <button
+                      onClick={handleGenerateGraph}
+                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center shadow-lg transition-transform transform hover:-translate-y-0.5"
+                    >
+                      <Sparkles size={20} className="mr-2" />
+                      Generate Graph
+                    </button>
+                  ) : (
+                    <div className="text-sm text-gray-500 italic">
+                      Only editors can generate graphs
+                    </div>
+                  )}
                 </div>
               )}
             </div>

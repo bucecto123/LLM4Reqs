@@ -7,6 +7,7 @@ import {
   Layers,
   Flag,
   Download,
+  Calendar,
 } from "lucide-react";
 import { apiFetch } from "../utils/auth.js";
 import ExportModal from "./ExportModal.jsx";
@@ -65,7 +66,7 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
       });
 
       const response = await apiFetch(
-        `/api/projects/${projectId}/requirements?${params}`
+        `/api/projects/${projectId}/requirements?${params}`,
       );
       console.log("Requirements API Response:", {
         success: response?.success,
@@ -145,8 +146,8 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
                 {filters.type === ""
                   ? "All Types"
                   : filters.type === "functional"
-                  ? "Functional"
-                  : "Non-Functional"}
+                    ? "Functional"
+                    : "Non-Functional"}
               </span>
               <ChevronDown
                 size={16}
@@ -494,49 +495,55 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
           {/* Modal */}
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col"
+              className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <div
+                className="px-6 py-4 border-b flex items-center justify-between"
+                style={{ backgroundColor: "#112D4E", borderColor: "#0a1f33" }}
+              >
                 <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <FileText className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <h3 className="text-lg font-bold text-slate-800">
+                  <FileText className="w-5 h-5 text-white" />
+                  <h3 className="text-lg font-semibold text-white">
                     Requirement Details
                   </h3>
                 </div>
                 <button
                   onClick={() => setSelectedRequirement(null)}
-                  className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-600 hover:text-slate-900"
+                  className="text-white hover:text-gray-300 text-xl"
                 >
-                  ✕
+                  ×
                 </button>
               </div>
 
               {/* Content */}
-              <div className="p-5 overflow-y-auto flex-1 space-y-3">
+              <div className="p-6 overflow-y-auto flex-1 space-y-4">
                 {/* ID Badge */}
-                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                <div className="bg-gray-50 rounded-md p-3 border border-gray-200">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                    <span className="text-xs font-semibold text-gray-600 uppercase">
                       Requirement ID
                     </span>
-                    <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full font-bold">
-                      #{selectedRequirement.requirement_number || selectedRequirement.id}
+                    <span
+                      className="px-3 py-1 rounded-md font-semibold"
+                      style={{ backgroundColor: "#4A7BA7", color: "white" }}
+                    >
+                      #
+                      {selectedRequirement.requirement_number ||
+                        selectedRequirement.id}
                     </span>
                   </div>
                 </div>
 
                 {/* Type & Priority */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                  <div className="bg-gray-50 rounded-md p-3 border border-gray-200">
+                    <div className="text-xs font-semibold text-gray-600 uppercase mb-2">
                       Type
                     </div>
                     <span
-                      className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                      className={`inline-block px-2.5 py-1 rounded text-xs font-semibold ${
                         selectedRequirement.requirement_type === "functional"
                           ? "bg-blue-100 text-blue-700"
                           : "bg-purple-100 text-purple-700"
@@ -546,17 +553,17 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
                     </span>
                   </div>
 
-                  <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                  <div className="bg-gray-50 rounded-md p-3 border border-gray-200">
+                    <div className="text-xs font-semibold text-gray-600 uppercase mb-2">
                       Priority
                     </div>
                     <span
-                      className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                      className={`inline-block px-2.5 py-1 rounded text-xs font-semibold ${
                         selectedRequirement.priority === "high"
                           ? "bg-red-100 text-red-700"
                           : selectedRequirement.priority === "medium"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-green-100 text-green-700"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-green-100 text-green-700"
                       }`}
                     >
                       {selectedRequirement.priority?.toUpperCase()}
@@ -565,22 +572,23 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
                 </div>
 
                 {/* Confidence Score */}
-                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                <div className="bg-gray-50 rounded-md p-3 border border-gray-200">
+                  <div className="text-xs font-semibold text-gray-600 uppercase mb-2">
                     Confidence Score
                   </div>
                   <div className="flex items-center space-x-2">
-                    <div className="flex-1 bg-slate-200 rounded-full h-2 overflow-hidden">
+                    <div className="flex-1 bg-gray-200 rounded-full h-2.5">
                       <div
-                        className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-500"
+                        className="h-full rounded-full"
                         style={{
                           width: `${
                             (selectedRequirement.confidence_score || 0) * 100
                           }%`,
+                          backgroundColor: "#4A7BA7",
                         }}
                       ></div>
                     </div>
-                    <span className="font-bold text-slate-700 text-sm min-w-[50px] text-right">
+                    <span className="font-semibold text-sm text-gray-700 min-w-[50px] text-right">
                       {(
                         (selectedRequirement.confidence_score || 0) * 100
                       ).toFixed(1)}
@@ -590,53 +598,55 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
                 </div>
 
                 {/* Full Text */}
-                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                <div className="bg-gray-50 rounded-md p-3 border border-gray-200">
+                  <div className="text-xs font-semibold text-gray-600 uppercase mb-2">
                     Requirement Text
                   </div>
-                  <div className="text-slate-700 leading-relaxed text-sm bg-white p-3 rounded border border-slate-200">
+                  <div className="text-gray-800 leading-relaxed text-sm bg-white p-3 rounded border border-gray-200">
                     {selectedRequirement.requirement_text}
                   </div>
                 </div>
 
-                {/* Source Document & Extracted Date */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                      Source Document
-                    </div>
-                    <div className="text-slate-700 text-sm font-medium">
-                      {selectedRequirement.document?.title ||
-                        selectedRequirement.document_id ||
-                        "Unknown"}
-                    </div>
+                {/* Source Information */}
+                <div className="bg-gray-50 rounded-md p-3 border border-gray-200">
+                  <div className="text-xs font-semibold text-gray-600 uppercase mb-3">
+                    Source Information
                   </div>
-
-                  <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                      Extracted At
+                  <div className="space-y-2.5">
+                    <div className="flex items-start space-x-2">
+                      <FileText className="w-4 h-4 text-gray-500 mt-0.5" />
+                      <div>
+                        <div className="text-xs text-gray-500 mb-0.5">
+                          Document
+                        </div>
+                        <div className="text-gray-800 text-sm">
+                          {selectedRequirement.document?.original_filename ||
+                            selectedRequirement.document?.title ||
+                            "Unknown"}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-slate-700 text-sm font-medium">
-                      {selectedRequirement.created_at
-                        ? new Date(
-                            selectedRequirement.created_at
-                          ).toLocaleDateString()
-                        : "N/A"}
-                    </div>
+                    {selectedRequirement.created_at && (
+                      <div className="flex items-start space-x-2">
+                        <Calendar className="w-4 h-4 text-gray-500 mt-0.5" />
+                        <div>
+                          <div className="text-xs text-gray-500 mb-0.5">
+                            Extracted
+                          </div>
+                          <div className="text-gray-800 text-sm">
+                            {new Date(
+                              selectedRequirement.created_at,
+                            ).toLocaleDateString("en-US", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                {/* Metadata */}
-                {selectedRequirement.document && (
-                  <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                      Document Metadata
-                    </div>
-                    <pre className="bg-slate-900 text-green-400 p-3 rounded text-xs overflow-x-auto font-mono max-h-40">
-                      {JSON.stringify(selectedRequirement.document, null, 2)}
-                    </pre>
-                  </div>
-                )}
               </div>
             </div>
           </div>
