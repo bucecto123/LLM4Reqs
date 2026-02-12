@@ -1476,7 +1476,7 @@ async def chat(request: ChatRequest):
         return ChatResponse(
             response=response_text, 
             tokens_used=tokens_used, 
-            model=request.model_id or DEFAULT_MODEL
+            model=request.model_id or DEFAULT_MODEL_ID
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1968,14 +1968,15 @@ async def get_job_status(job_id: str, api_key: str = Depends(verify_api_key)):
 async def test_groq():
     """Simple test endpoint to verify LangChain-Groq connection"""
     try:
-        response = chat_model_default.invoke([HumanMessage(content="Say 'Hello, FastAPI with LangChain-Groq!'")])
+        model = model_manager.get_chat_model(DEFAULT_PROVIDER, DEFAULT_MODEL_ID)
+        response = model.invoke([HumanMessage(content="Say 'Hello, FastAPI with LangChain-Groq!'")])
         content = response.content
         usage = response.additional_kwargs.get('usage', {})
         tokens_used = usage.get('total_tokens', 0)
         return {
             "success": True,
             "response": content,
-            "model": DEFAULT_MODEL,
+            "model": DEFAULT_MODEL_ID,
             "tokens_used": tokens_used,
         }
     except Exception as e:

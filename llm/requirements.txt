@@ -5,6 +5,8 @@ python-dotenv
 pydantic
 langchain-groq
 langchain-core
+langchain-google-genai
+google-generativeai
 pandas
 numpy
 faiss-cpu
