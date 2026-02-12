@@ -45,10 +45,12 @@ export default function LLMDashboard() {
     setConversationDocuments,
     messagesEndRef,
     isMobile,
-    loadMessages,
     loadConversations,
     loadConversationDocuments,
     performLogout,
+    models,
+    selectedModelId,
+    setSelectedModelId,
   } = useDashboard();
 
   const [streamingMessageId, setStreamingMessageId] = useState(null);
@@ -638,9 +640,11 @@ export default function LLMDashboard() {
         latestAIMessageId={latestAIMessageId}
         messagesEndRef={messagesEndRef}
         isMobile={isMobile}
-        isSidebarOpen={isSidebarOpen}
         onToggleSidebar={toggleSidebar}
         onScroll={handleScroll}
+        models={models}
+        selectedModelId={selectedModelId}
+        onSelectModel={setSelectedModelId}
       />
 
       {isFileUploadOpen && (

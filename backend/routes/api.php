@@ -15,6 +15,12 @@ use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\ProjectKBController;
 use App\Http\Controllers\Api\PasswordResetController;
+use App\Http\Controllers\Api\LLMController;
+
+Route::prefix('llm')->group(function () {
+    Route::get('/models', [LLMController::class, 'index']);
+    Route::post('/sync', [LLMController::class, 'sync']);
+});
 
 Route::get('/health', function () {
     return response()->json(['status' => 'ok', 'service' => 'backend']);

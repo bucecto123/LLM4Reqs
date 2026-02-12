@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use App\Models\LLMModel;
 
 class LLMService
 {
@@ -54,7 +55,7 @@ class LLMService
     /**
      * Chat with AI (with optional persona context)
      */
-    public function chat(string $message, array $history = [], ?string $context = null, ?array $personaData = null): array
+    public function chat(string $message, array $history = [], ?string $context = null, ?array $personaData = null, ?int $projectId = null): array
     {
         try {
             $payload = [
@@ -62,6 +63,21 @@ class LLMService
                 'conversation_history' => $history,
                 'context' => $context,
             ];
+
+            // Extract model_id from history or personaData if present
+            $modelId = $history['model_id'] ?? $personaData['model_id'] ?? null;
+            if ($modelId) {
+                $payload['model_id'] = $modelId;
+                // Remove from history if it was passed there
+                if (isset($history['model_id'])) {
+                    unset($history['model_id']);
+                    $payload['conversation_history'] = array_values($history); // Re-index array
+                }
+            }
+            
+            if ($projectId) {
+                $payload['project_id'] = (string)$projectId;
+            }
             
             // Add persona data if provided
             if ($personaData) {
@@ -91,7 +107,8 @@ class LLMService
         array $history = [], 
         ?string $context = null, 
         ?array $personaData = null,
-        ?callable $onChunk = null
+        ?callable $onChunk = null,
+        ?int $projectId = null
     ): array {
         try {
             $payload = [
@@ -99,6 +116,21 @@ class LLMService
                 'conversation_history' => $history,
                 'context' => $context,
             ];
+            
+            // Extract model_id from history or personaData if present
+            $modelId = $history['model_id'] ?? $personaData['model_id'] ?? null;
+            if ($modelId) {
+                $payload['model_id'] = $modelId;
+                // Remove from history if it was passed there
+                if (isset($history['model_id'])) {
+                    unset($history['model_id']);
+                    $payload['conversation_history'] = array_values($history);
+                }
+            }
+
+            if ($projectId) {
+                $payload['project_id'] = (string)$projectId;
+            }
             
             // Add persona data if provided
             if ($personaData) {
@@ -349,5 +381,87 @@ class LLMService
             Log::error('LLM job status check failed', ['error' => $e->getMessage()]);
             throw $e;
         }
+    }
+
+    /**
+     * Sync models from LLM service and update local database.
+     * 
+     * @return array
+     */
+    public function syncModels(): array
+    {
+        try {
+            // Call Python service to get models
+            $response = Http::withHeaders($this->getHeaders())
+                ->timeout(30)
+                ->get("{$this->baseUrl}/models");
+
+            if (!$response->successful()) {
+                throw new \Exception('Failed to fetch models from LLM service: ' . $response->body());
+            }
+
+            $models = $response->json(); 
+            $synced = [];
+
+            foreach ($models as $modelData) {
+                $model = LLMModel::updateOrCreate(
+                    ['model_id' => $modelData['model_id']],
+                    [
+                        'provider' => $modelData['provider'],
+                        'name' => $modelData['name'] ?? $modelData['model_id'],
+                        'is_active' => true,
+                        'context_window' => $modelData['context_window'] ?? null,
+                        'input_price' => $modelData['input_price'] ?? null,
+                        'output_price' => $modelData['output_price'] ?? null,
+                        'supports_tools' => $modelData['supports_tools'] ?? null, 
+                    ]
+                );
+                
+                if (is_null($model->supports_tools)) {
+                    $this->checkToolCapability($model);
+                }
+
+                $synced[] = $model->model_id;
+            }
+
+            return ['synced_count' => count($synced), 'models' => $synced];
+
+        } catch (\Exception $e) {
+            Log::error('Model sync failed', ['error' => $e->getMessage()]);
+            return ['error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Check tool capability for a model via Python service.
+     */
+    public function checkToolCapability(LLMModel $model): void
+    {
+        try {
+            $response = Http::withHeaders($this->getHeaders())
+                ->timeout(45)
+                ->post("{$this->baseUrl}/models/check-tools", [
+                    'model_id' => $model->model_id,
+                    'provider' => $model->provider,
+                ]);
+
+            if ($response->successful()) {
+                $result = $response->json();
+                $model->supports_tools = $result['supports_tools'] ?? false;
+                $model->save();
+            }
+        } catch (\Exception $e) {
+            Log::warning("Failed to check tool capability for {$model->model_id}", ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Get available models from local DB.
+     * 
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getAvailableModels()
+    {
+        return LLMModel::where('is_active', true)->orderBy('provider')->get();
     }
 }

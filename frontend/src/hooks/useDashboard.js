@@ -42,6 +42,11 @@ export const useDashboard = () => {
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [conversationDocuments, setConversationDocuments] = useState([]);
 
+  // Model state
+  const [models, setModels] = useState([]);
+  const [selectedModelId, setSelectedModelId] = useState(null);
+  const isLoadingModelsRef = useRef(false);
+
   // Refs
   const messagesEndRef = useRef(null);
   const prevChatModeRef = useRef(null);
@@ -157,6 +162,28 @@ export const useDashboard = () => {
     }
   };
 
+  // Load available models
+  const loadModels = async () => {
+    if (isLoadingModelsRef.current) return;
+    isLoadingModelsRef.current = true;
+    try {
+      const data = await apiFetch("/api/llm/models");
+      if (Array.isArray(data)) {
+        setModels(data);
+        if (data.length > 0 && !selectedModelId) {
+            // Default to first available model or a specific one if needed
+            setSelectedModelId(data[0].model_id);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load models:", err);
+      // Fallback
+      setModels([]);
+    } finally {
+        isLoadingModelsRef.current = false;
+    }
+  };
+
   // Load messages for selected conversation
   const loadMessages = async (conversationId) => {
     try {
@@ -239,6 +266,11 @@ export const useDashboard = () => {
       setIsInitializing(false);
     }
   }, [chatMode]);
+
+  // Load models on mount
+  useEffect(() => {
+    loadModels();
+  }, []);
 
   // Load conversations when chat mode or project changes
   useEffect(() => {
@@ -334,7 +366,13 @@ export const useDashboard = () => {
     conversationDocuments,
     setConversationDocuments,
     messagesEndRef,
-    isMobile, // ADD THIS LINE
+    isMobile,
+    
+    // Models
+    models,
+    setModels,
+    selectedModelId,
+    setSelectedModelId,
 
     // Functions
     loadProjects,

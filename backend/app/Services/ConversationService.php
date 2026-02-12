@@ -90,6 +90,11 @@ class ConversationService
             }
         }
             
+        // If a specific model was requested, pass it via history (handled by LLMService)
+        if (isset($messageData['model_id'])) {
+            $history['model_id'] = $messageData['model_id'];
+        }
+            
         $documentContext = '';
         $kbContext = '';
         
@@ -257,7 +262,8 @@ class ConversationService
             $aiContextMessage, 
             $history,
             $enhancedContext,
-            $personaData  // NEW: Pass persona data
+            $personaData,  // NEW: Pass persona data
+            $conversation->project_id // NEW: Pass project_id
         );
 
         // Save the AI response (with persona_id if used)
@@ -324,6 +330,11 @@ class ConversationService
                     'content' => $content
                 ];
             }
+        }
+            
+        // If a specific model was requested, pass it via history
+        if (isset($messageData['model_id'])) {
+            $history['model_id'] = $messageData['model_id'];
         }
             
         $documentContext = '';
@@ -471,7 +482,8 @@ class ConversationService
                     $chunk,
                     false
                 ));
-            }
+            },
+            $conversation->project_id // NEW: Pass project_id
         );
 
         // Save the complete AI response

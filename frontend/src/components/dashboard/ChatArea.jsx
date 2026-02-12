@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import { Loader2, Paperclip, FolderOpen, MessageCircle, X } from "lucide-react";
 import MessageBubble from "./MessageBubble";
 import ChatInput from "./ChatInput";
 import WelcomeScreen from "./WelcomeScreen";
 import ThinkingIndicator from "../ThinkingIndicator.jsx";
+import ModelSelector from "./ModelSelector";
 
 const ChatArea = ({
   selectedConversation,
@@ -36,6 +37,9 @@ const ChatArea = ({
   isSidebarOpen,
   onToggleSidebar,
   onScroll,
+  models,
+  selectedModelId,
+  onSelectModel,
 }) => {
   const showWelcome =
     !selectedConversation || (messages.length === 0 && !isLoading);
@@ -106,8 +110,16 @@ const ChatArea = ({
               </div>
             )}
           </div>
-
+          
           <div className="flex items-center space-x-2 md:space-x-3">
+             {/* Model Selector */}
+            <ModelSelector 
+              models={models} 
+              selectedModelId={selectedModelId} 
+              onSelect={onSelectModel} 
+              isLoading={isLoading} 
+            />
+
             {error && (
               <div className="text-red-600 text-xs md:text-sm bg-red-50 px-2 md:px-3 py-1 rounded-lg flex items-center space-x-2 max-w-[150px] sm:max-w-[200px] md:max-w-none">
                 <span className="truncate">{error}</span>
@@ -178,6 +190,7 @@ const ChatArea = ({
               isInitializing={isInitializing}
               chatMode={chatMode}
               currentProjectId={currentProjectId}
+              selectedModelId={selectedModelId} // Pass selectedModelId to ChatInput
             />
           </>
         )}

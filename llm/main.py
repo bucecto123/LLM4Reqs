@@ -44,7 +44,13 @@ except Exception:
 
 load_dotenv()
 
-DEFAULT_MODEL = os.getenv("GROQ_MODEL", "groq/mixtral-8x7b-32768")
+from model_manager import get_model_manager
+
+# Initialize Model Manager
+model_manager = get_model_manager()
+
+DEFAULT_MODEL_ID = "mixtral-8x7b-32768" # Groq Default
+DEFAULT_PROVIDER = "groq"
 
 app = FastAPI(
     title="AI Requirements Generation Service",
@@ -218,6 +224,9 @@ class ChatRequest(BaseModel):
     context: Optional[str] = None
     persona_id: Optional[int] = None
     persona_data: Optional[Dict[str, Any]] = None
+    project_id: Optional[str] = None  # Add support for project-specific context
+    model_id: Optional[str] = None
+    provider: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -373,6 +382,12 @@ class KBStatusResponse(BaseModel):
     error: Optional[str] = None
 
 
+class CheckToolRequest(BaseModel):
+    model_id: str
+    provider: str
+
+
+
 # ==================== PROMPT TEMPLATES ====================
 
 EXTRACTION_PROMPT = """You are Fishy, an expert business analyst. Extract software requirements from the following text.
@@ -473,15 +488,21 @@ async def verify_api_key(api_key: str = Depends(api_key_header)):
     return api_key
 
 
-def call_groq_chat(
-    messages: List[Dict], max_tokens: int = 1000, temperature: float = 0.7
+def call_llm_chat(
+    messages: List[Dict], 
+    model_id: str = DEFAULT_MODEL_ID, 
+    provider: str = DEFAULT_PROVIDER, 
+    max_tokens: int = 1000, 
+    temperature: float = 0.7
 ) -> tuple:
-    """Call LangChain ChatGroq and return response + token usage"""
-    # Choose model based on temperature
-    if temperature == 0.3:
-        model = chat_model_low_temp
-    else:
-        model = chat_model_default
+    """Call LLM via ModelManager and return response + token usage"""
+    
+    try:
+        model = model_manager.get_chat_model(provider, model_id, temperature)
+    except Exception as e:
+        print(f"Failed to get model {provider}/{model_id}: {e}")
+        # Fallback to default
+        model = model_manager.get_chat_model(DEFAULT_PROVIDER, DEFAULT_MODEL_ID, temperature)
 
     # Convert messages to LangChain format
     langchain_messages = []
@@ -495,13 +516,24 @@ def call_groq_chat(
 
     try:
         response = model.invoke(langchain_messages)
-    except HTTPException:
-        raise
     except Exception as exc:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Groq API error: {exc}",
-        ) from exc
+        print(f"LLM call failed with {provider}/{model_id}: {exc}")
+        # Fallback logic
+        if provider != DEFAULT_PROVIDER:
+            print(f"Falling back to default provider {DEFAULT_PROVIDER}...")
+            try:
+                fallback_model = model_manager.get_chat_model(DEFAULT_PROVIDER, DEFAULT_MODEL_ID, temperature)
+                response = fallback_model.invoke(langchain_messages)
+            except Exception as fallback_exc:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"LLM API failed (primary & fallback): {fallback_exc}",
+                ) from fallback_exc
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"LLM API error: {exc}",
+            ) from exc
 
     content = response.content
     usage = response.additional_kwargs.get('usage', {})
@@ -592,11 +624,42 @@ def _build_rag_context_message(retrieved: list) -> str:
         "Use the following retrieved context when helpful (do not fabricate answers):\n"
     ]
     for i, item in enumerate(retrieved, start=1):
-        # include score for debugging usefulness
-        lines.append(
-            f"{i}. {item.get('text', '')} (score: {item.get('score', 0.0):.4f})"
-        )
-    lines.append("\nIf the context does not contain the answer, say so explicitly.")
+        meta = item.get('meta', {})
+        # Handle nested metadata: meta may contain 'original_row' from CSV-based chunks
+        # or direct fields from KB-built chunks
+        if isinstance(meta, dict) and 'original_row' in meta and isinstance(meta['original_row'], dict):
+            # CSV-based chunks store metadata nested under 'original_row'
+            flat_meta = meta['original_row']
+        else:
+            flat_meta = meta if isinstance(meta, dict) else {}
+
+        line = f"{i}. {item.get('text', '')}"
+
+        # Surface stored metadata so LLM uses real values instead of hallucinating
+        meta_parts = []
+        req_num = flat_meta.get('requirement_number')
+        if req_num is not None:
+            meta_parts.append(f"Requirement #: {req_num}")
+        req_id = flat_meta.get('requirement_id')
+        if req_id is not None:
+            meta_parts.append(f"DB ID: {req_id}")
+        conf = flat_meta.get('confidence_score')
+        if conf is not None:
+            meta_parts.append(f"Confidence: {conf}")
+        req_type = flat_meta.get('requirement_type')
+        if req_type:
+            meta_parts.append(f"Type: {req_type}")
+        priority = flat_meta.get('priority')
+        if priority:
+            meta_parts.append(f"Priority: {priority}")
+        meta_parts.append(f"Similarity: {item.get('score', 0.0):.4f}")
+
+        if meta_parts:
+            line += f" [{', '.join(meta_parts)}]"
+        lines.append(line)
+
+    lines.append("\nIMPORTANT: Use the metadata values shown above (Confidence, Priority, Type, Requirement #) exactly as provided. Do NOT invent or estimate these values.")
+    lines.append("If the context does not contain the answer, say so explicitly.")
     return "\n".join(lines)
 
 
@@ -654,6 +717,258 @@ def _get_project_paths_with_fallback(rag, project_id: str) -> Tuple[str, str]:
     )
 
 
+# ==================== AGENTIC TOOL-BASED RETRIEVAL ====================
+
+import re as _re
+import logging
+
+_agentic_logger = logging.getLogger("agentic_retrieval")
+
+# Tool schemas for Groq native function/tool calling
+RETRIEVAL_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "lookup_by_id",
+            "description": (
+                "Look up a requirement by its number or identifier "
+                "(e.g., REQ-5, #3, requirement 42, Requirement #7). "
+                "Use when the user references a specific requirement by number or ID."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "identifier": {
+                        "type": "string",
+                        "description": "The requirement number or ID to search for (just the number, e.g. '5')"
+                    }
+                },
+                "required": ["identifier"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "lookup_by_content",
+            "description": (
+                "Search requirements by content or topic using semantic similarity. "
+                "Use when the user describes what a requirement is about rather than referencing it by number."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search query describing the requirement content or topic"
+                    }
+                },
+                "required": ["query"]
+            }
+        }
+    }
+]
+
+
+def _extract_numeric_id(identifier: str) -> Optional[str]:
+    """Extract numeric portion from identifiers like 'REQ-5', '#3', 'requirement 42'."""
+    if identifier is None:
+        return None
+    # Try to extract a number from the identifier
+    match = _re.search(r'\d+', str(identifier))
+    return match.group(0) if match else str(identifier).strip()
+
+
+def _tool_lookup_by_id(identifier: str, chunks: list) -> list:
+    """
+    Search chunks metadata for matching requirement number or ID.
+    Returns list of matching chunks with metadata.
+    """
+    numeric_id = _extract_numeric_id(identifier)
+    if not numeric_id:
+        return []
+
+    results = []
+    for chunk in chunks:
+        meta = chunk.get('meta', {})
+        # Check requirement_number (user-facing display number)
+        req_num = meta.get('requirement_number')
+        if req_num is not None and str(req_num) == numeric_id:
+            results.append({
+                'id': chunk.get('id'),
+                'text': chunk.get('text', ''),
+                'meta': meta,
+                'score': 1.0,  # Exact match
+                'match_type': 'requirement_number'
+            })
+            continue
+
+        # Check requirement_id (database PK)
+        req_id = meta.get('requirement_id')
+        if req_id is not None and str(req_id) == numeric_id:
+            results.append({
+                'id': chunk.get('id'),
+                'text': chunk.get('text', ''),
+                'meta': meta,
+                'score': 1.0,
+                'match_type': 'requirement_id'
+            })
+            continue
+
+        # Check chunk id
+        chunk_id = chunk.get('id')
+        if chunk_id is not None and str(chunk_id) == numeric_id:
+            results.append({
+                'id': chunk_id,
+                'text': chunk.get('text', ''),
+                'meta': meta,
+                'score': 0.9,
+                'match_type': 'chunk_id'
+            })
+
+    _agentic_logger.info(f"lookup_by_id('{identifier}') -> {len(results)} results")
+    return results
+
+
+def _tool_lookup_by_content(query: str, rag_manager, index, chunks: list, top_k: int = 5) -> list:
+    """Wrapper around existing RagManager.query() for semantic search."""
+    results = rag_manager.query(query, index, chunks, top_k=top_k)
+    _agentic_logger.info(f"lookup_by_content('{query[:50]}...') -> {len(results)} results")
+    return results
+
+
+def _detect_mismatch(id_results: list, content_results: list) -> Optional[str]:
+    """
+    If both ID-based and content-based lookups were performed, check for mismatches.
+    Returns a mismatch warning string if the results don't align, None otherwise.
+    """
+    if not id_results or not content_results:
+        return None
+
+    # Get the requirement text from ID lookup
+    id_texts = {r.get('text', '').strip() for r in id_results if r.get('text')}
+    # Get top content results
+    content_ids = set()
+    for r in content_results[:3]:
+        meta = r.get('meta', {})
+        rid = meta.get('requirement_number') or meta.get('requirement_id') or r.get('id')
+        if rid is not None:
+            content_ids.add(str(rid))
+
+    # Check if ID-based result appears in top content results
+    id_nums = set()
+    for r in id_results:
+        meta = r.get('meta', {})
+        rn = meta.get('requirement_number') or meta.get('requirement_id') or r.get('id')
+        if rn is not None:
+            id_nums.add(str(rn))
+
+    overlap = id_nums & content_ids
+    if not overlap:
+        return (
+            "⚠️ MISMATCH DETECTED: The requirement found by ID does not appear in the "
+            "top semantic search results for the described content. The user may be "
+            "referencing the wrong requirement number, or the requirement content "
+            "does not match their description."
+        )
+    return None
+
+
+async def _agentic_retrieve(
+    user_message: str,
+    rag_manager,
+    index,
+    chunks: list,
+    top_k: int = 5,
+) -> str:
+    """
+    Use LLM tool-calling to decide retrieval strategy, execute tools, and build context.
+    
+    Flow:
+    1. Send user query + tool schemas to LLM
+    2. LLM decides which tool(s) to call
+    3. Execute tool(s) and collect results
+    4. Detect mismatches when both tools are used
+    5. Return formatted context string
+    """
+    # Ask LLM which tool(s) to call
+    planning_messages = [
+        SystemMessage(content=(
+            "You are a retrieval planning assistant. Given the user's question, "
+            "decide which retrieval tool(s) to call. You can call one or both tools. "
+            "Call lookup_by_id when the user mentions a requirement number/ID. "
+            "Call lookup_by_content when the user asks about a topic or content. "
+            "Call both when the user references both an ID and describes content."
+        )),
+        HumanMessage(content=user_message),
+    ]
+
+    try:
+        # Use the low-temp model with tool binding for deterministic tool selection
+        tool_model = chat_model_low_temp.bind_tools(RETRIEVAL_TOOLS)
+        planning_response = tool_model.invoke(planning_messages)
+    except Exception as e:
+        _agentic_logger.warning(f"Tool calling failed, falling back to content search: {e}")
+        # Fallback: just do content-based search
+        results = _tool_lookup_by_content(user_message, rag_manager, index, chunks, top_k)
+        return _build_rag_context_message(results)
+
+    # Extract tool calls from response
+    tool_calls = getattr(planning_response, 'tool_calls', None) or []
+
+    # If no tools were called, the model may have decided RAG isn't needed,
+    # or the model doesn't support tool calling — fall back to content search
+    if not tool_calls:
+        _agentic_logger.info("No tool calls from LLM, falling back to content search")
+        results = _tool_lookup_by_content(user_message, rag_manager, index, chunks, top_k)
+        return _build_rag_context_message(results)
+
+    # Execute each tool call
+    all_results = []
+    id_results = []
+    content_results = []
+
+    for tc in tool_calls:
+        fname = tc.get('name', '') if isinstance(tc, dict) else getattr(tc, 'name', '')
+        args = tc.get('args', {}) if isinstance(tc, dict) else getattr(tc, 'args', {})
+
+        if fname == 'lookup_by_id':
+            identifier = args.get('identifier', '')
+            results = _tool_lookup_by_id(identifier, chunks)
+            id_results.extend(results)
+            all_results.extend(results)
+            print(f"🔍 Tool lookup_by_id('{identifier}') → {len(results)} results")
+
+        elif fname == 'lookup_by_content':
+            query = args.get('query', user_message)
+            results = _tool_lookup_by_content(query, rag_manager, index, chunks, top_k)
+            content_results.extend(results)
+            all_results.extend(results)
+            print(f"🔍 Tool lookup_by_content('{query[:50]}...') → {len(results)} results")
+
+    # Deduplicate results by chunk text (keep highest score)
+    seen_texts = {}
+    deduped = []
+    for r in all_results:
+        text = r.get('text', '')
+        if text not in seen_texts or r.get('score', 0) > seen_texts[text].get('score', 0):
+            seen_texts[text] = r
+    deduped = list(seen_texts.values())
+    # Sort by score descending
+    deduped.sort(key=lambda x: x.get('score', 0), reverse=True)
+
+    # Check for mismatches
+    mismatch_warning = _detect_mismatch(id_results, content_results)
+
+    # Build context message
+    context = _build_rag_context_message(deduped[:top_k])
+
+    if mismatch_warning:
+        context += f"\n\n{mismatch_warning}"
+
+    return context
+
+
 async def _detect_conflicts_simple(request: ConflictDetectionRequest) -> ConflictDetectionResponse:
     """
     Simple LLM-only conflict detection (fallback when semantic libraries unavailable).
@@ -672,7 +987,7 @@ async def _detect_conflicts_simple(request: ConflictDetectionRequest) -> Conflic
         {"role": "user", "content": prompt},
     ]
 
-    response_text, tokens_used = call_groq_chat(
+    response_text, tokens_used = call_llm_chat(
         messages, max_tokens=2000, temperature=0.3
     )
     parsed_data = parse_json_response(response_text)
@@ -990,6 +1305,17 @@ def health_check():
     }
 
 
+@app.get("/models")
+async def list_models(api_key: str = Depends(verify_api_key)):
+    """List available models from configured providers."""
+    return model_manager.get_available_models()
+
+@app.post("/models/check-tools")
+async def check_tool_capability_endpoint(request: CheckToolRequest, api_key: str = Depends(verify_api_key)):
+    """Check if a specific model supports tool calling."""
+    supports = model_manager.check_tool_capability(request.provider, request.model_id)
+    return {"model_id": request.model_id, "supports_tools": supports}
+
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """
@@ -1003,10 +1329,15 @@ async def chat(request: ChatRequest):
             {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": "Hi! How can I help?"}
         ],
-        "context": "Optional context about the project"
+        "context": "Optional context about the project",
+        "model_id": "llama3-70b-8192",
+        "provider": "groq"
     }
     """
     try:
+        # Determine model to use
+        model_id = request.model_id or DEFAULT_MODEL_ID
+        provider = request.provider or DEFAULT_PROVIDER
         # Build system prompt with persona if provided
         system_prompt = CHAT_SYSTEM_PROMPT
         
@@ -1080,35 +1411,72 @@ async def chat(request: ChatRequest):
         messages.append({"role": "user", "content": request.message})
 
         # RAG decision: decide whether to enrich with retrieved context
+        rag_system_msg = None
+        
         try:
-            use_rag = needs_rag(request.message, use_model=True)
-        except Exception as e:
-            # If RAG check fails for any reason, fall back to no RAG
-            print(f"RAG decision error: {e}")
-            use_rag = False
-
-        if use_rag:
-            avail, index, chunks = _load_rag_artifacts()
-            if avail and _rag_manager is not None:
+            # 1. Project-Specific RAG (Agentic Tool-Based Retrieval)
+            if request.project_id:
                 try:
-                    retrieved = _rag_manager.query(
-                        request.message, index, chunks, top_k=RAG_TOP_K
-                    )
-                    rag_system = _build_rag_context_message(retrieved)
-                    if rag_system:
-                        # Prepend retrieved context as a system instruction to guide the model
-                        messages.insert(1, {"role": "system", "content": rag_system})
+                    print(f"🔍 Attempting agentic project RAG for project_id={request.project_id}")
+                    # Initialize manager
+                    rag_manager = _get_rag_manager()
+                    # Get paths
+                    p_index, p_meta = _get_project_paths_with_fallback(rag_manager, request.project_id)
+                    
+                    if os.path.exists(p_index) and os.path.exists(p_meta):
+                        # Load project index (on-demand)
+                        p_index_obj, p_chunks = rag_manager.load_index_and_meta(p_index, p_meta)
+                        
+                        # Use agentic retrieval: LLM decides which tool(s) to call
+                        rag_system_msg = await _agentic_retrieve(
+                            request.message, rag_manager, p_index_obj, p_chunks, top_k=RAG_TOP_K
+                        )
+                        
+                        if rag_system_msg:
+                            print(f"✅ Agentic retrieval completed for project {request.project_id}")
+                    else:
+                        print(f"⚠️ No RAG index found for project {request.project_id}")
+                        
                 except Exception as e:
-                    print(f"RAG retrieval failed: {e}")
-                    # continue without RAG
+                    print(f"❌ Project RAG error: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
+            # 2. Global RAG Fallback (only if no project context or project RAG yielded nothing?)
+            # Valid strategy: If user provided project_id, they likely want project context. 
+            # If we failed to get project context, maybe we shouldn't fallback to global to avoid confusion?
+            # BUT, let's keep existing behavior for non-project requests.
+            if not rag_system_msg and not request.project_id:
+                use_rag = needs_rag(request.message, use_model=True)
+                if use_rag:
+                    avail, index, chunks = _load_rag_artifacts()
+                    if avail and _rag_manager is not None:
+                        retrieved = _rag_manager.query(
+                            request.message, index, chunks, top_k=RAG_TOP_K
+                        )
+                        rag_system_msg = _build_rag_context_message(retrieved)
 
-        # Call Groq
-        response_text, tokens_used = call_groq_chat(
-            messages, max_tokens=2000, temperature=0.7
+            # Insert RAG context if we have it
+            if rag_system_msg:
+                messages.insert(1, {"role": "system", "content": rag_system_msg})
+                
+        except Exception as e:
+            print(f"Global RAG logic error: {e}")
+            # Continue without RAG
+
+        # Call LLM
+        response_text, tokens_used = call_llm_chat(
+            messages, 
+            model_id=request.model_id or DEFAULT_MODEL_ID,
+            provider=request.provider or DEFAULT_PROVIDER,
+            max_tokens=2000, 
+            temperature=0.7
         )
 
         return ChatResponse(
-            response=response_text, tokens_used=tokens_used, model=DEFAULT_MODEL
+            response=response_text, 
+            tokens_used=tokens_used, 
+            model=request.model_id or DEFAULT_MODEL
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1138,7 +1506,7 @@ async def extract_requirements(request: ExtractionRequest):
         ]
 
         # Use lower temperature for more consistent JSON output
-        response_text, tokens_used = call_groq_chat(
+        response_text, tokens_used = call_llm_chat(
             messages, max_tokens=3000, temperature=0.3
         )
         parsed_data = parse_json_response(response_text)
@@ -1182,7 +1550,7 @@ async def generate_persona_view(request: PersonaGenerationRequest):
             {"role": "user", "content": prompt},
         ]
 
-        response_text, tokens_used = call_groq_chat(
+        response_text, tokens_used = call_llm_chat(
             messages, max_tokens=2000, temperature=0.7
         )
 
@@ -1272,7 +1640,7 @@ async def resolve_conflict(request: ConflictResolutionRequest):
             {"role": "user", "content": prompt},
         ]
 
-        response_text, tokens_used = call_groq_chat(
+        response_text, tokens_used = call_llm_chat(
             messages, max_tokens=1500, temperature=0.4
         )
         parsed_data = parse_json_response(response_text)
@@ -1328,7 +1696,7 @@ async def process_document(
             {"role": "user", "content": prompt},
         ]
 
-        response_text, tokens_used = call_groq_chat(
+        response_text, tokens_used = call_llm_chat(
             messages, max_tokens=3000, temperature=0.3
         )
         parsed_data = parse_json_response(response_text)

@@ -25,6 +25,7 @@ class MessageRequest extends FormRequest
             'role' => 'required|in:user,assistant,system',
             'content' => 'required|string',
             'model_used' => 'nullable|string',
+            'model_id' => 'nullable|string', // Allow requesting a specific model
             'tokens_used' => 'nullable|integer',
             'persona_id' => 'nullable|integer|exists:personas,id'  // NEW: Optional persona
         ];
