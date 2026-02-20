@@ -112,13 +112,7 @@ const ChatArea = ({
           </div>
           
           <div className="flex items-center space-x-2 md:space-x-3">
-             {/* Model Selector */}
-            <ModelSelector 
-              models={models} 
-              selectedModelId={selectedModelId} 
-              onSelect={onSelectModel} 
-              isLoading={isLoading} 
-            />
+
 
             {error && (
               <div className="text-red-600 text-xs md:text-sm bg-red-50 px-2 md:px-3 py-1 rounded-lg flex items-center space-x-2 max-w-[150px] sm:max-w-[200px] md:max-w-none">
@@ -190,7 +184,9 @@ const ChatArea = ({
               isInitializing={isInitializing}
               chatMode={chatMode}
               currentProjectId={currentProjectId}
-              selectedModelId={selectedModelId} // Pass selectedModelId to ChatInput
+              selectedModelId={selectedModelId}
+              models={models}
+              onSelectModel={onSelectModel}
             />
           </>
         )}

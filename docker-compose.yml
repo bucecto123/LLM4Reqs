@@ -39,6 +39,10 @@ services:
       REVERB_PORT: 8081
       REVERB_SCHEME: http
       APP_URL: http://localhost:8001
+      SESSION_DRIVER: file
+      CACHE_STORE: file
+      QUEUE_CONNECTION: sync
+
     ports:
       - "8001:8001"
     volumes:
@@ -46,7 +50,7 @@ services:
     depends_on:
       - db
       - llm
-    command: php -d upload_max_filesize=20M -d post_max_size=25M artisan serve --host 0.0.0.0 --port=8001
+    command: php -d memory_limit=512M -d upload_max_filesize=20M -d post_max_size=25M artisan serve --host 0.0.0.0 --port=8001
 
   reverb:
     build:

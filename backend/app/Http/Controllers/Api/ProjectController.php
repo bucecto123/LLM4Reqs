@@ -20,30 +20,41 @@ class ProjectController extends Controller
 
     public function index(\Illuminate\Http\Request $request)
     {
+        \Illuminate\Support\Facades\Log::info('ProjectController@index: Starting');
         $userId = $request->user()->id;
+        \Illuminate\Support\Facades\Log::info('ProjectController@index: User ID: ' . $userId);
         
         // Get projects owned by user OR where user is a collaborator
+        // Eager load the specific collaborator record for the current user to avoid N+1 queries loop
         $projects = Project::where('owner_id', $userId)
             ->orWhereHas('collaborators', function ($query) use ($userId) {
                 $query->where('user_id', $userId);
             })
             ->with(['owner:id,name,email']) // Eager load owner details
+            ->with(['collaborators' => function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            }])
             ->withCount(['documents', 'requirements']) // Get statistics
             ->select(['id', 'name', 'description', 'status', 'owner_id', 'created_at', 'updated_at'])
             ->orderBy('updated_at', 'desc')
             ->get();
+
+        \Illuminate\Support\Facades\Log::info('ProjectController@index: Projects retrieved: ' . $projects->count());
         
-        // Add permission/role attribute
+        // Add permission/role attribute using the eager loaded relation
         $projects->transform(function ($project) use ($userId) {
             $project->role = $project->owner_id == $userId ? 'owner' : 'viewer'; // Default to viewer
             
             if ($project->owner_id != $userId) {
-                // Check specific collaborator role
-                $collaborator = $project->collaborators()->where('user_id', $userId)->first();
+                // Check specific collaborator role from the eager loaded collection
+                // Since we filtered in the query, the collection will only contain the current user's record if it exists
+                $collaborator = $project->collaborators->first();
                 if ($collaborator) {
                     $project->role = $collaborator->pivot->role ?? 'viewer';
                 }
             }
+            // Hide the collaborators relation from the final JSON
+            $project->unsetRelation('collaborators');
             return $project;
         });
         

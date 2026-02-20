@@ -41,6 +41,8 @@ import MemberList from "../components/MemberList.jsx";
 import InviteForm from "../components/InviteForm.jsx";
 import { canEdit } from "../services/sharingService";
 import echo from "../utils/echo.js";
+import ModelSelector from "../components/dashboard/ModelSelector.jsx";
+
 import {
   ProjectDetailSkeleton,
   MessagesSkeleton,
@@ -247,7 +249,38 @@ export default function ProjectDetailPage() {
   const [showPersonaActions, setShowPersonaActions] = useState(false);
   const [personaToEdit, setPersonaToEdit] = useState(null);
 
+  // Model state
+  const [models, setModels] = useState([]);
+  const [selectedModelId, setSelectedModelId] = useState(null);
+  const isLoadingModelsRef = useRef(false);
+
+  // Load available models
+  const loadModels = async () => {
+    if (isLoadingModelsRef.current) return;
+    isLoadingModelsRef.current = true;
+    try {
+      const data = await apiFetch("/api/llm/models");
+      if (Array.isArray(data)) {
+        setModels(data);
+        if (data.length > 0 && !selectedModelId) {
+            // Default to first available model
+            setSelectedModelId(data[0].model_id);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load models:", err);
+      setModels([]);
+    } finally {
+        isLoadingModelsRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    loadModels();
+  }, []);
+
   const isAssistantThinking = isSendingMessage || Boolean(streamingMessageId);
+
   const personaList = Array.isArray(personas) ? personas : [];
   const activePersona = selectedPersonaId
     ? personaList.find((p) => p.id === selectedPersonaId)
@@ -760,6 +793,10 @@ export default function ProjectDetailPage() {
       if (selectedPersonaId) {
         body.persona_id = selectedPersonaId;
       }
+      if (selectedModelId) {
+        body.model_id = selectedModelId;
+      }
+
 
       const response = await apiFetch(
         `/api/conversations/${conversationId}/messages/stream`,
@@ -1123,11 +1160,15 @@ export default function ProjectDetailPage() {
                     </p>
                   )}
                 </div>
-              </div>
+                </div>
+
+
+
               <div
                 className="flex items-center space-x-2"
                 ref={personaDropdownRef}
               >
+
                 <div className="flex items-center space-x-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
                   <Sparkles size={14} className="text-purple-500" />
                   <span>Personas</span>
@@ -1635,6 +1676,14 @@ export default function ProjectDetailPage() {
 
                 {/* Input Box */}
                 <div className="flex items-end space-x-2">
+                  <div className="mb-1">
+                     <ModelSelector
+                      models={models}
+                      selectedModelId={selectedModelId}
+                      onSelect={setSelectedModelId}
+                      isLoading={isLoadingModelsRef.current}
+                    />
+                  </div>
                   <button
                     onClick={() => setIsFileUploadOpen(true)}
                     disabled={!canUserEdit}

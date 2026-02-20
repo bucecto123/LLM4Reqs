@@ -1,5 +1,6 @@
 import React from "react";
 import { Send, Loader2, Paperclip, X } from "lucide-react";
+import ModelSelector from "./ModelSelector";
 
 const ChatInput = ({
   message,
@@ -13,6 +14,9 @@ const ChatInput = ({
   isInitializing,
   chatMode,
   currentProjectId,
+  models,
+  selectedModelId,
+  onSelectModel,
 }) => {
   const isDisabled = isLoading || isInitializing;
   const canSend =
@@ -60,6 +64,14 @@ const ChatInput = ({
         {/* Message Input */}
         <div className="bg-white rounded-xl shadow-sm border-2 border-gray-300 p-3">
           <div className="flex items-center space-x-3">
+            <div className="mb-0">
+               <ModelSelector 
+                models={models} 
+                selectedModelId={selectedModelId} 
+                onSelect={onSelectModel} 
+                isLoading={isLoading} 
+              />
+            </div>
             <button
               onClick={openFileUpload}
               disabled={isDisabled}

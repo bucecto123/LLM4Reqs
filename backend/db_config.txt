@@ -1,0 +1,15 @@
+Array
+(
+    [driver] => pgsql
+    [url] => 
+    [host] => db
+    [port] => 5432
+    [database] => llm4reqs
+    [username] => postgres
+    [password] => 1023maledeeptry
+    [charset] => utf8
+    [prefix] => 
+    [prefix_indexes] => 1
+    [search_path] => public
+    [sslmode] => prefer
+)
