@@ -1,8 +1,15 @@
 
 import os
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+    genai = None
+    ChatGoogleGenerativeAI = None
+
 from langchain_groq import ChatGroq
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, ToolMessage
 from typing import List, Dict, Any, Optional
 import requests
@@ -13,7 +20,7 @@ class ModelManager:
         self.groq_api_key = os.getenv("GROQ_API_KEY")
         self.gemini_api_key = os.getenv("GEMINI_API_KEY")
         
-        if self.gemini_api_key:
+        if self.gemini_api_key and GEMINI_AVAILABLE:
             genai.configure(api_key=self.gemini_api_key)
 
     def get_available_models(self) -> List[Dict[str, Any]]:
@@ -44,7 +51,7 @@ class ModelManager:
                 print(f"Error fetching Groq models: {e}")
 
         # 2. Fetch Gemini Models
-        if self.gemini_api_key:
+        if self.gemini_api_key and GEMINI_AVAILABLE:
             try:
                 for m in genai.list_models():
                     if 'generateContent' in m.supported_generation_methods:
@@ -72,6 +79,8 @@ class ModelManager:
                 temperature=temperature
             )
         elif provider == 'gemini':
+            if not GEMINI_AVAILABLE:
+                raise ValueError("Gemini dependencies not installed. Please install google-generativeai and langchain-google-genai")
             if not self.gemini_api_key:
                 raise ValueError("GEMINI_API_KEY not set")
             # Google models require 'models/' prefix usually, but langchain might handle it. 

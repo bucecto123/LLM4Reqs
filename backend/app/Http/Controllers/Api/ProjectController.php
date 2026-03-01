@@ -64,8 +64,12 @@ class ProjectController extends Controller
 
     public function store(ProjectRequest $request)
     {
-        $new_user = $this->project_service->createProject($request->validated());
-        return response(json_encode($new_user), 201)
+        $project = $this->project_service->createProject($request->validated());
+        
+        // Add role attribute (creator is always owner)
+        $project->role = 'owner';
+        
+        return response(json_encode($project), 201)
             ->header('Content-Type', 'application/json');
     }
 
@@ -73,7 +77,7 @@ class ProjectController extends Controller
     {
         // Cache project data for 5 minutes to improve LCP
         $project = \Cache::remember("project_{$id}", 300, function () use ($id) {
-            return Project::findOrFail($id);
+            return Project::with('owner:id,name,email')->findOrFail($id);
         });
         
         // Check authorization
@@ -81,6 +85,17 @@ class ProjectController extends Controller
             return response()->json([
                 'message' => 'Unauthorized to view this project'
             ], 403);
+        }
+        
+        // Add role attribute based on ownership and collaboration
+        $userId = $request->user()->id;
+        
+        if ($project->owner_id == $userId) {
+            $project->role = 'owner';
+        } else {
+            // Check if user is a collaborator
+            $collaborator = $project->collaborators()->where('user_id', $userId)->first();
+            $project->role = $collaborator ? ($collaborator->pivot->role ?? 'viewer') : 'viewer';
         }
         
         return response(json_encode($project), 200)

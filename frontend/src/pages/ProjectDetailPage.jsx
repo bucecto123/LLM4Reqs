@@ -263,15 +263,15 @@ export default function ProjectDetailPage() {
       if (Array.isArray(data)) {
         setModels(data);
         if (data.length > 0 && !selectedModelId) {
-            // Default to first available model
-            setSelectedModelId(data[0].model_id);
+          // Default to first available model
+          setSelectedModelId(data[0].model_id);
         }
       }
     } catch (err) {
       console.error("Failed to load models:", err);
       setModels([]);
     } finally {
-        isLoadingModelsRef.current = false;
+      isLoadingModelsRef.current = false;
     }
   };
 
@@ -573,6 +573,11 @@ export default function ProjectDetailPage() {
       setEditProjectName(projectData.name);
       setEditProjectDescription(projectData.description || "");
       setDocuments(docsResponse.documents || docsResponse || []);
+
+      // Set user role from project data
+      if (projectData.role) {
+        setCurrentUserRole(projectData.role);
+      }
     } catch (err) {
       console.error("Failed to load project data:", err);
       setError("Failed to load project. Please try again.");
@@ -597,8 +602,7 @@ export default function ProjectDetailPage() {
         await import("../services/sharingService");
       const response = await getProjectCollaborators(projectId);
       setCollaborators(response.collaborators || []);
-      // Set current user role (assume owner for now - backend will provide this)
-      setCurrentUserRole("owner");
+      // Role is set from project data in loadProjectData()
     } catch (err) {
       console.error("Failed to load collaborators:", err);
     } finally {
@@ -796,7 +800,6 @@ export default function ProjectDetailPage() {
       if (selectedModelId) {
         body.model_id = selectedModelId;
       }
-
 
       const response = await apiFetch(
         `/api/conversations/${conversationId}/messages/stream`,
@@ -1160,15 +1163,12 @@ export default function ProjectDetailPage() {
                     </p>
                   )}
                 </div>
-                </div>
-
-
+              </div>
 
               <div
                 className="flex items-center space-x-2"
                 ref={personaDropdownRef}
               >
-
                 <div className="flex items-center space-x-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
                   <Sparkles size={14} className="text-purple-500" />
                   <span>Personas</span>
@@ -1677,7 +1677,7 @@ export default function ProjectDetailPage() {
                 {/* Input Box */}
                 <div className="flex items-end space-x-2">
                   <div className="mb-1">
-                     <ModelSelector
+                    <ModelSelector
                       models={models}
                       selectedModelId={selectedModelId}
                       onSelect={setSelectedModelId}

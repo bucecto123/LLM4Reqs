@@ -139,7 +139,7 @@ export default function LLMDashboard() {
 
         console.log("✅ [STREAMING COMPLETE]", {
           totalTime: `${totalTime.toFixed(2)}ms (${(totalTime / 1000).toFixed(
-            2
+            2,
           )}s)`,
           totalChunks: streamState.chunkCount,
           totalChars: streamState.totalChars,
@@ -151,8 +151,8 @@ export default function LLMDashboard() {
             avgCharsPerSecond > 100
               ? "🚀 Fast"
               : avgCharsPerSecond > 50
-              ? "⚡ Good"
-              : "🐌 Slow",
+                ? "⚡ Good"
+                : "🐌 Slow",
         });
 
         // Replace with saved message or mark as complete
@@ -161,16 +161,16 @@ export default function LLMDashboard() {
             prev.map((msg) =>
               msg.id === streamState.tempMessageId
                 ? { ...metadata.message, isStreaming: false }
-                : msg
-            )
+                : msg,
+            ),
           );
         } else {
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === streamState.tempMessageId
                 ? { ...msg, isStreaming: false }
-                : msg
-            )
+                : msg,
+            ),
           );
         }
 
@@ -182,9 +182,9 @@ export default function LLMDashboard() {
             .map((conv) =>
               conv.id === selectedConversation.id
                 ? { ...conv, updated_at: new Date().toISOString() }
-                : conv
+                : conv,
             )
-            .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+            .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)),
         );
       } else {
         // Track chunk performance
@@ -214,8 +214,8 @@ export default function LLMDashboard() {
                   content: msg.content + chunk,
                   isStreaming: true,
                 }
-              : msg
-          )
+              : msg,
+          ),
         );
       }
     };
@@ -224,7 +224,7 @@ export default function LLMDashboard() {
 
     return () => {
       console.log(
-        `🔌 Unsubscribing from conversation.${selectedConversation.id}`
+        `🔌 Unsubscribing from conversation.${selectedConversation.id}`,
       );
       channel.stopListening(".message.chunk", messageChunkHandler);
       echo.leaveChannel(`conversation.${selectedConversation.id}`);
@@ -272,7 +272,7 @@ export default function LLMDashboard() {
     if (isNewChatMode || !selectedConversation) {
       if (chatMode === "project" && !currentProjectId) {
         setError(
-          "No project available. Please wait for project initialization."
+          "No project available. Please wait for project initialization.",
         );
         return;
       }
@@ -284,12 +284,12 @@ export default function LLMDashboard() {
         const conversationTitle = message.trim()
           ? message.slice(0, 50)
           : attachedFiles.length > 0
-          ? `Files: ${attachedFiles[0].name}${
-              attachedFiles.length > 1
-                ? ` +${attachedFiles.length - 1} more`
-                : ""
-            }`
-          : "New Chat";
+            ? `Files: ${attachedFiles[0].name}${
+                attachedFiles.length > 1
+                  ? ` +${attachedFiles.length - 1} more`
+                  : ""
+              }`
+            : "New Chat";
 
         const requestBody = {
           title: conversationTitle,
@@ -402,6 +402,7 @@ export default function LLMDashboard() {
       const body = {
         content: messageForAI,
         role: "user",
+        ...(selectedModelId && { model_id: selectedModelId }),
         ...(chatMode === "project" &&
           currentProjectId && { project_id: currentProjectId }),
       };
@@ -411,15 +412,15 @@ export default function LLMDashboard() {
         {
           method: "POST",
           body,
-        }
+        },
       );
 
       // Replace temp user message with the actual saved message from server
       if (response.user_message) {
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === tempUserMessage.id ? response.user_message : msg
-          )
+            msg.id === tempUserMessage.id ? response.user_message : msg,
+          ),
         );
       }
 
@@ -506,8 +507,8 @@ export default function LLMDashboard() {
         prev.map((conv) =>
           conv.id === conversationId
             ? { ...conv, title: editingTitle.trim() }
-            : conv
-        )
+            : conv,
+        ),
       );
 
       if (selectedConversation?.id === conversationId) {
@@ -533,7 +534,7 @@ export default function LLMDashboard() {
         method: "DELETE",
       });
       setConversations((prev) =>
-        prev.filter((conv) => conv.id !== conversationId)
+        prev.filter((conv) => conv.id !== conversationId),
       );
 
       if (selectedConversation?.id === conversationId) {
