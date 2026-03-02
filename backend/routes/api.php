@@ -17,6 +17,21 @@ use App\Http\Controllers\Api\ProjectKBController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\LLMController;
 
+// Temporary diagnostic route - remove after fixing
+Route::get('/dbtest-laravel', function () {
+    try {
+        $count = \Illuminate\Support\Facades\DB::table('users')->count();
+        return response()->json(['laravel_db' => 'OK', 'count' => $count]);
+    } catch (\Illuminate\Database\QueryException $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'sqlstate' => $e->getCode(),
+            'errorInfo' => $e->getPrevious()->errorInfo ?? null,
+            'sqlite_code' => $e->getPrevious()->getCode() ?? null,
+        ], 500);
+    }
+});
+
 Route::prefix('llm')->group(function () {
     Route::get('/models', [LLMController::class, 'index']);
     Route::post('/sync', [LLMController::class, 'sync']);

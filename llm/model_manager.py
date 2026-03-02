@@ -23,6 +23,17 @@ class ModelManager:
         if self.gemini_api_key and GEMINI_AVAILABLE:
             genai.configure(api_key=self.gemini_api_key)
 
+    # Well-known Groq chat models used as fallback when the API is unreachable
+    GROQ_FALLBACK_MODELS = [
+        {"model_id": "llama-3.3-70b-versatile",    "name": "Llama 3.3 70B Versatile",    "context_window": 128000, "supports_tools": True},
+        {"model_id": "llama-3.1-8b-instant",       "name": "Llama 3.1 8B Instant",       "context_window": 131072, "supports_tools": True},
+        {"model_id": "llama3-70b-8192",            "name": "Llama 3 70B",                "context_window": 8192,   "supports_tools": True},
+        {"model_id": "llama3-8b-8192",             "name": "Llama 3 8B",                 "context_window": 8192,   "supports_tools": True},
+        {"model_id": "mixtral-8x7b-32768",         "name": "Mixtral 8x7B",               "context_window": 32768,  "supports_tools": True},
+        {"model_id": "gemma2-9b-it",               "name": "Gemma 2 9B",                 "context_window": 8192,   "supports_tools": False},
+        {"model_id": "deepseek-r1-distill-llama-70b", "name": "DeepSeek R1 Distill 70B", "context_window": 131072, "supports_tools": False},
+    ]
+
     def get_available_models(self) -> List[Dict[str, Any]]:
         models = []
         
@@ -38,17 +49,26 @@ class ModelManager:
                 if response.status_code == 200:
                     data = response.json()
                     for m in data.get('data', []):
-                        # Filter for likely chat models if needed, or take all
                         model_id = m['id']
                         models.append({
                             'provider': 'groq',
                             'model_id': model_id,
-                            'name': model_id, # Groq doesn't provide nice names in API usually
-                            'context_window': m.get('context_window', 8192), # Placeholder fallback
-                            'supports_tools': None # We will check this later
+                            'name': model_id,
+                            'context_window': m.get('context_window', 8192),
+                            'supports_tools': None
                         })
+                else:
+                    print(f"Groq API returned {response.status_code}, using fallback model list.")
             except Exception as e:
                 print(f"Error fetching Groq models: {e}")
+
+            # If API call failed or returned empty, use the hardcoded fallback list
+            if not models:
+                print("Using Groq fallback model list.")
+                models = [
+                    {**m, 'provider': 'groq'}
+                    for m in self.GROQ_FALLBACK_MODELS
+                ]
 
         # 2. Fetch Gemini Models
         if self.gemini_api_key and GEMINI_AVAILABLE:

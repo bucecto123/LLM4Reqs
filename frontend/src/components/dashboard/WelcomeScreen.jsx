@@ -9,6 +9,7 @@ import {
   Mic,
   X,
 } from "lucide-react";
+import ModelSelector from "./ModelSelector";
 
 const ActionButton = ({ icon, onClick }) => {
   return (
@@ -32,6 +33,9 @@ const WelcomeScreen = ({
   isLoading,
   isInitializing,
   currentProjectId,
+  models,
+  selectedModelId,
+  onSelectModel,
 }) => {
   return (
     <div className="flex-1 flex flex-col">
@@ -101,6 +105,12 @@ const WelcomeScreen = ({
               style={{ animationDelay: "0.4s" }}
             >
               <div className="flex items-center space-x-3">
+                <ModelSelector
+                  models={models || []}
+                  selectedModelId={selectedModelId}
+                  onSelect={onSelectModel}
+                  isLoading={isLoading || isInitializing}
+                />
                 <button
                   onClick={openFileUpload}
                   disabled={isLoading || isInitializing}

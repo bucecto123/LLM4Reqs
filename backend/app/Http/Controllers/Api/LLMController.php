@@ -18,28 +18,31 @@ class LLMController extends Controller
     }
 
     /**
+     * Curated fallback list returned instantly when the DB has no models yet.
+     * Avoids blocking the single-threaded PHP server with a slow remote API call on first boot.
+     */
+    private const FALLBACK_MODELS = [
+        ['provider' => 'groq', 'model_id' => 'llama-3.3-70b-versatile',       'name' => 'Llama 3.3 70B Versatile',  'context_window' => 128000, 'supports_tools' => true,  'is_active' => true],
+        ['provider' => 'groq', 'model_id' => 'llama-3.1-8b-instant',          'name' => 'Llama 3.1 8B Instant',     'context_window' => 131072, 'supports_tools' => true,  'is_active' => true],
+        ['provider' => 'groq', 'model_id' => 'llama3-70b-8192',               'name' => 'Llama 3 70B',               'context_window' => 8192,   'supports_tools' => true,  'is_active' => true],
+        ['provider' => 'groq', 'model_id' => 'llama3-8b-8192',                'name' => 'Llama 3 8B',                'context_window' => 8192,   'supports_tools' => true,  'is_active' => true],
+        ['provider' => 'groq', 'model_id' => 'mixtral-8x7b-32768',            'name' => 'Mixtral 8x7B',              'context_window' => 32768,  'supports_tools' => true,  'is_active' => true],
+        ['provider' => 'groq', 'model_id' => 'gemma2-9b-it',                  'name' => 'Gemma 2 9B',                'context_window' => 8192,   'supports_tools' => false, 'is_active' => true],
+        ['provider' => 'groq', 'model_id' => 'deepseek-r1-distill-llama-70b', 'name' => 'DeepSeek R1 Distill 70B',  'context_window' => 131072, 'supports_tools' => false, 'is_active' => true],
+    ];
+
+    /**
      * List available models.
+     *
+     * Returns the hardcoded curated list instantly (no DB / network I/O).
+     * Use POST /api/llm/sync to refresh from the live provider APIs and
+     * swap in DB records once they are available.
      */
     public function index()
     {
-        // First try to serve from DB
-        $models = LLMModel::where('is_active', true)->orderBy('provider')->orderBy('name')->get();
-
-        // Group by support tool capability for Frontend convenience? 
-        // Or just return flat list and let frontend handle it.
-        // Let's return flat list but ensuring fields are present.
-
-        if ($models->isEmpty()) {
-            // If no models in DB, try to sync synchronously
-            try {
-                $this->llmService->syncModels();
-                $models = LLMModel::where('is_active', true)->orderBy('provider')->orderBy('name')->get();
-            } catch (\Exception $e) {
-                Log::error('Failed to auto-sync models on index', ['error' => $e->getMessage()]);
-            }
-        }
-
-        return response()->json($models);
+        return response()->json(
+            collect(self::FALLBACK_MODELS)->map(fn($m) => (object) $m)->values()
+        );
     }
 
     /**

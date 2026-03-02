@@ -110,10 +110,8 @@ const ChatArea = ({
               </div>
             )}
           </div>
-          
+
           <div className="flex items-center space-x-2 md:space-x-3">
-
-
             {error && (
               <div className="text-red-600 text-xs md:text-sm bg-red-50 px-2 md:px-3 py-1 rounded-lg flex items-center space-x-2 max-w-[150px] sm:max-w-[200px] md:max-w-none">
                 <span className="truncate">{error}</span>
@@ -143,6 +141,9 @@ const ChatArea = ({
             isLoading={isLoading}
             isInitializing={isInitializing}
             currentProjectId={currentProjectId}
+            models={models}
+            selectedModelId={selectedModelId}
+            onSelectModel={onSelectModel}
           />
         ) : (
           <>
@@ -191,7 +192,6 @@ const ChatArea = ({
           </>
         )}
       </div>
-
     </div>
   );
 };

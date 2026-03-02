@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Database\Seeders\LLMModelSeeder;
 use Database\Seeders\PersonaSeeder;
 use Database\Seeders\ProjectSeeder;
 use Database\Seeders\RequirementSeeder;
@@ -27,6 +28,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $this->call([
+            LLMModelSeeder::class,
             PersonaSeeder::class,
             ProjectSeeder::class,
             RequirementSeeder::class,

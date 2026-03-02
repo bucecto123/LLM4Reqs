@@ -78,12 +78,12 @@ if not GROQ_API_KEY:
 # Initialize LangChain ChatGroq models
 chat_model_default = ChatGroq(
     groq_api_key=GROQ_API_KEY,
-    model_name=DEFAULT_MODEL,
+    model_name=DEFAULT_MODEL_ID,
     temperature=0.7
 )
 chat_model_low_temp = ChatGroq(
     groq_api_key=GROQ_API_KEY,
-    model_name=DEFAULT_MODEL,
+    model_name=DEFAULT_MODEL_ID,
     temperature=0.3
 )
 
@@ -1291,7 +1291,7 @@ def read_root():
         "service": "AI Requirements Generation Service (Groq)",
         "status": "running",
         "version": "1.0.0",
-        "model": DEFAULT_MODEL,
+        "model": DEFAULT_MODEL_ID,
     }
 
 
@@ -1301,7 +1301,7 @@ def health_check():
     return {
         "status": "healthy",
         "groq_configured": bool(os.getenv("GROQ_API_KEY")),
-        "model": DEFAULT_MODEL,
+        "model": DEFAULT_MODEL_ID,
     }
 
 
