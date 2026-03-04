@@ -45,6 +45,7 @@ export default function LLMDashboard() {
     setConversationDocuments,
     messagesEndRef,
     isMobile,
+    skipNextLoadRef,
     loadConversations,
     loadConversationDocuments,
     performLogout,
@@ -307,16 +308,22 @@ export default function LLMDashboard() {
         // Immediately add the new conversation to the list
         setConversations((prev) => [newConversation, ...prev]);
 
-        // Set the conversation as selected
-        setSelectedConversation(newConversation);
+        // Set messages to empty first
         setMessages([]);
         setIsNewChatMode(false);
 
         // Clear the reload flag since we've already updated the list
         setNeedsConversationReload(false);
 
+        // Send message FIRST, then set as selected to avoid race condition
         const messageToSend = message.trim() || "Here are the uploaded files:";
         await sendMessageToConversation(newConversation.id, messageToSend);
+
+        // Skip auto-loading messages since we just sent the first message which is streaming
+        skipNextLoadRef.current = true;
+
+        // Now set as selected after message is sent
+        setSelectedConversation(newConversation);
       } catch (err) {
         console.error("Failed to create conversation:", err);
         setError("Failed to create new conversation");
@@ -646,6 +653,7 @@ export default function LLMDashboard() {
         models={models}
         selectedModelId={selectedModelId}
         onSelectModel={setSelectedModelId}
+        user={user}
       />
 
       {isFileUploadOpen && (

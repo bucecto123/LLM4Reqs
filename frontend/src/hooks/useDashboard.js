@@ -127,7 +127,7 @@ export const useDashboard = () => {
   // Load conversations for current project
   const loadConversations = async (
     mode = chatMode,
-    projectId = currentProjectId
+    projectId = currentProjectId,
   ) => {
     // Prevent concurrent loads
     if (isLoadingConversationsRef.current) {
@@ -171,8 +171,13 @@ export const useDashboard = () => {
       if (Array.isArray(data)) {
         setModels(data);
         if (data.length > 0 && !selectedModelId) {
-            // Default to first available model or a specific one if needed
-            setSelectedModelId(data[0].model_id);
+          // Default to llama-3.3-70b-versatile if available, otherwise first model
+          const preferredModel = data.find(
+            (m) => m.model_id === "llama-3.3-70b-versatile",
+          );
+          setSelectedModelId(
+            preferredModel ? preferredModel.model_id : data[0].model_id,
+          );
         }
       }
     } catch (err) {
@@ -180,7 +185,7 @@ export const useDashboard = () => {
       // Fallback
       setModels([]);
     } finally {
-        isLoadingModelsRef.current = false;
+      isLoadingModelsRef.current = false;
     }
   };
 
@@ -189,7 +194,7 @@ export const useDashboard = () => {
     try {
       setIsLoadingMessages(true);
       const data = await apiFetch(
-        `/api/conversations/${conversationId}/messages`
+        `/api/conversations/${conversationId}/messages`,
       );
 
       // Handle wrapped response format { messages: [...] }
@@ -213,11 +218,11 @@ export const useDashboard = () => {
     try {
       if (chatMode === "project" && currentProjectId) {
         const data = await apiFetch(
-          `/api/projects/${currentProjectId}/documents`
+          `/api/projects/${currentProjectId}/documents`,
         );
         const conversationDocs =
           data.documents?.filter(
-            (doc) => doc.conversation_id == conversationId
+            (doc) => doc.conversation_id == conversationId,
           ) || [];
         setConversationDocuments(conversationDocs);
       }
@@ -306,6 +311,7 @@ export const useDashboard = () => {
 
   // Track previous conversation ID to only load when it actually changes
   const prevConversationIdRef = useRef(null);
+  const skipNextLoadRef = useRef(false);
 
   // Auto-load messages when conversation is selected (only when ID actually changes)
   useEffect(() => {
@@ -313,7 +319,15 @@ export const useDashboard = () => {
       selectedConversation?.id &&
       selectedConversation.id !== prevConversationIdRef.current
     ) {
+      const prevId = prevConversationIdRef.current;
       prevConversationIdRef.current = selectedConversation.id;
+
+      // Skip loading if flag is set (e.g., just created new conversation with first message streaming)
+      if (skipNextLoadRef.current) {
+        skipNextLoadRef.current = false;
+        return;
+      }
+
       loadMessages(selectedConversation.id);
     } else if (!selectedConversation?.id) {
       prevConversationIdRef.current = null;
@@ -367,12 +381,15 @@ export const useDashboard = () => {
     setConversationDocuments,
     messagesEndRef,
     isMobile,
-    
+
     // Models
     models,
     setModels,
     selectedModelId,
     setSelectedModelId,
+
+    // Refs
+    skipNextLoadRef,
 
     // Functions
     loadProjects,

@@ -31,7 +31,7 @@ const ChatInput = ({
 
   return (
     <div className="bg-white border-t border-gray-200 p-4">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-4xl mx-auto relative z-10">
         {/* Attached Files Display */}
         {attachedFiles.length > 0 && (
           <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
@@ -61,17 +61,23 @@ const ChatInput = ({
           </div>
         )}
 
+        {/* Model Selector - Above chat input */}
+        {models && models.length > 0 && (
+          <div className="mb-3 flex justify-end">
+            <ModelSelector
+              models={models}
+              selectedModelId={selectedModelId}
+              onSelect={onSelectModel}
+              isLoading={isLoading}
+              compact={false}
+              dropUp={true}
+            />
+          </div>
+        )}
+
         {/* Message Input */}
         <div className="bg-white rounded-xl shadow-sm border-2 border-gray-300 p-3">
           <div className="flex items-center space-x-3">
-            <div className="mb-0">
-               <ModelSelector 
-                models={models} 
-                selectedModelId={selectedModelId} 
-                onSelect={onSelectModel} 
-                isLoading={isLoading} 
-              />
-            </div>
             <button
               onClick={openFileUpload}
               disabled={isDisabled}

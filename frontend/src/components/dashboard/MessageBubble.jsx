@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { tomorrow } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { User, Bot } from "lucide-react";
 
 const TYPING_SPEED = 20; // ms per character
 
@@ -11,6 +12,7 @@ const MessageBubble = ({
   message,
   streamingMessageId,
   shouldAnimate = false,
+  user = null,
 }) => {
   const isUser = message.role === "user";
   const content = message.content || "";
@@ -22,7 +24,7 @@ const MessageBubble = ({
   const hasAnimated = useRef(false);
   const [isVisible, setIsVisible] = useState(false);
   const [displayedContent, setDisplayedContent] = useState(
-    shouldAnimate && !isUser ? "" : content
+    shouldAnimate && !isUser ? "" : content,
   );
   const [isTyping, setIsTyping] = useState(false);
 
@@ -80,9 +82,9 @@ const MessageBubble = ({
   };
 
   const userMessageStyles =
-    "max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-2xl px-4 py-3 rounded-lg shadow-sm bg-blue-500 text-white rounded-br-none";
+    "px-4 py-3 rounded-lg shadow-sm bg-blue-500 text-white rounded-tr-none";
   const aiMessageStyles =
-    "max-w-full sm:max-w-[90%] md:max-w-[85%] lg:max-w-[80%] xl:max-w-[75%] px-4 py-3 rounded-lg shadow-sm bg-gray-100 text-gray-800 rounded-bl-none";
+    "px-4 py-3 rounded-lg shadow-sm bg-gray-100 text-gray-800 rounded-tl-none";
 
   const markdownComponents = {
     p: ({ children, node, ...props }) => (
@@ -176,11 +178,11 @@ const MessageBubble = ({
       // If second half starts with the same content as first half, it's likely a duplicate
       if (
         secondHalf.startsWith(
-          firstHalf.substring(0, Math.min(100, firstHalf.length))
+          firstHalf.substring(0, Math.min(100, firstHalf.length)),
         )
       ) {
         console.warn(
-          "Detected duplicate content in message, using first half only"
+          "Detected duplicate content in message, using first half only",
         );
         return firstHalf;
       }
@@ -195,6 +197,18 @@ const MessageBubble = ({
     return null;
   }
 
+  // Get display name and initials for avatar
+  const displayName = isUser ? user?.name || user?.email || "You" : "Fishy";
+
+  const getInitials = (name) => {
+    if (!name) return "?";
+    const parts = name.split(" ");
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
+
   return (
     <div
       className={`flex ${
@@ -205,30 +219,62 @@ const MessageBubble = ({
           : "opacity-0 translate-y-2 scale-[0.98]"
       }`}
     >
-      <div className={isUser ? userMessageStyles : aiMessageStyles}>
-        <div className="text-sm leading-relaxed">
+      <div
+        className={`flex ${isUser ? "flex-row-reverse" : "flex-row"} items-start gap-3 max-w-[85%]`}
+      >
+        {/* Avatar */}
+        <div
+          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm ${
+            isUser ? "bg-blue-500" : "bg-indigo-500"
+          }`}
+        >
           {isUser ? (
-            <div className="whitespace-pre-wrap break-words">{content}</div>
+            user?.name ? (
+              getInitials(user.name)
+            ) : (
+              <User size={16} />
+            )
           ) : (
-            <div className="relative">
-              <div className="prose prose-sm max-w-none text-gray-800">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeRaw]}
-                  components={markdownComponents}
-                >
-                  {cleanedContent || " "}
-                </ReactMarkdown>
-              </div>
-            </div>
+            <Bot size={16} />
           )}
         </div>
 
-        {isUser && (
-          <div className="text-xs mt-2 text-blue-100">
-            {formatTime(message.created_at)}
+        {/* Message Content */}
+        <div className="flex flex-col gap-1 flex-1">
+          {/* Name */}
+          <div
+            className={`text-xs font-medium ${isUser ? "text-right text-gray-600" : "text-left text-gray-600"}`}
+          >
+            {displayName}
           </div>
-        )}
+
+          {/* Message Bubble */}
+          <div className={isUser ? userMessageStyles : aiMessageStyles}>
+            <div className="text-sm leading-relaxed">
+              {isUser ? (
+                <div className="whitespace-pre-wrap break-words">{content}</div>
+              ) : (
+                <div className="prose prose-sm max-w-none text-gray-800">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeRaw]}
+                    components={markdownComponents}
+                  >
+                    {cleanedContent || " "}
+                  </ReactMarkdown>
+                </div>
+              )}
+            </div>
+
+            {message.created_at && (
+              <div
+                className={`text-xs mt-2 ${isUser ? "text-blue-100" : "text-gray-400"}`}
+              >
+                {formatTime(message.created_at)}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

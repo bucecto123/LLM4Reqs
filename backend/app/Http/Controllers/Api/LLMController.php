@@ -33,16 +33,27 @@ class LLMController extends Controller
 
     /**
      * List available models.
-     *
-     * Returns the hardcoded curated list instantly (no DB / network I/O).
-     * Use POST /api/llm/sync to refresh from the live provider APIs and
-     * swap in DB records once they are available.
      */
     public function index()
     {
-        return response()->json(
-            collect(self::FALLBACK_MODELS)->map(fn($m) => (object) $m)->values()
-        );
+        // First try to serve from DB
+        $models = LLMModel::where('is_active', true)->orderBy('provider')->orderBy('name')->get();
+
+        // Group by support tool capability for Frontend convenience? 
+        // Or just return flat list and let frontend handle it.
+        // Let's return flat list but ensuring fields are present.
+
+        if ($models->isEmpty()) {
+            // If no models in DB, try to sync synchronously
+            try {
+                $this->llmService->syncModels();
+                $models = LLMModel::where('is_active', true)->orderBy('provider')->orderBy('name')->get();
+            } catch (\Exception $e) {
+                Log::error('Failed to auto-sync models on index', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return response()->json($models);
     }
 
     /**

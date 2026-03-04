@@ -71,7 +71,7 @@ const WelcomeScreen = ({
           </div>
 
           {/* Compact Input Area */}
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-2xl mx-auto relative z-10">
             {/* Attached Files Display */}
             {attachedFiles.length > 0 && (
               <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
@@ -100,17 +100,25 @@ const WelcomeScreen = ({
               </div>
             )}
 
+            {/* Model Selector - Above chat input */}
+            {models && models.length > 0 && (
+              <div className="mb-3 flex justify-end">
+                <ModelSelector
+                  models={models}
+                  selectedModelId={selectedModelId}
+                  onSelect={onSelectModel}
+                  isLoading={isLoading}
+                  compact={false}
+                  dropUp={true}
+                />
+              </div>
+            )}
+
             <div
               className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-200 p-4 backdrop-blur-sm bg-white/80 animate-fade-in"
               style={{ animationDelay: "0.4s" }}
             >
               <div className="flex items-center space-x-3">
-                <ModelSelector
-                  models={models || []}
-                  selectedModelId={selectedModelId}
-                  onSelect={onSelectModel}
-                  isLoading={isLoading || isInitializing}
-                />
                 <button
                   onClick={openFileUpload}
                   disabled={isLoading || isInitializing}

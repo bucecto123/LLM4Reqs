@@ -263,8 +263,13 @@ export default function ProjectDetailPage() {
       if (Array.isArray(data)) {
         setModels(data);
         if (data.length > 0 && !selectedModelId) {
-          // Default to first available model
-          setSelectedModelId(data[0].model_id);
+          // Default to llama-3.3-70b-versatile if available, otherwise first model
+          const preferredModel = data.find(
+            (m) => m.model_id === "llama-3.3-70b-versatile",
+          );
+          setSelectedModelId(
+            preferredModel ? preferredModel.model_id : data[0].model_id,
+          );
         }
       }
     } catch (err) {
@@ -1632,6 +1637,7 @@ export default function ProjectDetailPage() {
                           message={msg}
                           streamingMessageId={streamingMessageId}
                           shouldAnimate={false}
+                          user={user}
                         />
                       ))
                     )}
@@ -1682,6 +1688,8 @@ export default function ProjectDetailPage() {
                       selectedModelId={selectedModelId}
                       onSelect={setSelectedModelId}
                       isLoading={isLoadingModelsRef.current}
+                      iconOnly={true}
+                      dropUp={true}
                     />
                   </div>
                   <button

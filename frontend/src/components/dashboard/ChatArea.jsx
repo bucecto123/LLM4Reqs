@@ -4,7 +4,6 @@ import MessageBubble from "./MessageBubble";
 import ChatInput from "./ChatInput";
 import WelcomeScreen from "./WelcomeScreen";
 import ThinkingIndicator from "../ThinkingIndicator.jsx";
-import ModelSelector from "./ModelSelector";
 
 const ChatArea = ({
   selectedConversation,
@@ -40,6 +39,7 @@ const ChatArea = ({
   models,
   selectedModelId,
   onSelectModel,
+  user,
 }) => {
   const showWelcome =
     !selectedConversation || (messages.length === 0 && !isLoading);
@@ -163,6 +163,7 @@ const ChatArea = ({
                     message={msg}
                     streamingMessageId={streamingMessageId}
                     shouldAnimate={false}
+                    user={user}
                   />
                 ))}
 
@@ -185,8 +186,8 @@ const ChatArea = ({
               isInitializing={isInitializing}
               chatMode={chatMode}
               currentProjectId={currentProjectId}
-              selectedModelId={selectedModelId}
               models={models}
+              selectedModelId={selectedModelId}
               onSelectModel={onSelectModel}
             />
           </>
