@@ -30,8 +30,7 @@ import { apiFetch } from "../utils/auth.js";
 import { useAuth } from "../hooks/useAuth.jsx";
 import Sidebar from "../components/dashboard/Sidebar.jsx";
 import MessageBubble from "../components/dashboard/MessageBubble.jsx";
-import GraphRenderer from "../components/GraphRenderer";
-import { graphService } from "../services/graphService";
+import GraphView from "../components/GraphView";
 import FileUpload from "../components/FileUpload.jsx";
 import KBUploadModal from "../components/KBUploadModal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
@@ -152,47 +151,34 @@ export default function ProjectDetailPage() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("chat"); // 'chat', 'documents', 'sharing'
 
-  // Story Graph State
-  const [graphData, setGraphData] = useState(null);
-  const [isLoadingGraph, setIsLoadingGraph] = useState(false);
+  // Graph tab state — all messages across all project conversations
+  const [allProjectMessages, setAllProjectMessages] = useState([]);
+  const [isLoadingGraphMessages, setIsLoadingGraphMessages] = useState(false);
 
-  // Fetch story graph when graph tab is active
   useEffect(() => {
-    if (activeTab === "graph" && projectId) {
-      setIsLoadingGraph(true);
-      graphService
-        .getStoryGraph(projectId)
-        .then((data) => setGraphData(data))
-        .catch((err) => {
-          console.error("Failed to load graph:", err);
-          setError("Failed to load story graph. Please try again.");
-        })
-        .finally(() => setIsLoadingGraph(false));
-    }
-  }, [activeTab, projectId]);
-
-  const handleGenerateGraph = async () => {
-    setIsLoadingGraph(true);
-    setError(null);
-    try {
-      // Clear cache to force fresh generation
-      await graphService.clearCache(projectId);
-
-      const data = await graphService.getStoryGraph(projectId);
-      setGraphData(data);
-
-      if (!data) {
-        setError(
-          "No requirements found to generate graph. Please add requirements first.",
+    if (activeTab !== "graph" || !projectId) return;
+    setIsLoadingGraphMessages(true);
+    apiFetch(`/api/projects/${projectId}/conversations`)
+      .then(async (convList) => {
+        if (!Array.isArray(convList) || convList.length === 0) {
+          setAllProjectMessages([]);
+          return;
+        }
+        const results = await Promise.all(
+          convList.map((conv) =>
+            apiFetch(`/api/conversations/${conv.id}/messages`)
+              .then((res) => res.messages ?? [])
+              .catch(() => [])
+          )
         );
-      }
-    } catch (err) {
-      console.error("Failed to generate graph:", err);
-      setError("Failed to generate story graph. Please try again.");
-    } finally {
-      setIsLoadingGraph(false);
-    }
-  };
+        setAllProjectMessages(results.flat());
+      })
+      .catch((err) => {
+        console.error("Failed to load project messages for graph view:", err);
+        setAllProjectMessages([]);
+      })
+      .finally(() => setIsLoadingGraphMessages(false));
+  }, [activeTab, projectId]);
 
   // Edit project state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -1893,47 +1879,11 @@ export default function ProjectDetailPage() {
           )}
 
           {activeTab === "graph" && (
-            <div className="h-full bg-gray-50 rounded-xl border border-gray-200 overflow-hidden min-h-[600px]">
-              {isLoadingGraph ? (
-                <div className="flex items-center justify-center h-full">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-                  <span className="ml-2 text-gray-600">
-                    Generating Story Graph...
-                  </span>
-                </div>
-              ) : graphData ? (
-                <GraphRenderer
-                  type="storymap"
-                  storyMap={graphData}
-                  interactive={true}
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full space-y-4">
-                  <div className="p-4 bg-blue-50 rounded-full">
-                    <Network size={48} className="text-blue-500" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-800">
-                    No Story Graph Generated
-                  </h3>
-                  <p className="text-gray-500 max-w-md text-center">
-                    Generate a visual story map from your project requirements
-                    to see the big picture.
-                  </p>
-                  {canUserEdit ? (
-                    <button
-                      onClick={handleGenerateGraph}
-                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center shadow-lg transition-transform transform hover:-translate-y-0.5"
-                    >
-                      <Sparkles size={20} className="mr-2" />
-                      Generate Graph
-                    </button>
-                  ) : (
-                    <div className="text-sm text-gray-500 italic">
-                      Only editors can generate graphs
-                    </div>
-                  )}
-                </div>
-              )}
+            <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden min-h-[600px]">
+              <GraphView
+                messages={allProjectMessages}
+                isLoading={isLoadingGraphMessages}
+              />
             </div>
           )}
         </main>

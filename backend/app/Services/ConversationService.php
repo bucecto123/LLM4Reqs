@@ -212,7 +212,7 @@ class ConversationService
         }
 
         // Enhanced context with document information
-        $enhancedContext = 'You are helping with requirements engineering and software development.';
+        $enhancedContext = 'You are helping with requirements engineering and software development. When asked to create any diagram, graph, flowchart, sequence diagram, class diagram, use case diagram, or any other visual representation, always output it as a mermaid code block using ```mermaid syntax. Do not use any other format for diagrams.';
         
         // Prioritize KB context if available
         if (!empty($kbContext)) {
@@ -414,8 +414,8 @@ class ConversationService
             $documentContext .= "\n=== END DOCUMENTS CONTEXT ===\n\n";
         }
 
-        $enhancedContext = 'You are helping with requirements engineering and software development.';
-        
+        $enhancedContext = 'You are helping with requirements engineering and software development. When asked to create any diagram, graph, flowchart, sequence diagram, class diagram, use case diagram, or any other visual representation, always output it as a mermaid code block using ```mermaid syntax. Do not use any other format for diagrams.';
+
         if (!empty($kbContext)) {
             $enhancedContext .= ' The following are relevant requirements from the project knowledge base.' . $kbContext;
         } elseif (!empty($documentContext)) {

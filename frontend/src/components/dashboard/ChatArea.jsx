@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { Loader2, Paperclip, FolderOpen, MessageCircle, X } from "lucide-react";
+import { Loader2, Paperclip, FolderOpen, MessageCircle, X, BarChart2 } from "lucide-react";
 import MessageBubble from "./MessageBubble";
 import ChatInput from "./ChatInput";
 import WelcomeScreen from "./WelcomeScreen";
 import ThinkingIndicator from "../ThinkingIndicator.jsx";
+import GraphView from "../GraphView.jsx";
 
 const ChatArea = ({
   selectedConversation,
@@ -41,6 +42,8 @@ const ChatArea = ({
   onSelectModel,
   user,
 }) => {
+  const [showGraphs, setShowGraphs] = useState(false);
+
   const showWelcome =
     !selectedConversation || (messages.length === 0 && !isLoading);
 
@@ -123,13 +126,31 @@ const ChatArea = ({
                 </button>
               </div>
             )}
+            {selectedConversation && (
+              <button
+                onClick={() => setShowGraphs((v) => !v)}
+                title={showGraphs ? "Back to chat" : "View graphs"}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                  showGraphs
+                    ? "bg-indigo-600 text-white border-indigo-600"
+                    : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+                }`}
+              >
+                <BarChart2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Graphs</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
 
       {/* Chat Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {showWelcome ? (
+        {showGraphs ? (
+          <div className="flex-1 overflow-y-auto" style={{ backgroundColor: "#F8FAFC" }}>
+            <GraphView messages={messages} />
+          </div>
+        ) : showWelcome ? (
           <WelcomeScreen
             message={message}
             setMessage={setMessage}
@@ -196,5 +217,6 @@ const ChatArea = ({
     </div>
   );
 };
+
 
 export default ChatArea;

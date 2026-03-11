@@ -5,6 +5,7 @@ import rehypeRaw from "rehype-raw";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { tomorrow } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { User, Bot } from "lucide-react";
+import GraphRenderer from "../GraphRenderer";
 
 const TYPING_SPEED = 20; // ms per character
 
@@ -143,6 +144,16 @@ const MessageBubble = ({
     ),
     code({ inline, className, children, ...props }) {
       const match = /language-(\w+)/.exec(className || "");
+      if (!inline && match?.[1] === "mermaid") {
+        return (
+          <GraphRenderer
+            type="mermaid"
+            mermaidCode={String(children).replace(/\n$/, "")}
+            height="400px"
+            interactive={true}
+          />
+        );
+      }
       return !inline && match ? (
         <SyntaxHighlighter
           style={tomorrow}
