@@ -31,6 +31,7 @@ export default function LLMDashboard() {
     setCurrentProjectId,
     projects,
     isInitializing,
+    isLoadingConversations,
     editingConversationId,
     setEditingConversationId,
     editingTitle,
@@ -587,8 +588,8 @@ export default function LLMDashboard() {
     setLatestAIMessageId(null);
   };
 
-  // Show skeleton while initializing
-  if (isInitializing) {
+  // Show skeleton while initializing or loading conversations for the first time
+  if (isInitializing || isLoadingConversations) {
     return <DashboardSkeleton />;
   }
 

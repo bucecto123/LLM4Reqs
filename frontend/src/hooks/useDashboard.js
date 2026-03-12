@@ -25,6 +25,7 @@ export const useDashboard = () => {
   // Loading and error states
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(true);
   const [error, setError] = useState(null);
 
   // Project state
@@ -149,6 +150,7 @@ export const useDashboard = () => {
         data = await apiFetch(`/api/projects/${projectId}/conversations`);
       } else {
         isLoadingConversationsRef.current = false;
+        setIsLoadingConversations(false);
         return;
       }
 
@@ -159,6 +161,7 @@ export const useDashboard = () => {
       setConversations([]);
     } finally {
       isLoadingConversationsRef.current = false;
+      setIsLoadingConversations(false);
     }
   };
 
@@ -359,6 +362,8 @@ export const useDashboard = () => {
     setIsLoading,
     isLoadingMessages,
     setIsLoadingMessages,
+    isLoadingConversations,
+    setIsLoadingConversations,
     error,
     setError,
     currentProjectId,

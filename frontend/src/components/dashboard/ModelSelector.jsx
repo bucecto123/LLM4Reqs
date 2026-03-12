@@ -43,10 +43,9 @@ const ModelSelector = ({
   const otherModels = models.filter(
     (m) => !featuredModelIds.includes(m.model_id),
   );
-  const displayedModels = showAllModels ? models : featuredModels;
-
+  // Set a high z-index and ensure it creates a stacking context
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative z-[9999]" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={isLoading}

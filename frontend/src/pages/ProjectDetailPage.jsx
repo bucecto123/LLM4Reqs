@@ -89,49 +89,59 @@ const PersonaDropdownItem = ({
   onDelete,
 }) => (
   <div
-    className={`flex items-center px-4 py-2 transition-colors ${
-      selected && !showActions ? "bg-purple-50" : "hover:bg-gray-50"
+    className={`group flex items-center gap-3 px-3 py-2.5 mx-1.5 rounded-lg cursor-pointer transition-all duration-100 ${
+      selected && !showActions
+        ? "bg-violet-50 ring-1 ring-violet-200"
+        : "hover:bg-gray-50"
     }`}
+    onClick={!showActions ? onClick : undefined}
   >
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex-1 text-left flex items-start gap-3"
+    {/* Icon badge */}
+    <span
+      className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-base ${
+        selected && !showActions ? "bg-violet-100" : "bg-gray-100"
+      }`}
     >
-      <span className="text-lg">{icon}</span>
-      <div className="flex-1 min-w-0">
-        <div className="font-medium text-sm text-gray-900 truncate">
-          {label}
-        </div>
-        {description && (
-          <div className="text-xs text-gray-500 line-clamp-2">
-            {description}
-          </div>
-        )}
-      </div>
-    </button>
-    <div className="ml-2 flex items-center gap-1">
+      {icon}
+    </span>
+
+    {/* Text */}
+    <div className="flex-1 min-w-0">
+      <p className={`text-sm font-semibold leading-tight truncate ${
+        selected && !showActions ? "text-violet-900" : "text-slate-800"
+      }`}>
+        {label}
+      </p>
+      {description && (
+        <p className="text-xs text-slate-400 truncate mt-0.5">{description}</p>
+      )}
+    </div>
+
+    {/* Right: selected dot or edit/delete actions */}
+    <div className="flex items-center gap-1 shrink-0">
       {showActions ? (
         <>
           <button
             type="button"
-            onClick={onEdit}
-            className="p-1.5 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-md"
+            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            className="p-1.5 rounded-md text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
             title="Edit persona"
           >
-            <Pencil size={14} />
+            <Pencil size={13} />
           </button>
           <button
             type="button"
-            onClick={onDelete}
-            className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md"
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
             title="Delete persona"
           >
-            <Trash2 size={14} />
+            <Trash2 size={13} />
           </button>
         </>
       ) : (
-        selected && <div className="w-2 h-2 bg-purple-600 rounded-full" />
+        selected && (
+          <div className="w-1.5 h-1.5 rounded-full bg-violet-600" />
+        )
       )}
     </div>
   </div>
@@ -1157,72 +1167,69 @@ export default function ProjectDetailPage() {
               </div>
 
               <div
-                className="flex items-center space-x-2"
+                className="flex items-center gap-3"
                 ref={personaDropdownRef}
               >
-                <div className="flex items-center space-x-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  <Sparkles size={14} className="text-purple-500" />
-                  <span>Personas</span>
-                </div>
+                {/* Persona trigger pill */}
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setIsPersonaDropdownOpen((prev) => !prev)}
-                    className="flex items-center justify-between min-w-[220px] px-4 py-2 rounded-lg border border-gray-200 bg-white text-left shadow-sm hover:border-purple-400 focus:outline-none"
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-150 ${
+                      selectedPersonaId
+                        ? "bg-violet-50 border-violet-300 text-violet-800 hover:bg-violet-100"
+                        : "bg-white border-gray-200 text-slate-600 hover:border-violet-300 hover:text-violet-700"
+                    }`}
                   >
-                    <div className="flex items-center space-x-2">
-                      <span>
-                        {selectedPersonaId
-                          ? getPersonaIcon(activePersona)
-                          : "✨"}
-                      </span>
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {selectedPersonaId
-                            ? activePersona?.name || "Persona"
-                            : "Normal Mode"}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {selectedPersonaId
-                            ? "Persona active"
-                            : "General conversation"}
-                        </div>
-                      </div>
-                    </div>
+                    <Sparkles size={14} className={selectedPersonaId ? "text-violet-600" : "text-slate-400"} />
+                    <span className="hidden sm:inline">
+                      {selectedPersonaId ? activePersona?.name || "Persona" : "Normal Mode"}
+                    </span>
                     <ChevronDown
-                      size={16}
-                      className={`text-gray-500 transition-transform ${
+                      size={13}
+                      className={`transition-transform duration-150 ${
                         isPersonaDropdownOpen ? "rotate-180" : ""
-                      }`}
+                      } ${selectedPersonaId ? "text-violet-500" : "text-slate-400"}`}
                     />
                   </button>
 
+                  {/* Dropdown panel */}
                   {isPersonaDropdownOpen && (
-                    <div className="absolute z-30 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-72 overflow-y-auto">
+                    <div className="absolute z-30 top-full mt-2 w-76 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden">
+                      {/* Header */}
+                      <div className="px-4 pt-3 pb-2 border-b border-gray-100">
+                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
+                          Choose persona
+                        </p>
+                      </div>
+
                       {isLoadingPersonas ? (
-                        <div className="p-4 text-center text-xs text-gray-500">
-                          Loading personas...
+                        <div className="p-6 text-center">
+                          <Loader2 size={18} className="animate-spin text-violet-400 mx-auto" />
+                          <p className="text-xs text-slate-400 mt-2">Loading…</p>
                         </div>
                       ) : (
                         <>
-                          <PersonaDropdownItem
-                            label="Normal Mode"
-                            description="General conversation"
-                            icon="✨"
-                            selected={!selectedPersonaId}
-                            onClick={() => {
-                              setSelectedPersonaId(null);
-                              setIsPersonaDropdownOpen(false);
-                            }}
-                            showActions={false}
-                          />
-                          <div className="border-t border-gray-100">
-                            {personaList.length === 0 ? (
-                              <div className="p-4 text-xs text-gray-400">
-                                No personas yet
-                              </div>
-                            ) : (
-                              personaList.map((persona) => (
+                          {/* Normal mode option */}
+                          <div className="pt-1.5 pb-1">
+                            <PersonaDropdownItem
+                              label="Normal Mode"
+                              description="General conversation"
+                              icon="✨"
+                              selected={!selectedPersonaId}
+                              onClick={() => {
+                                setSelectedPersonaId(null);
+                                setIsPersonaDropdownOpen(false);
+                              }}
+                              showActions={false}
+                            />
+                          </div>
+
+                          {/* Custom personas list */}
+                          {personaList.length > 0 && (
+                            <div className="border-t border-gray-100 pt-1 pb-1">
+                              <p className="text-xs text-slate-400 px-4 py-1.5">Custom personas</p>
+                              {personaList.map((persona) => (
                                 <PersonaDropdownItem
                                   key={persona.id}
                                   label={persona.name}
@@ -1233,50 +1240,44 @@ export default function ProjectDetailPage() {
                                     setSelectedPersonaId(persona.id);
                                     setIsPersonaDropdownOpen(false);
                                   }}
-                                  showActions={
-                                    showPersonaActions && canUserEdit
-                                  }
-                                  onEdit={() =>
-                                    openPersonaManagerForEdit(persona)
-                                  }
-                                  onDelete={() =>
-                                    handleDeletePersona(persona.id)
-                                  }
+                                  showActions={showPersonaActions && canUserEdit}
+                                  onEdit={() => openPersonaManagerForEdit(persona)}
+                                  onDelete={() => handleDeletePersona(persona.id)}
                                 />
-                              ))
-                            )}
-                          </div>
-                          <div className="border-t border-gray-100 px-4 py-3 flex items-center justify-between">
-                            {canUserEdit && (
+                              ))}
+                            </div>
+                          )}
+
+                          {personaList.length === 0 && (
+                            <div className="px-4 py-3 text-xs text-slate-400 border-t border-gray-100">
+                              No custom personas yet
+                            </div>
+                          )}
+
+                          {/* Footer actions */}
+                          <div className="border-t border-gray-100 px-3 py-2.5 flex items-center justify-between bg-gray-50/60">
+                            {canUserEdit ? (
                               <>
                                 <button
                                   type="button"
-                                  onClick={() =>
-                                    setShowPersonaActions((prev) => !prev)
-                                  }
-                                  className={`text-xs font-medium ${
-                                    showPersonaActions
-                                      ? "text-purple-800"
-                                      : "text-purple-600"
-                                  } hover:text-purple-800`}
+                                  onClick={() => setShowPersonaActions((prev) => !prev)}
+                                  className="text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors"
                                 >
-                                  {showPersonaActions
-                                    ? "Done"
-                                    : "Manage personas"}
+                                  {showPersonaActions ? "Done" : "Manage"}
                                 </button>
                                 <button
                                   type="button"
                                   onClick={openPersonaManagerForCreate}
-                                  className="text-xs font-medium text-purple-600 hover:text-purple-800"
+                                  className="inline-flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors"
                                 >
-                                  + Add persona
+                                  <span className="text-base leading-none">+</span>
+                                  Add persona
                                 </button>
                               </>
-                            )}
-                            {!canUserEdit && (
-                              <div className="text-xs text-gray-400 italic w-full text-center">
-                                View-only: Cannot manage personas
-                              </div>
+                            ) : (
+                              <p className="text-xs text-slate-400 italic w-full text-center">
+                                View-only — cannot manage personas
+                              </p>
                             )}
                           </div>
                         </>
@@ -1288,55 +1289,52 @@ export default function ProjectDetailPage() {
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center gap-2">
+            {/* Edit */}
             <button
               onClick={() => setShowEditModal(true)}
               disabled={!canUserEdit}
-              title={
-                !canUserEdit
-                  ? "You don't have permission to edit this project"
-                  : "Edit project"
-              }
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:shadow-lg ${
+              title={!canUserEdit ? "You don't have permission to edit this project" : "Edit project"}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 ${
                 !canUserEdit
                   ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-60"
-                  : "bg-gray-100 text-slate-800"
+                  : "bg-white border border-gray-200 text-slate-700 hover:border-slate-400 hover:bg-gray-50"
               }`}
             >
-              <Edit2 size={18} />
+              <Edit2 size={15} />
               <span className="hidden md:inline">Edit</span>
             </button>
+
+            {/* Build KB */}
             <button
               onClick={() => setIsKBUploadOpen(true)}
               disabled={!canUserEdit}
-              title={
+              title={!canUserEdit ? "You don't have permission to build KB" : "Build Knowledge Base"}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-150 ${
                 !canUserEdit
-                  ? "You don't have permission to build KB"
-                  : "Build Knowledge Base"
-              }
-              className={`flex items-center space-x-2 px-4 py-2 rounded-md font-medium transition-colors ${
-                !canUserEdit
-                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                  : "text-white hover:opacity-90"
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-60"
+                  : "bg-blue-700 text-white hover:bg-blue-800 shadow-sm hover:shadow-md"
               }`}
-              style={!canUserEdit ? {} : { backgroundColor: "#4A7BA7" }}
             >
-              <Database size={18} />
+              <Database size={15} />
               <span className="hidden md:inline">Build KB</span>
             </button>
+
+            {/* Requirements */}
             <button
               onClick={() => setShowRequirements((v) => !v)}
-              className="flex items-center space-x-2 px-4 py-2 rounded-md font-medium transition-colors hover:opacity-90"
-              style={{ backgroundColor: "#112D4E", color: "white" }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold bg-slate-900 text-white hover:bg-slate-700 shadow-sm hover:shadow-md transition-all duration-150"
             >
-              <FileText size={18} />
+              <FileText size={15} />
               <span className="hidden md:inline">Requirements</span>
             </button>
+
+            {/* Conflicts */}
             <button
               onClick={() => setShowConflicts((v) => !v)}
-              className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:shadow-lg bg-red-600 text-white"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700 shadow-sm hover:shadow-md transition-all duration-150"
             >
-              <AlertTriangle size={18} />
+              <AlertTriangle size={15} />
               <span className="hidden md:inline">Conflicts</span>
             </button>
           </div>
@@ -1440,161 +1438,133 @@ export default function ProjectDetailPage() {
                 (messages.length === 0 &&
                   !isSendingMessage &&
                   !isLoadingMessages) ? (
-                  <div className="flex flex-col py-12 px-6">
-                    {/* Welcome Section */}
-                    <div className="max-w-4xl mx-auto w-full">
-                      <div className="mb-10">
-                        <h3
-                          className="text-4xl font-bold mb-4"
-                          style={{ color: "#112D4E" }}
-                        >
-                          {project?.name || "Project Workspace"}
-                        </h3>
-                        <p className="text-gray-600 text-lg leading-relaxed">
-                          Collaborate on requirements, analyze documents, and
-                          manage your project efficiently.
-                        </p>
-                      </div>
+                  <div className="flex flex-col h-full">
 
-                      {/* Feature Cards */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                        <div
-                          className="group bg-white rounded-xl p-6 border-2 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer"
-                          style={{ borderColor: "#DBE2EF" }}
-                        >
-                          <div className="mb-5">
-                            <div
-                              className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-transform duration-300 group-hover:scale-110"
-                              style={{ backgroundColor: "#4A7BA7" }}
-                            >
-                              <BookOpen size={24} className="text-white" />
-                            </div>
-                            <h4
-                              className="font-bold text-lg mb-2"
-                              style={{ color: "#112D4E" }}
-                            >
-                              Document Library
-                            </h4>
+                    {/* ── Header block ── */}
+                    <div className="pt-8 pb-6 px-2 border-b border-gray-100">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          {/* eyebrow */}
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                            <span className="text-xs font-medium text-indigo-600 uppercase tracking-widest">
+                              Project Chat
+                            </span>
                           </div>
-                          <p className="text-sm text-gray-600 leading-relaxed">
-                            Access and query all uploaded project documents with
-                            intelligent search capabilities.
-                          </p>
-                        </div>
-
-                        <div
-                          className="group bg-white rounded-xl p-6 border-2 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer"
-                          style={{ borderColor: "#DBE2EF" }}
-                        >
-                          <div className="mb-5">
-                            <div
-                              className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-transform duration-300 group-hover:scale-110"
-                              style={{ backgroundColor: "#4A7BA7" }}
-                            >
-                              <MessagesSquare
-                                size={24}
-                                className="text-white"
-                              />
-                            </div>
-                            <h4
-                              className="font-bold text-lg mb-2"
-                              style={{ color: "#112D4E" }}
-                            >
-                              Conversation History
-                            </h4>
-                          </div>
-                          <p className="text-sm text-gray-600 leading-relaxed">
-                            Track discussions and decisions with full
-                            conversation context and history.
-                          </p>
-                        </div>
-
-                        <div
-                          className="group bg-white rounded-xl p-6 border-2 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer"
-                          style={{ borderColor: "#DBE2EF" }}
-                        >
-                          <div className="mb-5">
-                            <div
-                              className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-transform duration-300 group-hover:scale-110"
-                              style={{ backgroundColor: "#4A7BA7" }}
-                            >
-                              <Target size={24} className="text-white" />
-                            </div>
-                            <h4
-                              className="font-bold text-lg mb-2"
-                              style={{ color: "#112D4E" }}
-                            >
-                              Requirements Focus
-                            </h4>
-                          </div>
-                          <p className="text-sm text-gray-600 leading-relaxed">
-                            Organize and analyze project requirements with
-                            structured workflows.
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Quick Start Section */}
-                      <div
-                        className="rounded-xl p-6 border-2"
-                        style={{
-                          backgroundColor: "#DBE2EF",
-                          borderColor: "#4A7BA7",
-                        }}
-                      >
-                        <div className="flex items-start space-x-4">
-                          <div
-                            className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center"
-                            style={{ backgroundColor: "#112D4E" }}
-                          >
-                            <MessageSquare size={20} className="text-white" />
-                          </div>
-                          <div className="flex-1">
-                            <h5
-                              className="font-bold text-lg mb-2"
-                              style={{ color: "#112D4E" }}
-                            >
-                              Getting Started
-                            </h5>
-                            <p
-                              className="text-sm mb-4"
-                              style={{ color: "#112D4E" }}
-                            >
-                              Start a conversation to work with your project.
-                              Here are some things you can do:
+                          <h1 className="text-3xl font-extrabold text-slate-900 leading-tight truncate">
+                            {project?.name || "Workspace"}
+                          </h1>
+                          {project?.description && (
+                            <p className="mt-1.5 text-sm text-slate-500 leading-relaxed line-clamp-2">
+                              {project.description}
                             </p>
-                            <ul
-                              className="space-y-2 text-sm"
-                              style={{ color: "#112D4E" }}
-                            >
-                              <li className="flex items-start space-x-3">
-                                <span
-                                  className="flex-shrink-0 w-1.5 h-1.5 rounded-full mt-1.5"
-                                  style={{ backgroundColor: "#4A7BA7" }}
-                                ></span>
-                                <span>
-                                  Summarize project documents and requirements
-                                </span>
-                              </li>
-                              <li className="flex items-start space-x-3">
-                                <span
-                                  className="flex-shrink-0 w-1.5 h-1.5 rounded-full mt-1.5"
-                                  style={{ backgroundColor: "#4A7BA7" }}
-                                ></span>
-                                <span>
-                                  Ask questions about specific requirements
-                                </span>
-                              </li>
-                              <li className="flex items-start space-x-3">
-                                <span
-                                  className="flex-shrink-0 w-1.5 h-1.5 rounded-full mt-1.5"
-                                  style={{ backgroundColor: "#4A7BA7" }}
-                                ></span>
-                                <span>Analyze conflicts and dependencies</span>
-                              </li>
-                            </ul>
-                          </div>
+                          )}
                         </div>
+                        {/* mini stats */}
+                        <div className="flex flex-col gap-1.5 text-right shrink-0">
+                          <span className="text-xs text-slate-400">
+                            <span className="font-semibold text-slate-700">
+                              {Array.isArray(documents) ? documents.length : 0}
+                            </span>{" "}
+                            docs
+                          </span>
+                          <span className="text-xs text-slate-400">
+                            <span className="font-semibold text-slate-700">
+                              {conversations.length}
+                            </span>{" "}
+                            chats
+                          </span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold capitalize">
+                            {currentUserRole || "member"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ── Action grid ── */}
+                    <div className="flex-1 py-6 px-2">
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">
+                        What would you like to do?
+                      </p>
+                      <div className="grid grid-cols-2 gap-3 mb-8">
+                        {[
+                          {
+                            icon: <FileText size={18} />,
+                            color: "text-violet-600",
+                            bg: "bg-violet-50 hover:bg-violet-100",
+                            ring: "ring-violet-200",
+                            label: "Summarize documents",
+                            sub: "Get a quick overview of all project files",
+                            msg: "Summarize all documents in this project",
+                          },
+                          {
+                            icon: <AlertTriangle size={18} />,
+                            color: "text-amber-600",
+                            bg: "bg-amber-50 hover:bg-amber-100",
+                            ring: "ring-amber-200",
+                            label: "Find conflicts",
+                            sub: "Detect contradicting requirements",
+                            msg: "Find conflicting requirements",
+                          },
+                          {
+                            icon: <Target size={18} />,
+                            color: "text-blue-600",
+                            bg: "bg-blue-50 hover:bg-blue-100",
+                            ring: "ring-blue-200",
+                            label: "List requirements",
+                            sub: "Extract structured functional requirements",
+                            msg: "List all functional requirements",
+                          },
+                          {
+                            icon: <Network size={18} />,
+                            color: "text-emerald-600",
+                            bg: "bg-emerald-50 hover:bg-emerald-100",
+                            ring: "ring-emerald-200",
+                            label: "Show dependencies",
+                            sub: "Map relationships between requirements",
+                            msg: "Show dependencies between requirements",
+                          },
+                        ].map((action) => (
+                          <button
+                            key={action.label}
+                            onClick={() => {
+                              setMessage(action.msg);
+                              if (!selectedConversation) createNewConversation();
+                            }}
+                            className={`group flex items-start gap-3 p-4 rounded-xl ${action.bg} ring-1 ${action.ring} ring-transparent hover:ring-1 text-left transition-all duration-150 active:scale-[0.98]`}
+                          >
+                            <span className={`mt-0.5 shrink-0 ${action.color}`}>
+                              {action.icon}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-slate-800 leading-tight">
+                                {action.label}
+                              </p>
+                              <p className="text-xs text-slate-500 mt-0.5 leading-snug">
+                                {action.sub}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* ── Quick-launch row ── */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-slate-400 mr-1">Quick launch →</span>
+                        {[
+                          { label: "Upload doc", icon: <Upload size={13} />, action: () => setIsFileUploadOpen(true) },
+                          { label: "View docs",  icon: <BookOpen size={13} />, action: () => setActiveTab("documents") },
+                          { label: "Story graph", icon: <Network size={13} />, action: () => setActiveTab("graph") },
+                        ].map((btn) => (
+                          <button
+                            key={btn.label}
+                            onClick={btn.action}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-200 text-slate-600 hover:border-indigo-400 hover:text-indigo-700 hover:bg-indigo-50 transition-all duration-150"
+                          >
+                            {btn.icon}
+                            {btn.label}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -1642,96 +1612,135 @@ export default function ProjectDetailPage() {
               </div>
 
               {/* Chat Input Area */}
-              <div className="border-t pt-4">
+              <div className="border-t border-gray-100 pt-3 px-1">
                 {/* Attached Files */}
                 {attachedFiles.length > 0 && (
-                  <div className="mb-3 flex flex-wrap gap-2">
+                  <div className="mb-2 flex flex-wrap gap-2">
                     {attachedFiles.map((file, index) => (
                       <div
                         key={index}
-                        className="flex items-center space-x-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm"
+                        className="flex items-center space-x-2 px-3 py-1.5 bg-indigo-50 border border-indigo-200 rounded-full text-sm shadow-sm"
                       >
-                        <Paperclip size={14} className="text-blue-600" />
-                        <span className="text-blue-800 truncate max-w-[200px]">
+                        <Paperclip size={13} className="text-indigo-500" />
+                        <span className="text-indigo-700 truncate max-w-[180px] font-medium">
                           {file.name}
                         </span>
                         <button
                           onClick={() => removeAttachedFile(index)}
-                          className="text-blue-600 hover:text-blue-800"
+                          className="text-indigo-400 hover:text-indigo-700 transition-colors"
                         >
-                          <X size={14} />
+                          <X size={13} />
                         </button>
                       </div>
                     ))}
                   </div>
                 )}
 
-                {/* Input Box */}
-                <div className="flex items-end space-x-2">
-                  <div className="mb-1">
-                    <ModelSelector
-                      models={models}
-                      selectedModelId={selectedModelId}
-                      onSelect={setSelectedModelId}
-                      isLoading={isLoadingModelsRef.current}
-                      iconOnly={true}
-                      dropUp={true}
-                    />
-                  </div>
-                  <button
-                    onClick={() => setIsFileUploadOpen(true)}
-                    disabled={!canUserEdit}
-                    title={
-                      !canUserEdit
-                        ? "You don't have permission to upload files"
-                        : "Attach files"
-                    }
-                    className={`p-3 rounded-lg transition-colors flex-shrink-0 ${
-                      !canUserEdit
-                        ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-60"
-                        : "bg-gray-100 hover:bg-gray-200 text-gray-600"
-                    }`}
-                  >
-                    <Paperclip size={20} />
-                  </button>
-
+                {/* Modern integrated input card */}
+                <div
+                  className={`rounded-2xl border-2 bg-white shadow-md transition-all duration-200 ${
+                    !canUserEdit
+                      ? "border-gray-200 opacity-80"
+                      : "border-gray-200 focus-within:border-indigo-400 focus-within:shadow-lg focus-within:shadow-indigo-50"
+                  }`}
+                >
+                  {/* Textarea */}
                   <textarea
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     onKeyDown={handleKeyPress}
                     placeholder={
                       !canUserEdit
-                        ? "View-only mode: You can read but not send messages"
+                        ? "View-only mode — you cannot send messages"
                         : "Ask about this project..."
                     }
-                    className="flex-1 px-4 py-3 rounded-lg border-2 border-gray-200 focus:border-blue-400 focus:outline-none resize-none"
+                    className="w-full px-4 pt-3 pb-1 bg-transparent focus:outline-none resize-none text-gray-800 placeholder-gray-400 text-sm leading-relaxed"
                     rows={3}
                     disabled={
                       !canUserEdit || isSendingMessage || isLoadingMessages
                     }
                   />
 
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={
-                      !canUserEdit ||
-                      (!message.trim() && attachedFiles.length === 0) ||
-                      isSendingMessage ||
-                      isLoadingMessages
-                    }
-                    title={
-                      !canUserEdit
-                        ? "You don't have permission to send messages"
-                        : "Send message"
-                    }
-                    className="p-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                  >
-                    {isSendingMessage ? (
-                      <Loader2 size={20} className="animate-spin" />
-                    ) : (
-                      <MessageSquare size={20} />
-                    )}
-                  </button>
+                  {/* Bottom toolbar */}
+                  <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100">
+                    {/* Left — model + attach */}
+                    <div className="flex items-center gap-1">
+                      <div
+                        className="flex items-center"
+                        title="Select AI model"
+                      >
+                        <ModelSelector
+                          models={models}
+                          selectedModelId={selectedModelId}
+                          onSelect={setSelectedModelId}
+                          isLoading={isLoadingModelsRef.current}
+                          iconOnly={true}
+                          dropUp={true}
+                        />
+                      </div>
+
+                      <button
+                        onClick={() => setIsFileUploadOpen(true)}
+                        disabled={!canUserEdit}
+                        title={
+                          !canUserEdit
+                            ? "You don't have permission to upload files"
+                            : "Attach files"
+                        }
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                          !canUserEdit
+                            ? "text-gray-300 cursor-not-allowed"
+                            : "text-gray-500 hover:text-indigo-600 hover:bg-indigo-50"
+                        }`}
+                      >
+                        <Paperclip size={15} />
+                        <span className="hidden sm:inline">Attach</span>
+                      </button>
+                    </div>
+
+                    {/* Right — hint + send button */}
+                    <div className="flex items-center gap-3">
+                      <span className="hidden md:block text-xs text-gray-400 select-none">
+                        {message.trim()
+                          ? "Enter ↵ to send · Shift+Enter for newline"
+                          : ""}
+                      </span>
+                      <button
+                        onClick={handleSendMessage}
+                        disabled={
+                          !canUserEdit ||
+                          (!message.trim() && attachedFiles.length === 0) ||
+                          isSendingMessage ||
+                          isLoadingMessages
+                        }
+                        title={
+                          !canUserEdit
+                            ? "You don't have permission to send messages"
+                            : "Send message (Enter)"
+                        }
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                          !canUserEdit ||
+                          (!message.trim() && attachedFiles.length === 0) ||
+                          isSendingMessage ||
+                          isLoadingMessages
+                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                            : "bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white shadow-sm hover:shadow-md active:scale-95"
+                        }`}
+                      >
+                        {isSendingMessage ? (
+                          <>
+                            <Loader2 size={15} className="animate-spin" />
+                            <span>Sending…</span>
+                          </>
+                        ) : (
+                          <>
+                            <MessageSquare size={15} />
+                            <span>Send</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

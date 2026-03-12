@@ -75,27 +75,27 @@ class ProjectController extends Controller
 
     public function show(\Illuminate\Http\Request $request, string $id)
     {
-        // Cache project data for 5 minutes to improve LCP
-        $project = \Cache::remember("project_{$id}", 300, function () use ($id) {
-            return Project::with('owner:id,name,email')->findOrFail($id);
+        $userId = $request->user()->id;
+
+        // Cache project + role together (scoped per user) for 5 minutes
+        $cacheKey = "project_{$id}_user_{$userId}";
+        $project = \Cache::remember($cacheKey, 300, function () use ($id, $userId) {
+            $p = Project::with('owner:id,name,email')->findOrFail($id);
+            // Resolve and store the role inside the cache so no extra query runs later
+            if ($p->owner_id == $userId) {
+                $p->role = 'owner';
+            } else {
+                $collaborator = $p->collaborators()->where('user_id', $userId)->first();
+                $p->role = $collaborator ? ($collaborator->pivot->role ?? 'viewer') : 'viewer';
+            }
+            return $p;
         });
-        
+
         // Check authorization
         if (!$request->user()->can('view', $project)) {
             return response()->json([
                 'message' => 'Unauthorized to view this project'
             ], 403);
-        }
-        
-        // Add role attribute based on ownership and collaboration
-        $userId = $request->user()->id;
-        
-        if ($project->owner_id == $userId) {
-            $project->role = 'owner';
-        } else {
-            // Check if user is a collaborator
-            $collaborator = $project->collaborators()->where('user_id', $userId)->first();
-            $project->role = $collaborator ? ($collaborator->pivot->role ?? 'viewer') : 'viewer';
         }
         
         return response(json_encode($project), 200)
@@ -114,6 +114,10 @@ class ProjectController extends Controller
         }
         
         $project = $this->project_service->updateProject($id, $request->validated());
+        
+        // Bust the user-scoped project cache so stale data isn't served
+        \Cache::forget("project_{$id}_user_{$request->user()->id}");
+        
         return response(json_encode($project), 200)
             ->header('Content-Type', 'application/json');
     }
@@ -128,6 +132,9 @@ class ProjectController extends Controller
                 'message' => 'Unauthorized to delete this project'
             ], 403);
         }
+        
+        // Bust cache before deleting
+        \Cache::forget("project_{$id}_user_{$request->user()->id}");
         
         $this->project_service->deleteProject($id);
         return response()->json(null, 204);
@@ -154,15 +161,6 @@ class ProjectController extends Controller
 
             // Build the base query
             $query = Requirement::where('project_id', $project->id)->with('document');
-            
-            // Debug query
-            Log::info('SQL Query Debug', [
-                'raw_sql' => $query->toSql(),
-                'bindings' => $query->getBindings(),
-                'project_id' => $project->id,
-                'all_requirements' => Requirement::count(),
-                'project_requirements' => Requirement::where('project_id', $project->id)->count()
-            ]);
 
             // Apply filters only if they have non-empty values
             if (request()->filled('type')) {

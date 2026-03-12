@@ -61,19 +61,20 @@ const ConversationItem = ({
   onKeyPress,
 }) => (
   <div
-    className={`group relative p-3 rounded-xl cursor-pointer transition-all duration-300 ${
+    className={`group flex items-center rounded-xl cursor-pointer transition-all duration-300 ${
       isSelected
         ? "bg-blue-50 border-l-4 border-blue-500 shadow-sm scale-[1.02]"
         : "hover:bg-gray-50 hover:shadow-sm hover:scale-[1.01]"
     }`}
   >
+    {/* Clickable conversation info area */}
     <div
       onClick={() => {
         if (!isEditing) {
           onSelect(conversation);
         }
       }}
-      className="flex-1"
+      className="flex-1 min-w-0 p-3"
     >
       {isEditing ? (
         <div className="flex items-center space-x-2">
@@ -86,21 +87,21 @@ const ConversationItem = ({
             autoFocus
           />
           <button
-            onClick={() => onSaveEdit(conversation.id)}
-            className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+            onClick={(e) => { e.stopPropagation(); onSaveEdit(conversation.id); }}
+            className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors flex-shrink-0"
           >
             <Check size={16} />
           </button>
           <button
-            onClick={onCancelEdit}
-            className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            onClick={(e) => { e.stopPropagation(); onCancelEdit(); }}
+            className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
           >
             <X size={16} />
           </button>
         </div>
       ) : (
         <>
-          <div className="font-semibold text-sm text-gray-800 truncate">
+          <div className="font-semibold text-sm text-gray-800 truncate pr-1">
             {conversation.title || "New Chat"}
           </div>
           <div className="text-xs text-gray-500 mt-0.5 font-medium">
@@ -110,41 +111,41 @@ const ConversationItem = ({
       )}
     </div>
 
+    {/* Three-dot menu button — always in flow, shown on hover */}
     {!isEditing && (
-      <div className="absolute right-2 top-2">
+      <div className="relative flex-shrink-0 pr-2">
         <button
           onClick={(e) => {
             e.stopPropagation();
             onToggleDropdown(conversation.id);
           }}
-          className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-gray-200/80 transition-all duration-300 backdrop-blur-sm"
+          className="p-1.5 rounded-lg opacity-40 hover:opacity-100 hover:bg-gray-200/80 transition-all duration-200"
+          title="More options"
         >
-          <MoreVertical size={16} />
+          <MoreVertical size={16} className="text-gray-600" />
         </button>
 
         {showDropdown && (
-          <div className="conversation-dropdown absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-xl z-10 min-w-[140px] overflow-hidden backdrop-blur-lg bg-white/95">
+          <div className="conversation-dropdown absolute right-0 top-9 bg-white border border-gray-200 rounded-xl shadow-xl z-50 min-w-[140px] overflow-hidden">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onStartEdit(conversation);
               }}
-              className="w-full text-left px-4 py-2.5 text-sm hover:bg-blue-50 flex items-center space-x-2.5 transition-all font-medium"
+              className="w-full text-left px-4 py-2.5 text-sm hover:bg-blue-50 flex items-center space-x-2.5 transition-colors font-medium text-gray-700"
             >
-              <Edit2 size={14} className="text-blue-600" />
+              <Edit2 size={14} className="text-blue-600 flex-shrink-0" />
               <span>Rename</span>
             </button>
-            <div className="relative">
-              <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
-            </div>
+            <div className="h-px bg-gray-100 mx-2" />
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete(conversation.id);
               }}
-              className="w-full text-left px-4 py-2.5 text-sm hover:bg-red-50 text-red-600 flex items-center space-x-2.5 transition-all font-medium"
+              className="w-full text-left px-4 py-2.5 text-sm hover:bg-red-50 text-red-600 flex items-center space-x-2.5 transition-colors font-medium"
             >
-              <Trash2 size={14} />
+              <Trash2 size={14} className="flex-shrink-0" />
               <span>Delete</span>
             </button>
           </div>

@@ -32,9 +32,12 @@ class ConversationService
         ]);
     }
 
-    public function getMessages($conversationId)
+    public function getMessages($conversationId, int $limit = 50)
     {
-        return Message::where('conversation_id', $conversationId)->get();
+        return Message::where('conversation_id', $conversationId)
+            ->orderBy('created_at', 'asc')
+            ->limit($limit)
+            ->get();
     }
 
     public function sendMessage($conversationId, $messageData)
@@ -467,14 +470,6 @@ class ConversationService
             $enhancedContext,
             $personaData,
             function($chunk) use ($conversationId, $tempMessageId) {
-                // DEBUG: Log what we're broadcasting
-                Log::info('💬 Broadcasting chunk', [
-                    'conversation_id' => $conversationId,
-                    'message_id' => $tempMessageId,
-                    'chunk_length' => mb_strlen($chunk),
-                    'chunk_preview' => mb_substr($chunk, 0, 50)
-                ]);
-                
                 // Broadcast each chunk via WebSocket
                 broadcast(new MessageChunk(
                     $conversationId,
@@ -483,7 +478,7 @@ class ConversationService
                     false
                 ));
             },
-            $conversation->project_id // NEW: Pass project_id
+            $conversation->project_id
         );
 
         // Save the complete AI response

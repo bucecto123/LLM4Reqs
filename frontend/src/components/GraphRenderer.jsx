@@ -13,6 +13,42 @@ import {
 import '@xyflow/react/dist/style.css';
 import { Download, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 
+/**
+ * Sanitize AI-generated Mermaid code to fix common parse errors.
+ * Handles:
+ *  - Labels containing > or < (wrap in quotes)
+ *  - Bare ">" used as an arrow instead of "-->"
+ *  - HTML entities that Mermaid can't parse
+ */
+function sanitizeMermaidCode(code) {
+  if (!code) return code;
+
+  const lines = code.split('\n');
+  const sanitized = lines.map(line => {
+    // 1) Fix bare ">" used as arrow: A[label]> B → A[label] --> B
+    // Only if it's after a node definition and not part of an existing arrow
+    line = line.replace(/([\]\)])\s*>(?!\s*>|\s*-)\s*/g, '$1 --> ');
+
+    // 2) Fix `<` and `>` inside text labels by replacing them with HTML entities
+    // Mermaid chokes on bare `<` or `>` inside brackets unless they are in quotes.
+    // However, quoting can break if there are already quotes. Safest is HTML entities.
+    // We match text inside brackets [...] or parens (...)
+    line = line.replace(/\[([^\]]+)\]/g, (match, inner) => {
+      const sanitized = inner.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return `[${sanitized}]`;
+    });
+    
+    line = line.replace(/\(([^)]+)\)/g, (match, inner) => {
+      const sanitized = inner.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return `(${sanitized})`;
+    });
+
+    return line;
+  });
+
+  return sanitized.join('\n');
+}
+
 // Initialize Mermaid
 mermaid.initialize({
   startOnLoad: false,
@@ -62,7 +98,7 @@ const GraphRenderer = ({
 }) => {
   const mermaidRef = useRef(null);
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [mermaidSvg, setMermaidSvg] = useState('');
   
   // React Flow state
@@ -83,8 +119,9 @@ const GraphRenderer = ({
           // Generate unique ID
           const id = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
           
-          // Render diagram
-          const { svg } = await mermaid.render(id, mermaidCode);
+          // Sanitize and render diagram
+          const cleanCode = sanitizeMermaidCode(mermaidCode);
+          const { svg } = await mermaid.render(id, cleanCode);
           
           setMermaidSvg(svg);
           mermaidRef.current.innerHTML = svg;
@@ -349,16 +386,10 @@ const GraphRenderer = ({
     }
   };
 
-  if (loading) {
-    return (
-      <div className={`flex items-center justify-center ${className}`} style={{ height }}>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Rendering graph...</p>
-        </div>
-      </div>
-    );
-  }
+  // NOTE: We do NOT early-return a spinner here anymore.
+  // Returning the spinner would unmount the mermaidRef div, making the ref null
+  // and preventing the render effect from ever running (infinite loading deadlock).
+  // Instead, we overlay the spinner on top of the mermaid container so the ref stays mounted.
 
   if (error) {
     return (
@@ -375,6 +406,15 @@ const GraphRenderer = ({
   if (type === 'mermaid') {
     return (
       <div className={`relative border border-gray-300 rounded-lg overflow-hidden ${className}`} style={{ height }}>
+        {/* Loading overlay — kept in-tree so mermaidRef div is always mounted */}
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-20">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
+              <p className="text-gray-600">Rendering graph...</p>
+            </div>
+          </div>
+        )}
         {interactive && (
           <div className="absolute top-4 right-4 z-10 flex gap-2">
             <button
