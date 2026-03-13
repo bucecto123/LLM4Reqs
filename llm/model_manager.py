@@ -1,7 +1,7 @@
 
 import os
 try:
-    import google.generativeai as genai
+    from google import genai
     from langchain_google_genai import ChatGoogleGenerativeAI
     GEMINI_AVAILABLE = True
 except ImportError:
@@ -19,9 +19,12 @@ class ModelManager:
     def __init__(self):
         self.groq_api_key = os.getenv("GROQ_API_KEY")
         self.gemini_api_key = os.getenv("GEMINI_API_KEY")
-        
+
+        # Initialize the new google-genai client
         if self.gemini_api_key and GEMINI_AVAILABLE:
-            genai.configure(api_key=self.gemini_api_key)
+            self.gemini_client = genai.Client(api_key=self.gemini_api_key)
+        else:
+            self.gemini_client = None
 
     # Well-known Groq chat models used as fallback when the API is unreachable
     GROQ_FALLBACK_MODELS = [
@@ -71,17 +74,19 @@ class ModelManager:
                 ]
 
         # 2. Fetch Gemini Models
-        if self.gemini_api_key and GEMINI_AVAILABLE:
+        if self.gemini_client and GEMINI_AVAILABLE:
             try:
-                for m in genai.list_models():
-                    if 'generateContent' in m.supported_generation_methods:
+                for m in self.gemini_client.models.list():
+                    # New google-genai SDK uses supported_actions instead of supported_generation_methods
+                    supported = getattr(m, 'supported_actions', []) or getattr(m, 'supported_generation_methods', [])
+                    if 'generateContent' in supported:
                         # Extract clean name, e.g. models/gemini-1.5-pro -> gemini-1.5-pro
                         model_id = m.name.replace('models/', '')
                         models.append({
                             'provider': 'gemini',
                             'model_id': model_id,
                             'name': m.display_name or model_id,
-                            'context_window': m.input_token_limit,
+                            'context_window': getattr(m, 'input_token_limit', None),
                             'supports_tools': None
                         })
             except Exception as e:
@@ -100,7 +105,7 @@ class ModelManager:
             )
         elif provider == 'gemini':
             if not GEMINI_AVAILABLE:
-                raise ValueError("Gemini dependencies not installed. Please install google-generativeai and langchain-google-genai")
+                raise ValueError("Gemini dependencies not installed. Please install google-genai and langchain-google-genai")
             if not self.gemini_api_key:
                 raise ValueError("GEMINI_API_KEY not set")
             # Google models require 'models/' prefix usually, but langchain might handle it. 

@@ -6,7 +6,7 @@ pydantic
 langchain-groq
 langchain-core
 langchain-google-genai
-google-generativeai
+google-genai
 pandas
 numpy
 faiss-cpu
