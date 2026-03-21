@@ -10,27 +10,11 @@ use App\Models\Persona;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\ProjectKBController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\LLMController;
-
-// Temporary diagnostic route - remove after fixing
-Route::get('/dbtest-laravel', function () {
-    try {
-        $count = \Illuminate\Support\Facades\DB::table('users')->count();
-        return response()->json(['laravel_db' => 'OK', 'count' => $count]);
-    } catch (\Illuminate\Database\QueryException $e) {
-        return response()->json([
-            'error' => $e->getMessage(),
-            'sqlstate' => $e->getCode(),
-            'errorInfo' => $e->getPrevious()->errorInfo ?? null,
-            'sqlite_code' => $e->getPrevious()->getCode() ?? null,
-        ], 500);
-    }
-});
 
 Route::prefix('llm')->group(function () {
     Route::get('/models', [LLMController::class, 'index']);
@@ -51,8 +35,6 @@ Route::get('/test-document-routes', function () {
         ]
     ]);
 });
-
-Route::post('/chat', [ChatController::class, 'chat']);
 
 // Authentication routes
 Route::prefix('auth')->group(function () {
@@ -109,6 +91,37 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/documents/{id}/process', [DocumentController::class, 'processDocument']);
     Route::get('/projects/{id}/documents', [DocumentController::class, 'getProjectDocuments']);
     Route::delete('/documents/{id}', [DocumentController::class, 'destroy']);
+
+    // Debug endpoint - test storage
+    Route::post('/debug/storage-test', function (Request $request) {
+        $file = $request->file('file');
+        if (!$file) {
+            return response()->json(['error' => 'No file provided'], 400);
+        }
+
+        try {
+            $path = $file->store('documents');
+            $fullPath = storage_path('app/' . $path);
+            $exists = file_exists($fullPath);
+            $writable = is_writable(dirname($fullPath));
+
+            return response()->json([
+                'success' => true,
+                'path' => $path,
+                'full_path' => $fullPath,
+                'exists' => $exists,
+                'writable' => $writable,
+                'storage_disk_root' => config('filesystems.disks.local.root'),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ], 500);
+        }
+    });
 
     // Conflict Detection API
     Route::post('/projects/{project}/conflicts/detect', [ConflictController::class, 'detectConflicts']);

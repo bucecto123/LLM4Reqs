@@ -107,7 +107,53 @@ export default function LLMDashboard() {
     const messageChunkHandler = (data) => {
       const { metadata, message_id, is_complete, chunk } = data;
 
-      if (metadata?.status === "started") {
+      // Handle error messages
+      if (message_id === 'error' || metadata?.error) {
+        const errorMessage = metadata?.error || 'An unknown error occurred';
+        console.error("❌ Stream error:", errorMessage);
+
+        setIsLoading(false);
+        setStreamingMessageId(null);
+
+        // Check if it's a model/API error that might benefit from fallback
+        const isModelError = errorMessage.includes("model") ||
+                           errorMessage.includes("Model") ||
+                           errorMessage.includes("not found") ||
+                           errorMessage.includes("does not exist") ||
+                           errorMessage.includes("404") ||
+                           errorMessage.includes("invalid") ||
+                           errorMessage.includes("failed") ||
+                           errorMessage.includes("Failed");
+
+        if (isModelError && models.length > 1) {
+          // Auto-switch to a fallback model (prefer llama)
+          const currentIndex = models.findIndex(m => m.model_id === selectedModelId);
+          const fallbackModel = models.find((m, idx) =>
+            idx !== currentIndex && m.model_id.includes('llama')
+          ) || models.find((m, idx) =>
+            idx !== currentIndex && m.provider === 'groq'
+          ) || models[0];
+
+          if (fallbackModel && fallbackModel.model_id !== selectedModelId) {
+            console.log(`🔄 Auto-switching to fallback model: ${fallbackModel.name}`);
+            setSelectedModelId(fallbackModel.model_id);
+            setError(`${errorMessage}. Switched to ${fallbackModel.name}.`);
+          } else {
+            setError(errorMessage);
+          }
+        } else {
+          setError(errorMessage);
+        }
+        return;
+      }
+
+      // PHP's ConversationService sends is_complete=true on the FIRST event with
+      // status="streaming" — so we also initialise on the first chunk when
+      // tempMessageId hasn't been set yet and this is not a completion event.
+      if (
+        metadata?.status === "started" ||
+        (streamState.tempMessageId === null && !is_complete)
+      ) {
         streamState.tempMessageId = message_id;
         streamState.startTime = performance.now();
         streamState.chunkCount = 0;
@@ -174,6 +220,15 @@ export default function LLMDashboard() {
                 : msg,
             ),
           );
+        }
+
+        // Show notification if fallback was used
+        if (metadata?.fallback_used) {
+          setTimeout(() => {
+            setError(`Note: Primary model failed, automatically switched to fallback model.`);
+            // Auto-clear after 5 seconds
+            setTimeout(() => setError(null), 5000);
+          }, 500);
         }
 
         setStreamingMessageId(null);
@@ -406,11 +461,16 @@ export default function LLMDashboard() {
         }
       }
 
+      // Get provider for the selected model
+      const selectedModel = models.find(m => m.model_id === selectedModelId);
+      const modelProvider = selectedModel?.provider || 'groq';
+
       // Send message with streaming support
       const body = {
         content: messageForAI,
         role: "user",
         ...(selectedModelId && { model_id: selectedModelId }),
+        ...(modelProvider && { provider: modelProvider }),
         ...(chatMode === "project" &&
           currentProjectId && { project_id: currentProjectId }),
       };
@@ -423,8 +483,11 @@ export default function LLMDashboard() {
         },
       );
 
-      // Replace temp user message with the actual saved message from server
-      if (response.user_message) {
+      // This endpoint returns JSON (not SSE) — streaming happens over WebSocket.
+      // The response contains { user_message, success, streaming } on success,
+      // or { error, ... } on failure (which apiFetch already throws as an exception).
+      if (response?.user_message) {
+        // Replace temp user message with the server-persisted one
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === tempUserMessage.id ? response.user_message : msg,
@@ -432,10 +495,8 @@ export default function LLMDashboard() {
         );
       }
 
+      // Stop loading; AI response streams in via WebSocket
       setIsLoading(false);
-
-      // WebSocket will stream the AI response in real-time
-      // No need to fetch all messages again
 
       // Load conversation documents if any were uploaded
       if (uploadedDocuments.length > 0) {

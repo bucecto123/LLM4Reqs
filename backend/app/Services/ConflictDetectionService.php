@@ -16,8 +16,12 @@ class ConflictDetectionService
 
     public function __construct()
     {
-        $this->llmBaseUrl = env('LLM_API_URL', 'http://localhost:8000');
-        $this->apiKey = env('LLM_API_KEY', 'dev-secret-key-12345');
+        $this->llmBaseUrl = config('services.llm.url', 'http://llm:8000');
+        $apiKey = config('services.llm.api_key');
+        if (empty($apiKey)) {
+            throw new \Exception('LLM_API_KEY not configured');
+        }
+        $this->apiKey = $apiKey;
     }
 
     /**
@@ -173,26 +177,32 @@ class ConflictDetectionService
 
         foreach ($conflicts as $conflict) {
             try {
-                // Parse requirement IDs (remove "REQ_" prefix if present)
+                // Parse requirement IDs (remove "REQ_" or "REQ-" prefix if present)
                 $req1Id = $conflict['req_id_1'];
                 $req2Id = $conflict['req_id_2'];
-                
-                // Strip "REQ_" prefix if it exists
-                if (is_string($req1Id) && str_starts_with($req1Id, 'REQ_')) {
-                    $req1Id = (int)substr($req1Id, 4);
+
+                // Strip prefixes: "REQ_", "REQ-", or just numeric
+                if (is_string($req1Id)) {
+                    $req1Id = preg_replace('/^REQ[-_]/i', '', $req1Id);
+                    $req1Id = is_numeric($req1Id) ? (int)$req1Id : $req1Id;
                 }
-                if (is_string($req2Id) && str_starts_with($req2Id, 'REQ_')) {
-                    $req2Id = (int)substr($req2Id, 4);
+                if (is_string($req2Id)) {
+                    $req2Id = preg_replace('/^REQ[-_]/i', '', $req2Id);
+                    $req2Id = is_numeric($req2Id) ? (int)$req2Id : $req2Id;
                 }
-                
+
                 // Find requirements by their IDs
                 $req1 = Requirement::find($req1Id);
                 $req2 = Requirement::find($req2Id);
 
                 if (!$req1 || !$req2) {
                     Log::warning("Skipping conflict - requirement not found", [
-                        'req_id_1' => $conflict['req_id_1'],
-                        'req_id_2' => $conflict['req_id_2']
+                        'req_id_1_original' => $conflict['req_id_1'],
+                        'req_id_1_parsed' => $req1Id,
+                        'req_id_2_original' => $conflict['req_id_2'],
+                        'req_id_2_parsed' => $req2Id,
+                        'req1_found' => (bool)$req1,
+                        'req2_found' => (bool)$req2,
                     ]);
                     continue;
                 }
@@ -282,17 +292,20 @@ class ConflictDetectionService
     }
 
     /**
-     * Get all conflicts for a project.
+     * Get all conflicts for a project with optional pagination.
      *
      * @param int $projectId
-     * @return \Illuminate\Database\Eloquent\Collection
+     * @param int $perPage
+     * @param int $page
+     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
-    public function getProjectConflicts(int $projectId)
+    public function getProjectConflicts(int $projectId, int $perPage = 10, int $page = 1)
     {
         return RequirementConflict::where('project_id', $projectId)
         ->with(['requirement1', 'requirement2'])
+        ->orderByRaw("CASE severity WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 2 END")
         ->orderBy('conflict_number', 'asc')
-        ->get();
+        ->paginate($perPage, ['*'], 'page', $page);
     }
 
     /**

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
+import React, { useState, useEffect, useRef, lazy, Suspense, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -30,7 +30,6 @@ import { apiFetch } from "../utils/auth.js";
 import { useAuth } from "../hooks/useAuth.jsx";
 import Sidebar from "../components/dashboard/Sidebar.jsx";
 import MessageBubble from "../components/dashboard/MessageBubble.jsx";
-import GraphView from "../components/GraphView";
 import FileUpload from "../components/FileUpload.jsx";
 import KBUploadModal from "../components/KBUploadModal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
@@ -58,6 +57,7 @@ const ConflictsDisplay = lazy(() =>
     default: module.ConflictsDisplay,
   })),
 );
+const GraphView = lazy(() => import("../components/GraphView"));
 
 const PERSONA_ROLE_ICONS = {
   end_user: "👤",
@@ -165,29 +165,45 @@ export default function ProjectDetailPage() {
   const [allProjectMessages, setAllProjectMessages] = useState([]);
   const [isLoadingGraphMessages, setIsLoadingGraphMessages] = useState(false);
 
+  // Knowledge Base status — used to decide between full rebuild vs incremental reindex
+  const [kbStatus, setKbStatus] = useState(null);
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // GRAPH TAB — fetch project messages once per session (not on every switch)
+  // Uses isGraphTabInitializedRef to skip re-fetching when tab is re-selected.
+  // Previously fired a Promise.all over every conversation on every tab switch.
+  // ─────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (activeTab !== "graph" || !projectId) return;
-    setIsLoadingGraphMessages(true);
-    apiFetch(`/api/projects/${projectId}/conversations`)
-      .then(async (convList) => {
-        if (!Array.isArray(convList) || convList.length === 0) {
+
+    // Skip if already loaded this session
+    if (isGraphTabInitializedRef.current) return;
+    isGraphTabInitializedRef.current = true;
+
+    // Push heavy work off the current frame so the tab switch feels instant
+    setTimeout(() => {
+      setIsLoadingGraphMessages(true);
+      apiFetch(`/api/projects/${projectId}/conversations`)
+        .then(async (convList) => {
+          if (!Array.isArray(convList) || convList.length === 0) {
+            setAllProjectMessages([]);
+            return;
+          }
+          const results = await Promise.all(
+            convList.map((conv) =>
+              apiFetch(`/api/conversations/${conv.id}/messages`)
+                .then((res) => res.messages ?? [])
+                .catch(() => [])
+            )
+          );
+          setAllProjectMessages(results.flat());
+        })
+        .catch((err) => {
+          console.error("Failed to load project messages for graph view:", err);
           setAllProjectMessages([]);
-          return;
-        }
-        const results = await Promise.all(
-          convList.map((conv) =>
-            apiFetch(`/api/conversations/${conv.id}/messages`)
-              .then((res) => res.messages ?? [])
-              .catch(() => [])
-          )
-        );
-        setAllProjectMessages(results.flat());
-      })
-      .catch((err) => {
-        console.error("Failed to load project messages for graph view:", err);
-        setAllProjectMessages([]);
-      })
-      .finally(() => setIsLoadingGraphMessages(false));
+        })
+        .finally(() => setIsLoadingGraphMessages(false));
+    }, 0);
   }, [activeTab, projectId]);
 
   // Edit project state
@@ -250,8 +266,15 @@ export default function ProjectDetailPage() {
   const [selectedModelId, setSelectedModelId] = useState(null);
   const isLoadingModelsRef = useRef(false);
 
+  // PERFORMANCE: Track which conversations have had their messages loaded this session
+  // Skips redundant fetch for conversations already in memory
+  const loadedMessagesRef = useRef(new Set());
+
+  // PERFORMANCE: Track whether graph tab has been initialized to prevent re-fetching
+  // graph messages on every tab switch
+  const isGraphTabInitializedRef = useRef(false);
+
   // Load available models
-  const loadModels = async () => {
     if (isLoadingModelsRef.current) return;
     isLoadingModelsRef.current = true;
     try {
@@ -275,10 +298,6 @@ export default function ProjectDetailPage() {
       isLoadingModelsRef.current = false;
     }
   };
-
-  useEffect(() => {
-    loadModels();
-  }, []);
 
   const isAssistantThinking = isSendingMessage || Boolean(streamingMessageId);
 
@@ -372,43 +391,6 @@ export default function ProjectDetailPage() {
   // Refs
   const messagesEndRef = useRef(null);
 
-  // Load personas once when component mounts
-  useEffect(() => {
-    loadPersonas();
-  }, []);
-
-  const loadPersonas = async () => {
-    try {
-      setIsLoadingPersonas(true);
-      const response = await apiFetch("/api/personas");
-
-      if (response.success) {
-        if (Array.isArray(response.all)) {
-          setPersonas(response.all);
-        } else if (response.data) {
-          const allPersonas = [
-            ...(Array.isArray(response.data.predefined)
-              ? response.data.predefined
-              : []),
-            ...(Array.isArray(response.data.custom)
-              ? response.data.custom
-              : []),
-          ];
-          setPersonas(allPersonas);
-        } else {
-          setPersonas([]);
-        }
-      } else {
-        setPersonas([]);
-      }
-    } catch (err) {
-      console.error("Error loading personas:", err);
-      setPersonas([]);
-    } finally {
-      setIsLoadingPersonas(false);
-    }
-  };
-
   useEffect(() => {
     const checkMobile = () => {
       const mobile = window.innerWidth < 768;
@@ -423,12 +405,114 @@ export default function ProjectDetailPage() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // COORDINATED INITIALIZATION — one effect fires all critical data loads in
+  // parallel: project + docs + KB status, conversations, personas, and models.
+  // Previously this was 4 separate useEffects firing sequentially.
+  // ─────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    loadProjectData();
-    loadProjectConversations();
+    if (!projectId) return;
+
+    // Reset graph initialization flag when project changes so stale data isn't shown
+    isGraphTabInitializedRef.current = false;
+    // Reset message deduplication cache on project switch
+    loadedMessagesRef.current = new Set();
+
+    const initializeProject = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      // Fire ALL independent fetches in parallel — no sequential chains
+      await Promise.all([
+        // 1. Core project data (project, documents, KB status)
+        (async () => {
+          try {
+            const [projectData, docsResponse, kbResponse] = await Promise.all([
+              apiFetch(`/api/projects/${projectId}`),
+              apiFetch(`/api/projects/${projectId}/documents`),
+              apiFetch(`/api/projects/${projectId}/kb/status`),
+            ]);
+            setProject(projectData);
+            setEditProjectName(projectData.name);
+            setEditProjectDescription(projectData.description || "");
+            setDocuments(docsResponse.documents || docsResponse || []);
+            setKbStatus(kbResponse.kb?.status ?? null);
+            if (projectData.role) {
+              setCurrentUserRole(projectData.role);
+            }
+          } catch (err) {
+            console.error("Failed to load project data:", err);
+            setError("Failed to load project. Please try again.");
+          }
+        })(),
+
+        // 2. Conversations
+        (async () => {
+          try {
+            const data = await apiFetch(`/api/projects/${projectId}/conversations`);
+            setConversations(data || []);
+          } catch (err) {
+            console.error("Failed to load project conversations:", err);
+          }
+        })(),
+
+        // 3. Personas
+        (async () => {
+          try {
+            setIsLoadingPersonas(true);
+            const response = await apiFetch("/api/personas");
+            if (response.success) {
+              if (Array.isArray(response.all)) {
+                setPersonas(response.all);
+              } else if (response.data) {
+                const allPersonas = [
+                  ...(Array.isArray(response.data.predefined) ? response.data.predefined : []),
+                  ...(Array.isArray(response.data.custom) ? response.data.custom : []),
+                ];
+                setPersonas(allPersonas);
+              } else {
+                setPersonas([]);
+              }
+            } else {
+              setPersonas([]);
+            }
+          } catch (err) {
+            console.error("Error loading personas:", err);
+            setPersonas([]);
+          } finally {
+            setIsLoadingPersonas(false);
+          }
+        })(),
+
+        // 4. Models (guarded by ref to prevent concurrent loads)
+        (async () => {
+          if (isLoadingModelsRef.current) return;
+          isLoadingModelsRef.current = true;
+          try {
+            const data = await apiFetch("/api/llm/models");
+            if (Array.isArray(data)) {
+              setModels(data);
+              if (data.length > 0 && !selectedModelId) {
+                const preferredModel = data.find((m) => m.model_id === "llama-3.3-70b-versatile");
+                setSelectedModelId(preferredModel ? preferredModel.model_id : data[0].model_id);
+              }
+            }
+          } catch (err) {
+            console.error("Failed to load models:", err);
+            setModels([]);
+          } finally {
+            isLoadingModelsRef.current = false;
+          }
+        })(),
+      ]);
+
+      setIsLoading(false);
+    };
+
+    initializeProject();
   }, [projectId]);
 
-  // Load collaborators when switching to sharing tab
+  // Load collaborators when switching to sharing tab (lazy — only when tab opens)
   useEffect(() => {
     if (activeTab === "sharing" && projectId) {
       loadCollaborators();
@@ -559,34 +643,7 @@ export default function ProjectDetailPage() {
     };
   }, [selectedConversation?.id]);
 
-  const loadProjectData = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // Load project details and documents in parallel for faster LCP
-      const [projectData, docsResponse] = await Promise.all([
-        apiFetch(`/api/projects/${projectId}`),
-        apiFetch(`/api/projects/${projectId}/documents`),
-      ]);
-
-      setProject(projectData);
-      setEditProjectName(projectData.name);
-      setEditProjectDescription(projectData.description || "");
-      setDocuments(docsResponse.documents || docsResponse || []);
-
-      // Set user role from project data
-      if (projectData.role) {
-        setCurrentUserRole(projectData.role);
-      }
-    } catch (err) {
-      console.error("Failed to load project data:", err);
-      setError("Failed to load project. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Keep loadProjectConversations — called by selectConversation & sidebar toggle
   const loadProjectConversations = async () => {
     try {
       const data = await apiFetch(`/api/projects/${projectId}/conversations`);
@@ -611,7 +668,14 @@ export default function ProjectDetailPage() {
     }
   };
 
+  // PERFORMANCE: Deduplication — skip fetch if messages already loaded this session.
+  // 50 messages × N re-selects adds up quickly; the ref persists across re-renders.
   const loadMessages = async (conversationId) => {
+    if (loadedMessagesRef.current.has(conversationId)) {
+      return; // Already loaded — state already has the messages
+    }
+    loadedMessagesRef.current.add(conversationId);
+
     try {
       setIsLoadingMessages(true);
       const data = await apiFetch(
@@ -626,6 +690,8 @@ export default function ProjectDetailPage() {
     } catch (err) {
       console.error("Failed to load messages:", err);
       setError("Failed to load messages");
+      // Remove from cache so retry is possible on next select
+      loadedMessagesRef.current.delete(conversationId);
     } finally {
       setIsLoadingMessages(false);
     }
@@ -670,63 +736,11 @@ export default function ProjectDetailPage() {
     await loadMessages(conv.id);
   };
 
-  const handleSendMessage = async () => {
-    if (
-      (!message.trim() && attachedFiles.length === 0) ||
-      isSendingMessage ||
-      isLoadingMessages
-    ) {
-      return;
-    }
-
-    if (isNewChatMode || !selectedConversation) {
-      try {
-        setError(null);
-        setIsSendingMessage(true);
-
-        const conversationTitle = message.trim()
-          ? message.slice(0, 50)
-          : attachedFiles.length > 0
-            ? `Files: ${attachedFiles[0].name}${
-                attachedFiles.length > 1
-                  ? ` +${attachedFiles.length - 1} more`
-                  : ""
-              }`
-            : "New Chat";
-
-        const newConversation = await apiFetch("/api/conversations", {
-          method: "POST",
-          body: {
-            title: conversationTitle,
-            context: null,
-            status: "active",
-            project_id: parseInt(projectId),
-          },
-        });
-
-        // Immediately add the new conversation to the list
-        setConversations((prev) => [newConversation, ...prev]);
-
-        // Set the conversation as selected
-        setSelectedConversation(newConversation);
-        setMessages([]);
-        setIsNewChatMode(false);
-
-        // Clear the reload flag since we've already updated the list
-        setNeedsConversationReload(false);
-
-        const messageToSend = message.trim() || "Here are the uploaded files:";
-        await sendMessageToConversation(newConversation.id, messageToSend);
-      } catch (err) {
-        console.error("Failed to create conversation:", err);
-        setError("Failed to create conversation");
-        setIsSendingMessage(false);
-      }
-    } else {
-      await sendMessage();
-    }
-  };
-
+  // ─────────────────────────────────────────────────────────────────────────────
+  // sendMessageToConversation — core async send. Must be defined BEFORE
+  // handleSendMessage so it can be captured in the useCallback deps array.
+  // Not memoized itself (async, has many state dependencies).
+  // ─────────────────────────────────────────────────────────────────────────────
   const sendMessageToConversation = async (conversationId, messageContent) => {
     const userMessage = messageContent.trim();
     const filesToUpload = [...attachedFiles];
@@ -790,6 +804,9 @@ export default function ProjectDetailPage() {
           : `Uploaded documents:\n${docList}`;
       }
 
+      const selectedModel = models.find((m) => m.model_id === selectedModelId);
+      const modelProvider = selectedModel?.provider || "groq";
+
       const body = {
         content: messageForAI,
         role: "user",
@@ -800,17 +817,14 @@ export default function ProjectDetailPage() {
       }
       if (selectedModelId) {
         body.model_id = selectedModelId;
+        body.provider = modelProvider;
       }
 
       const response = await apiFetch(
         `/api/conversations/${conversationId}/messages/stream`,
-        {
-          method: "POST",
-          body,
-        },
+        { method: "POST", body },
       );
 
-      // Replace temp user message with the actual saved message from server
       if (response.user_message) {
         setMessages((prev) =>
           prev.map((msg) =>
@@ -820,14 +834,10 @@ export default function ProjectDetailPage() {
       }
 
       setIsSendingMessage(false);
-
-      // WebSocket will stream the AI response in real-time
-      // No need to fetch messages or reload documents - they're already in state
     } catch (err) {
       console.error("❌ Failed to send message:", err);
       setError("Failed to send message. Please try again.");
       setIsSendingMessage(false);
-
       try {
         await loadMessages(conversationId);
       } catch (reloadErr) {
@@ -836,6 +846,7 @@ export default function ProjectDetailPage() {
     }
   };
 
+  // sendMessage — for existing conversation. Not memoized (calls async sendMessageToConversation).
   const sendMessage = async () => {
     if (
       (!message.trim() && attachedFiles.length === 0) ||
@@ -849,27 +860,97 @@ export default function ProjectDetailPage() {
     await sendMessageToConversation(selectedConversation.id, messageToSend);
   };
 
-  const handleKeyPress = (e) => {
+  // ─────────────────────────────────────────────────────────────────────────────
+  // handleSendMessage — memoized so its identity is stable for handleKeyPress.
+  // sendMessageToConversation is intentionally in deps — it won't change.
+  // ─────────────────────────────────────────────────────────────────────────────
+  const handleSendMessage = useCallback(async () => {
     if (
-      e.key === "Enter" &&
-      !e.shiftKey &&
-      !isSendingMessage &&
-      !isLoadingMessages
+      (!message.trim() && attachedFiles.length === 0) ||
+      isSendingMessage ||
+      isLoadingMessages
     ) {
-      e.preventDefault();
-      if (message.trim() || attachedFiles.length > 0) {
-        handleSendMessage();
-      }
+      return;
     }
-  };
 
-  const handleScroll = (e) => {
+    if (isNewChatMode || !selectedConversation) {
+      try {
+        setError(null);
+        setIsSendingMessage(true);
+
+        const conversationTitle = message.trim()
+          ? message.slice(0, 50)
+          : attachedFiles.length > 0
+            ? `Files: ${attachedFiles[0].name}${
+                attachedFiles.length > 1
+                  ? ` +${attachedFiles.length - 1} more`
+                  : ""
+              }`
+            : "New Chat";
+
+        const newConversation = await apiFetch("/api/conversations", {
+          method: "POST",
+          body: {
+            title: conversationTitle,
+            context: null,
+            status: "active",
+            project_id: parseInt(projectId),
+          },
+        });
+
+        setConversations((prev) => [newConversation, ...prev]);
+        setSelectedConversation(newConversation);
+        setMessages([]);
+        setIsNewChatMode(false);
+        setNeedsConversationReload(false);
+
+        const messageToSend = message.trim() || "Here are the uploaded files:";
+        await sendMessageToConversation(newConversation.id, messageToSend);
+      } catch (err) {
+        console.error("Failed to create conversation:", err);
+        setError("Failed to create conversation");
+        setIsSendingMessage(false);
+      }
+    } else {
+      await sendMessage();
+    }
+  }, [
+    message,
+    attachedFiles,
+    isSendingMessage,
+    isLoadingMessages,
+    isNewChatMode,
+    selectedConversation,
+    projectId,
+    sendMessageToConversation,
+  ]);
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Memoized event handlers — stable identities prevent child re-renders
+  // ─────────────────────────────────────────────────────────────────────────────
+  const handleKeyPress = useCallback(
+    (e) => {
+      if (
+        e.key === "Enter" &&
+        !e.shiftKey &&
+        !isSendingMessage &&
+        !isLoadingMessages
+      ) {
+        e.preventDefault();
+        if (message.trim() || attachedFiles.length > 0) {
+          handleSendMessage();
+        }
+      }
+    },
+    [isSendingMessage, isLoadingMessages, message, attachedFiles.length, handleSendMessage],
+  );
+
+  const handleScroll = useCallback((e) => {
     const container = e.target;
     const isAtBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight <
-      50;
+      container.scrollHeight - container.scrollTop - container.clientHeight < 50;
     setIsUserScrolling(!isAtBottom);
-  };
+  }, []);
 
   const startEditingConversation = (conversation) => {
     setEditingConversationId(conversation.id);
@@ -958,6 +1039,28 @@ export default function ProjectDetailPage() {
     setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Run conflict detection manually
+  const runConflictDetection = async () => {
+    if (!projectId) return;
+
+    try {
+      setError(null);
+      const response = await apiFetch(`/api/projects/${projectId}/conflicts/detect`, {
+        method: "POST",
+      });
+      console.log("Conflict detection result:", response);
+
+      if (response.total_conflicts > 0) {
+        setAlert(`Found ${response.total_conflicts} conflicts!`);
+      } else {
+        setAlert("No conflicts detected");
+      }
+    } catch (err) {
+      console.error("Conflict detection failed:", err);
+      setError(err.message || "Failed to detect conflicts");
+    }
+  };
+
   const handleKBUpload = async (files, onProgress) => {
     if (!projectId) throw new Error("No project selected");
 
@@ -997,13 +1100,32 @@ export default function ProjectDetailPage() {
       });
     }
 
+    // Refresh KB status to determine whether to do a full rebuild or incremental reindex.
+    // If KB is already "ready", only the newly uploaded documents are processed (no rebuild).
+    let kbReady = false;
     try {
-      onProgress?.("Building Knowledge Base...");
-      await apiFetch(`/api/projects/${projectId}/kb/build`, {
-        method: "POST",
-      });
+      const statusResp = await apiFetch(`/api/projects/${projectId}/kb/status`);
+      kbReady = statusResp.kb?.is_ready === true;
+      setKbStatus(statusResp.kb?.status ?? null);
+    } catch (err) {
+      console.warn("Could not refresh KB status, assuming first build:", err);
+    }
+
+    const endpoint = kbReady
+      ? `/api/projects/${projectId}/kb/reindex`
+      : `/api/projects/${projectId}/kb/build`;
+    const progressMsg = kbReady ? "Adding to Knowledge Base..." : "Building Knowledge Base...";
+
+    try {
+      onProgress?.(progressMsg);
+      await apiFetch(endpoint, { method: "POST" });
       onProgress?.("Build started!");
       setTimeout(() => onProgress?.(null), 3000);
+      // Update local KB status — after a reindex the KB stays ready;
+      // after a fresh build the backend will broadcast the new status via WebSocket
+      if (kbReady) {
+        setKbStatus("reindexing");
+      }
     } catch (err) {
       setError("KB build failed");
       throw new Error("Failed to build KB");
@@ -1555,11 +1677,12 @@ export default function ProjectDetailPage() {
                           { label: "Upload doc", icon: <Upload size={13} />, action: () => setIsFileUploadOpen(true) },
                           { label: "View docs",  icon: <BookOpen size={13} />, action: () => setActiveTab("documents") },
                           { label: "Story graph", icon: <Network size={13} />, action: () => setActiveTab("graph") },
+                          { label: "Find conflicts", icon: <AlertTriangle size={13} />, action: runConflictDetection },
                         ].map((btn) => (
                           <button
                             key={btn.label}
                             onClick={btn.action}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-200 text-slate-600 hover:border-indigo-400 hover:text-indigo-700 hover:bg-indigo-50 transition-all duration-150"
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-200 text-slate-600 hover:border-indigo-400 hover:text-indigo-700 hover:bg-indigo-50 transition-all duration-150 ${btn.color || ''}`}
                           >
                             {btn.icon}
                             {btn.label}
@@ -1666,7 +1789,7 @@ export default function ProjectDetailPage() {
                     {/* Left — model + attach */}
                     <div className="flex items-center gap-1">
                       <div
-                        className="flex items-center"
+                        className="flex items-center relative"
                         title="Select AI model"
                       >
                         <ModelSelector
@@ -1889,10 +2012,19 @@ export default function ProjectDetailPage() {
 
           {activeTab === "graph" && (
             <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden min-h-[600px]">
-              <GraphView
-                messages={allProjectMessages}
-                isLoading={isLoadingGraphMessages}
-              />
+              <Suspense
+                fallback={
+                  <div className="flex items-center justify-center h-full py-24">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+                    <span className="ml-3 text-gray-500">Loading graphs…</span>
+                  </div>
+                }
+              >
+                <GraphView
+                  messages={allProjectMessages}
+                  isLoading={isLoadingGraphMessages}
+                />
+              </Suspense>
             </div>
           )}
         </main>

@@ -216,6 +216,30 @@ export const useDashboard = () => {
     }
   };
 
+  // Load earlier messages for infinite scroll / "Load more" functionality
+  const loadEarlierMessages = async (conversationId) => {
+    if (messages.length === 0) return;
+    try {
+      setIsLoadingMessages(true);
+      const oldestMessage = messages[0];
+      const beforeId = oldestMessage?.id;
+      const url = beforeId
+        ? `/api/conversations/${conversationId}/messages?before=${beforeId}`
+        : `/api/conversations/${conversationId}/messages`;
+      const data = await apiFetch(url);
+
+      const messagesList = data.messages || data;
+      if (Array.isArray(messagesList) && messagesList.length > 0) {
+        // Prepend earlier messages
+        setMessages((prev) => [...messagesList, ...prev]);
+      }
+    } catch (err) {
+      console.error("Failed to load earlier messages:", err);
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  };
+
   // Load documents for a conversation
   const loadConversationDocuments = async (conversationId) => {
     try {
@@ -266,19 +290,21 @@ export const useDashboard = () => {
     }
   }, [searchParams]);
 
-  // Initialize projects when switching to project mode
-  useEffect(() => {
-    if (chatMode === "project") {
-      loadProjects();
-    } else {
-      setIsInitializing(false);
-    }
-  }, [chatMode]);
-
   // Load models on mount
   useEffect(() => {
     loadModels();
   }, []);
+
+  // Load initial data (projects and conversations) in parallel when chatMode is determined
+  useEffect(() => {
+    if (chatMode === "project") {
+      loadProjects();
+    } else {
+      // For normal mode, just load conversations directly
+      setIsInitializing(false);
+      loadConversations("normal", null);
+    }
+  }, [chatMode]);
 
   // Load conversations when chat mode or project changes
   useEffect(() => {
@@ -401,6 +427,7 @@ export const useDashboard = () => {
     createDefaultProject,
     loadConversations,
     loadMessages,
+    loadEarlierMessages,
     loadConversationDocuments,
     scrollToBottom,
     performLogout,

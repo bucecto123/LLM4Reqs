@@ -31,7 +31,7 @@ const ChatInput = ({
 
   return (
     <div className="bg-white border-t border-gray-200 p-4">
-      <div className="max-w-4xl mx-auto relative z-10">
+      <div className="max-w-4xl mx-auto">
         {/* Attached Files Display */}
         {attachedFiles.length > 0 && (
           <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
@@ -61,48 +61,54 @@ const ChatInput = ({
           </div>
         )}
 
-        {/* Model Selector - Above chat input */}
-        {models && models.length > 0 && (
-          <div className="mb-3 flex justify-end">
-            <ModelSelector
-              models={models}
-              selectedModelId={selectedModelId}
-              onSelect={onSelectModel}
-              isLoading={isLoading}
-              compact={false}
-              dropUp={true}
-            />
-          </div>
-        )}
+        {/* Message Input with toolbar */}
+        <div className="bg-white rounded-xl shadow-sm border-2 border-gray-300">
+          {/* Textarea */}
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyPress}
+            onInput={handleTextareaInput}
+            placeholder={chatMode === "project" ? "Ask about this project..." : "Type your message here..."}
+            className="w-full px-4 pt-3 pb-1 bg-transparent focus:outline-none resize-none text-gray-800 placeholder-gray-400 text-sm"
+            rows={3}
+            disabled={isDisabled}
+          />
 
-        {/* Message Input */}
-        <div className="bg-white rounded-xl shadow-sm border-2 border-gray-300 p-3">
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={openFileUpload}
-              disabled={isDisabled}
-              className="p-1.5 hover:bg-gray-100 rounded-md text-gray-600 transition-all duration-200 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Attach file"
-            >
-              <Paperclip size={18} />
-            </button>
+          {/* Bottom toolbar */}
+          <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100">
+            {/* Left — attach + model */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={openFileUpload}
+                disabled={isDisabled}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Attach file"
+              >
+                <Paperclip size={15} />
+                <span className="hidden sm:inline">Attach</span>
+              </button>
 
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={handleKeyPress}
-              onInput={handleTextareaInput}
-              placeholder="Type your message here..."
-              className="flex-1 bg-transparent border-none outline-none resize-none text-gray-800 placeholder-gray-400 text-sm"
-              rows={1}
-              disabled={isDisabled}
-              style={{ minHeight: "24px", maxHeight: "120px" }}
-            />
+              {/* Model Selector */}
+              {models && models.length > 0 && (
+                <div className="flex items-center" title="Select AI model">
+                  <ModelSelector
+                    models={models}
+                    selectedModelId={selectedModelId}
+                    onSelect={onSelectModel}
+                    isLoading={isLoading}
+                    compact={true}
+                    dropUp={true}
+                  />
+                </div>
+              )}
+            </div>
 
+            {/* Right — send button */}
             <button
               onClick={sendMessage}
               disabled={!canSend}
-              className={`p-2 rounded-lg text-white transition-all duration-200 flex-shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all text-white ${
                 canSend
                   ? "hover:shadow-md opacity-100"
                   : "opacity-40 cursor-not-allowed"
@@ -111,9 +117,12 @@ const ChatInput = ({
               aria-label="Send message"
             >
               {isLoading ? (
-                <Loader2 className="animate-spin" size={16} />
+                <Loader2 className="animate-spin" size={14} />
               ) : (
-                <Send size={16} />
+                <>
+                  <span className="hidden sm:inline">Send</span>
+                  <Send size={14} />
+                </>
               )}
             </button>
           </div>

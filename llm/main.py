@@ -11,6 +11,7 @@ from fastapi import (
     BackgroundTasks,
     Depends,
 )
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
@@ -19,6 +20,7 @@ import os
 import json
 import uuid
 import asyncio
+import threading
 from dotenv import load_dotenv
 from datetime import datetime
 
@@ -26,9 +28,26 @@ from datetime import datetime
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
-from rag import RagManager
+# Gemini (optional - for fallback)
+try:
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    GEMINI_AVAILABLE = True
+except ImportError:
+    ChatGoogleGenerativeAI = None
+    GEMINI_AVAILABLE = False
+
+from rag import RagManager, get_faiss_index
 from build_faiss import build_index_for_project
 from story_graph import UserStoryMap, STORY_MAP_PROMPT_TEMPLATE, generate_mermaid_chart
+from memory_service import (
+    ConversationMemory,
+    ProjectMemory,
+    get_project_memory,
+    build_memory_context,
+    save_memory_after_response,
+    MEMORY_WINDOW_SIZE,
+    MEMORY_TOP_K,
+)
 
 try:
     import hdbscan
@@ -49,7 +68,7 @@ from model_manager import get_model_manager
 # Initialize Model Manager
 model_manager = get_model_manager()
 
-DEFAULT_MODEL_ID = "mixtral-8x7b-32768" # Groq Default
+DEFAULT_MODEL_ID = "llama-3.3-70b-versatile" # Groq Default
 DEFAULT_PROVIDER = "groq"
 
 app = FastAPI(
@@ -61,7 +80,7 @@ app = FastAPI(
 # CORS configuration for Laravel
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8001", "http://localhost:3000"],  # Laravel & React
+    allow_origins=["http://localhost:8001", "http://localhost:3000", "http://localhost:5173"],  # Laravel, React, Vite dev
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -87,8 +106,34 @@ chat_model_low_temp = ChatGroq(
     temperature=0.3
 )
 
+# Gemini model for conflict detection (when Groq is unavailable)
+gemini_api_key = os.getenv("GEMINI_API_KEY")
+if gemini_api_key and GEMINI_AVAILABLE:
+    try:
+        chat_model_gemini = ChatGoogleGenerativeAI(
+            google_api_key=gemini_api_key,
+            model="gemini-2.0-flash",
+            temperature=0.3,
+            convert_system_message_to_human=True
+        )
+        print("✅ Gemini model initialized for conflict detection")
+    except Exception as e:
+        print(f"⚠️ Failed to initialize Gemini: {e}")
+        chat_model_gemini = None
+else:
+    chat_model_gemini = None
+    if not gemini_api_key:
+        print("⚠️ GEMINI_API_KEY not set, conflict detection will use Groq")
+    elif not GEMINI_AVAILABLE:
+        print("⚠️ Gemini package not available")
+
 # API Key Authentication
-LLM_API_KEY = os.getenv("LLM_API_KEY", "test-api-key")  # Override via env in production.
+LLM_API_KEY = os.getenv("LLM_API_KEY", "")  # Must be set via env in production.
+if not LLM_API_KEY:
+    print(
+        "WARNING: LLM_API_KEY is not set. "
+        "API endpoints protected by X-API-Key will reject all requests."
+    )
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 # Knowledge Base configuration
@@ -209,6 +254,42 @@ _rag_chunks = None
 _rag_available = False
 _embedding_model_cache = None
 
+# ---------------------------------------------------------------------------
+# Performance optimizations
+# ---------------------------------------------------------------------------
+
+# --- LRU cache for RAG query results (keyed by project_id + query hash + top_k) ---
+import hashlib
+import time as _time
+
+_RAG_CACHE_SIZE = int(os.getenv("RAG_CACHE_SIZE", "100"))
+_rag_result_cache: Dict[str, Tuple[List[Dict[str, Any]], List[float], float]] = {}
+_rag_cache_lock = threading.Lock()
+
+
+def _rag_cache_key(project_id: Optional[str], query: str, top_k: int) -> str:
+    """Stable cache key: project_id:md5(query):top_k."""
+    qhash = hashlib.md5(query.encode()).hexdigest()
+    return f"{project_id or 'global'}:{qhash}:{top_k}"
+
+
+def _rag_cache_get(key: str) -> Optional[Tuple[List[Dict[str, Any]], List[float]]]:
+    with _rag_cache_lock:
+        entry = _rag_result_cache.get(key)
+        if entry is None:
+            return None
+        results, scores, _ = entry
+        return results, scores
+
+
+def _rag_cache_set(key: str, results: List[Dict[str, Any]], scores: List[float]) -> None:
+    with _rag_cache_lock:
+        if len(_rag_result_cache) >= _RAG_CACHE_SIZE:
+            oldest_key = min(_rag_result_cache, key=lambda k: _rag_result_cache[k][2])
+            del _rag_result_cache[oldest_key]
+        _rag_result_cache[key] = (results, scores, _time.time())
+
+
 # ==================== REQUEST/RESPONSE MODELS ====================
 
 
@@ -233,6 +314,7 @@ class ChatResponse(BaseModel):
     response: str
     tokens_used: int
     model: str
+    fallback_used: bool = False
 
 
 class ExtractionRequest(BaseModel):
@@ -387,6 +469,39 @@ class CheckToolRequest(BaseModel):
     provider: str
 
 
+# ==================== MEMORY API MODELS ====================
+
+
+class AddMemoryRequest(BaseModel):
+    project_id: int
+    text: str
+    memory_type: Optional[str] = "conversation"  # conversation | entity | decision
+
+
+class AddMemoryResponse(BaseModel):
+    project_id: int
+    success: bool
+    message: str
+
+
+class MemoryEntry(BaseModel):
+    content: str
+    metadata: Dict[str, Any] = {}
+    relevance_score: Optional[float] = None
+
+
+class GetMemoryResponse(BaseModel):
+    project_id: int
+    total_memories: int
+    memories: List[MemoryEntry]
+
+
+class ClearMemoryResponse(BaseModel):
+    project_id: int
+    success: bool
+    message: str
+
+
 
 # ==================== PROMPT TEMPLATES ====================
 
@@ -489,57 +604,122 @@ async def verify_api_key(api_key: str = Depends(api_key_header)):
 
 
 def call_llm_chat(
-    messages: List[Dict], 
-    model_id: str = DEFAULT_MODEL_ID, 
-    provider: str = DEFAULT_PROVIDER, 
-    max_tokens: int = 1000, 
+    messages: List[Dict],
+    model_id: str = DEFAULT_MODEL_ID,
+    provider: str = DEFAULT_PROVIDER,
+    max_tokens: int = 1000,
     temperature: float = 0.7
 ) -> tuple:
-    """Call LLM via ModelManager and return response + token usage"""
-    
-    try:
-        model = model_manager.get_chat_model(provider, model_id, temperature)
-    except Exception as e:
-        print(f"Failed to get model {provider}/{model_id}: {e}")
-        # Fallback to default
-        model = model_manager.get_chat_model(DEFAULT_PROVIDER, DEFAULT_MODEL_ID, temperature)
+    """Call LLM via ModelManager and return response + token usage + model used"""
 
-    # Convert messages to LangChain format
-    langchain_messages = []
-    for msg in messages:
-        if msg["role"] == "system":
-            langchain_messages.append(SystemMessage(content=msg["content"]))
-        elif msg["role"] == "user":
-            langchain_messages.append(HumanMessage(content=msg["content"]))
-        elif msg["role"] == "assistant":
-            langchain_messages.append(AIMessage(content=msg["content"]))
+    # Helper function to parse API errors
+    def parse_api_error(exc: Exception) -> dict:
+        error_info = {
+            "type": "unknown",
+            "message": str(exc),
+            "status_code": 500
+        }
 
+        exc_str = str(exc).lower()
+
+        # Model not found / invalid model
+        if "404" in str(exc) or "model_not_found" in exc_str or "does not exist" in exc_str or "not found" in exc_str:
+            error_info["type"] = "model_not_found"
+            error_info["message"] = f"Model '{model_id}' not found or not accessible"
+            error_info["status_code"] = 400
+
+        # Rate limit
+        elif "rate_limit" in exc_str or "rate limit" in exc_str or "429" in str(exc):
+            error_info["type"] = "rate_limit"
+            error_info["message"] = "Rate limit exceeded. Please wait and try again."
+            error_info["status_code"] = 429
+
+        # Authentication error
+        elif "401" in str(exc) or "authentication" in exc_str or "api key" in exc_str or "unauthorized" in exc_str:
+            error_info["type"] = "authentication"
+            error_info["message"] = "API authentication failed. Check your API key."
+            error_info["status_code"] = 401
+
+        # Invalid request
+        elif "400" in str(exc) or "invalid_request" in exc_str or "bad request" in exc_str:
+            error_info["type"] = "invalid_request"
+            error_info["message"] = f"Invalid request: {exc}"
+            error_info["status_code"] = 400
+
+        # Timeout
+        elif "timeout" in exc_str or "timed out" in exc_str:
+            error_info["type"] = "timeout"
+            error_info["message"] = "Request timed out. Please try again."
+            error_info["status_code"] = 408
+
+        return error_info
+
+    # Helper function to get model
+    def get_model(p: str, m_id: str):
+        return model_manager.get_chat_model(p, m_id, temperature)
+
+    # Helper function to convert messages
+    def convert_messages(msgs: List[Dict]):
+        lc_msgs = []
+        for msg in msgs:
+            if msg["role"] == "system":
+                lc_msgs.append(SystemMessage(content=msg["content"]))
+            elif msg["role"] == "user":
+                lc_msgs.append(HumanMessage(content=msg["content"]))
+            elif msg["role"] == "assistant":
+                lc_msgs.append(AIMessage(content=msg["content"]))
+        return lc_msgs
+
+    # Try primary model
     try:
+        model = get_model(provider, model_id)
+        langchain_messages = convert_messages(messages)
         response = model.invoke(langchain_messages)
-    except Exception as exc:
-        print(f"LLM call failed with {provider}/{model_id}: {exc}")
-        # Fallback logic
-        if provider != DEFAULT_PROVIDER:
-            print(f"Falling back to default provider {DEFAULT_PROVIDER}...")
+    except Exception as primary_exc:
+        # Log the error with full details
+        print(f"❌ LLM call failed with {provider}/{model_id}: {primary_exc}")
+
+        error_info = parse_api_error(primary_exc)
+        print(f"   Error type: {error_info['type']}, status: {error_info['status_code']}")
+
+        # Try fallback if not already using default
+        fallback_used = False
+        if provider != DEFAULT_PROVIDER or model_id != DEFAULT_MODEL_ID:
+            print(f"🔄 Attempting fallback to {DEFAULT_PROVIDER}/{DEFAULT_MODEL_ID}...")
             try:
                 fallback_model = model_manager.get_chat_model(DEFAULT_PROVIDER, DEFAULT_MODEL_ID, temperature)
-                response = fallback_model.invoke(langchain_messages)
+                fallback_messages = convert_messages(messages)
+                response = fallback_model.invoke(fallback_messages)
+                print(f"✅ Fallback successful! Using {DEFAULT_MODEL_ID}")
+                tokens_used = response.additional_kwargs.get('usage', {}).get('total_tokens', 0)
+                fallback_used = True
+                return response.content, tokens_used, DEFAULT_MODEL_ID, fallback_used
             except Exception as fallback_exc:
+                print(f"❌ Fallback also failed: {fallback_exc}")
+                fallback_error = parse_api_error(fallback_exc)
+
+                # If primary error was model not found, include that info
+                error_msg = f"Primary model '{model_id}' failed: {error_info['message']}. Fallback also failed: {fallback_error['message']}"
+
                 raise HTTPException(
-                    status_code=500,
-                    detail=f"LLM API failed (primary & fallback): {fallback_exc}",
-                ) from fallback_exc
+                    status_code=error_info['status_code'],
+                    detail=error_msg
+                ) from primary_exc
         else:
+            # Already using default model, raise the error
             raise HTTPException(
-                status_code=500,
-                detail=f"LLM API error: {exc}",
-            ) from exc
+                status_code=error_info['status_code'],
+                detail=error_info['message']
+            ) from primary_exc
 
     content = response.content
     usage = response.additional_kwargs.get('usage', {})
     tokens_used = usage.get('total_tokens', 0)
+    # Return model used (either original or fallback)
+    model_used = model_id if provider == DEFAULT_PROVIDER else f"{provider}/{model_id}"
+    fallback_used = False
 
-    return content, tokens_used
+    return content, tokens_used, model_used, fallback_used
 
 
 def _load_rag_artifacts() -> Tuple[bool, object, list]:
@@ -589,19 +769,11 @@ def needs_rag(user_query: str, use_model: bool = True) -> bool:
     # If model-based classification requested, try similarity against the index
     if use_model:
         try:
-            load_result = _load_rag_artifacts()
+            avail, index, chunks = _load_rag_artifacts()
         except Exception as exc:
             print(f"RAG artifact load error: {exc}")
             return False
 
-        if (
-            not load_result
-            or not isinstance(load_result, tuple)
-            or len(load_result) < 3
-        ):
-            return False
-
-        avail, index, chunks = load_result
         if not avail or _rag_manager is None:
             return False
         try:
@@ -987,7 +1159,7 @@ async def _detect_conflicts_simple(request: ConflictDetectionRequest) -> Conflic
         {"role": "user", "content": prompt},
     ]
 
-    response_text, tokens_used = call_llm_chat(
+    response_text, tokens_used, _, _ = call_llm_chat(
         messages, max_tokens=2000, temperature=0.3
     )
     parsed_data = parse_json_response(response_text)
@@ -1081,8 +1253,8 @@ async def _detect_conflicts_semantic(request: ConflictDetectionRequest) -> Confl
         # Split into batches if needed
         max_batch = request.max_batch_size
         if len(cluster_requirements) <= max_batch:
-            conflicts = _check_conflicts_in_batch(
-                cluster_requirements, 
+            conflicts = await _check_conflicts_in_batch(
+                cluster_requirements,
                 cluster_id
             )
             all_conflicts.extend(conflicts)
@@ -1090,7 +1262,7 @@ async def _detect_conflicts_semantic(request: ConflictDetectionRequest) -> Confl
             # Process in batches
             for batch_start in range(0, len(cluster_requirements), max_batch):
                 batch = cluster_requirements[batch_start:batch_start + max_batch]
-                conflicts = _check_conflicts_in_batch(batch, cluster_id)
+                conflicts = await _check_conflicts_in_batch(batch, cluster_id)
                 all_conflicts.extend(conflicts)
     
     print(f"✅ Found {len(all_conflicts)} conflicts")
@@ -1180,62 +1352,82 @@ Response format:
 
 JSON output only:"""
 
+    # Try Groq first, fallback to Gemini if Groq fails
+    response_text = None
     try:
         response = chat_model_low_temp.invoke([HumanMessage(content=prompt)])
-        
         response_text = response.content
-        
+
         # Extract JSON from markdown code blocks if present
         if "```json" in response_text:
             response_text = response_text.split("```json")[1].split("```")[0].strip()
         elif "```" in response_text:
             response_text = response_text.split("```")[1].split("```")[0].strip()
-        
+
         # Parse JSON response
         conflicts_data = json.loads(response_text)
-        
+
         if not isinstance(conflicts_data, list):
             print(f"⚠️ Expected list of conflicts, got {type(conflicts_data)}")
             return []
-        
-        # Create Conflict objects
-        # Create maps: number -> (id, text)
-        req_number_to_id = {req_number: req_id for req_id, req_number, text in requirements}
-        req_id_to_text = {req_id: text for req_id, req_number, text in requirements}
-        conflicts = []
-        
-        for conflict in conflicts_data:
-            req_a_num = str(conflict.get("req_a", ""))
-            req_b_num = str(conflict.get("req_b", ""))
-            
-            # Map requirement numbers back to database IDs
-            req_a_id = req_number_to_id.get(req_a_num, req_a_num)
-            req_b_id = req_number_to_id.get(req_b_num, req_b_num)
-            
-            # Convert ID to integer (handle both numeric and string IDs)
-            id_a = int(req_a_id) if str(req_a_id).isdigit() else abs(hash(req_a_id)) % 100000
-            id_b = int(req_b_id) if str(req_b_id).isdigit() else abs(hash(req_b_id)) % 100000
-            
-            conflicts.append(Conflict(
-                requirement_id_1=id_a,
-                requirement_id_2=id_b,
-                conflict_description=conflict.get("reason", "No reason provided"),
-                severity=conflict.get("severity", "medium"),
-                req_text_1=req_id_to_text.get(req_a_id, ""),
-                req_text_2=req_id_to_text.get(req_b_id, ""),
-                confidence=conflict.get("confidence", "medium"),
-                cluster_id=cluster_id
-            ))
-        
-        return conflicts
-        
-    except json.JSONDecodeError as e:
-        print(f"⚠️ JSON parsing error in conflict detection: {e}")
-        print(f"   Response preview: {response_text[:200]}...")
-        return []
+
     except Exception as e:
-        print(f"⚠️ Error checking batch for conflicts: {str(e)}")
-        return []
+        print(f"⚠️ Error in conflict detection: {str(e)}")
+        if response_text:
+            print(f"   Response preview: {response_text[:200]}...")
+        # Try Gemini as fallback
+        if chat_model_gemini:
+            try:
+                print(f"   Trying Gemini as fallback...")
+                response = chat_model_gemini.invoke([HumanMessage(content=prompt)])
+                response_text = response.content
+
+                # Extract JSON from markdown code blocks if present
+                if "```json" in response_text:
+                    response_text = response_text.split("```json")[1].split("```")[0].strip()
+                elif "```" in response_text:
+                    response_text = response_text.split("```")[1].split("```")[0].strip()
+
+                conflicts_data = json.loads(response_text)
+                if not isinstance(conflicts_data, list):
+                    print(f"⚠️ Expected list of conflicts, got {type(conflicts_data)}")
+                    return []
+            except Exception as gemini_error:
+                print(f"❌ Gemini fallback also failed: {gemini_error}")
+                return []
+        else:
+            return []
+
+    # Create Conflict objects
+    # Create maps: number -> (id, text)
+    req_number_to_id = {req_number: req_id for req_id, req_number, text in requirements}
+    req_id_to_text = {req_id: text for req_id, req_number, text in requirements}
+    conflicts = []
+
+    for conflict in conflicts_data:
+        req_a_num = str(conflict.get("req_a", ""))
+        req_b_num = str(conflict.get("req_b", ""))
+
+        # Map requirement numbers back to database IDs
+        req_a_id = req_number_to_id.get(req_a_num, req_a_num)
+        req_b_id = req_number_to_id.get(req_b_num, req_b_num)
+
+        # Convert ID to integer (handle both numeric and string IDs)
+        id_a = int(req_a_id) if str(req_a_id).isdigit() else abs(hash(req_a_id)) % 100000
+        id_b = int(req_b_id) if str(req_b_id).isdigit() else abs(hash(req_b_id)) % 100000
+
+        conflicts.append(Conflict(
+            requirement_id_1=id_a,
+            requirement_id_2=id_b,
+            conflict_description=conflict.get("reason", "No reason provided"),
+            severity=conflict.get("severity", "medium"),
+            req_text_1=req_id_to_text.get(req_a_id, ""),
+            req_text_2=req_id_to_text.get(req_b_id, ""),
+            confidence=conflict.get("confidence", "medium"),
+            cluster_id=cluster_id
+        ))
+
+    return conflicts
 
 
 def _prepare_document_chunks(documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -1384,8 +1576,28 @@ async def chat(request: ChatRequest):
             print(f"🎭 Using persona: {persona_name} (ID: {request.persona_id})")
             print(f"   Role: {persona_role}")
             print(f"   Tech Level: {persona_tech_level}")
-        
+
+        # ---- Dual-mode memory: inject relevant context ----
+        # Detect mode: project_id provided → project mode, otherwise → normal mode
+        is_project_mode = bool(request.project_id)
+
+        if is_project_mode:
+            print(f"🧠 Project mode active for project_id={request.project_id}")
+        else:
+            print(f"🧠 Normal chat mode (window={MEMORY_WINDOW_SIZE})")
+
+        memory_context_str, conversation_memory, project_memory = build_memory_context(
+            message=request.message,
+            conversation_history=request.conversation_history or [],
+            project_id=request.project_id,
+            model_manager=model_manager,
+        )
+
         messages = [{"role": "system", "content": system_prompt}]
+
+        # Prepend memory context (from either normal or project mode)
+        if memory_context_str:
+            messages.append({"role": "system", "content": memory_context_str})
 
         # Add context if provided
         if request.context:
@@ -1412,31 +1624,55 @@ async def chat(request: ChatRequest):
 
         # RAG decision: decide whether to enrich with retrieved context
         rag_system_msg = None
-        
+
+        # ── Performance: skip expensive RAG for very short / non-informative queries ──
+        _q = request.message.strip().lower()
+        _RAG_SIGNAL_KW = {
+            "requirement", "requirements", "document", "feature", "spec",
+            "analyze", "compare", "conflict", "summarize", "extract",
+            "kb", "knowledge", "user story", "epic", "stakeholder",
+            "use case", "frs", "srs",
+        }
+        _skip_rag = (
+            len(_q) < 20
+            and not any(kw in _q for kw in _RAG_SIGNAL_KW)
+        )
+
         try:
             # 1. Project-Specific RAG (Agentic Tool-Based Retrieval)
-            if request.project_id:
+            if request.project_id and not _skip_rag:
                 try:
                     print(f"🔍 Attempting agentic project RAG for project_id={request.project_id}")
-                    # Initialize manager
                     rag_manager = _get_rag_manager()
-                    # Get paths
                     p_index, p_meta = _get_project_paths_with_fallback(rag_manager, request.project_id)
-                    
+
                     if os.path.exists(p_index) and os.path.exists(p_meta):
-                        # Load project index (on-demand)
-                        p_index_obj, p_chunks = rag_manager.load_index_and_meta(p_index, p_meta)
-                        
-                        # Use agentic retrieval: LLM decides which tool(s) to call
-                        rag_system_msg = await _agentic_retrieve(
-                            request.message, rag_manager, p_index_obj, p_chunks, top_k=RAG_TOP_K
+                        # Use TTL-cached FAISS loader (avoids disk I/O on every call)
+                        p_index_obj, p_chunks = get_faiss_index(
+                            request.project_id, p_index, p_meta
                         )
-                        
+
+                        # Try RAG result cache first
+                        cache_key = _rag_cache_key(request.project_id, request.message, RAG_TOP_K)
+                        cached = _rag_cache_get(cache_key)
+                        if cached is not None:
+                            cached_results, cached_scores = cached
+                            print(f"📦 RAG cache hit for project {request.project_id}")
+                            rag_system_msg = _build_rag_context_message(cached_results)
+                        else:
+                            # Use agentic retrieval: LLM decides which tool(s) to call
+                            rag_system_msg = await _agentic_retrieve(
+                                request.message, rag_manager, p_index_obj, p_chunks, top_k=RAG_TOP_K
+                            )
+                            # NOTE: agentic retrieval returns a formatted string directly,
+                            # not structured result lists — skip caching it since we cannot
+                            # reconstruct the original results from the string alone.
+
                         if rag_system_msg:
                             print(f"✅ Agentic retrieval completed for project {request.project_id}")
                     else:
                         print(f"⚠️ No RAG index found for project {request.project_id}")
-                        
+
                 except Exception as e:
                     print(f"❌ Project RAG error: {e}")
                     import traceback
@@ -1446,15 +1682,28 @@ async def chat(request: ChatRequest):
             # Valid strategy: If user provided project_id, they likely want project context. 
             # If we failed to get project context, maybe we shouldn't fallback to global to avoid confusion?
             # BUT, let's keep existing behavior for non-project requests.
-            if not rag_system_msg and not request.project_id:
+            if not rag_system_msg and not request.project_id and not _skip_rag:
                 use_rag = needs_rag(request.message, use_model=True)
                 if use_rag:
-                    avail, index, chunks = _load_rag_artifacts()
-                    if avail and _rag_manager is not None:
-                        retrieved = _rag_manager.query(
-                            request.message, index, chunks, top_k=RAG_TOP_K
-                        )
-                        rag_system_msg = _build_rag_context_message(retrieved)
+                    cache_key = _rag_cache_key(None, request.message, RAG_TOP_K)
+                    cached = _rag_cache_get(cache_key)
+                    if cached is not None:
+                        cached_results, cached_scores = cached
+                        rag_system_msg = _build_rag_context_message(cached_results)
+                        print("📦 Global RAG cache hit")
+                    else:
+                        avail, index, chunks = _load_rag_artifacts()
+                        if avail and _rag_manager is not None:
+                            retrieved = _rag_manager.query(
+                                request.message, index, chunks, top_k=RAG_TOP_K
+                            )
+                            rag_system_msg = _build_rag_context_message(retrieved)
+                            # Cache structured results for future identical queries
+                            _rag_cache_set(
+                                cache_key,
+                                retrieved,
+                                [r.get("score", 0.0) for r in retrieved],
+                            )
 
             # Insert RAG context if we have it
             if rag_system_msg:
@@ -1465,19 +1714,128 @@ async def chat(request: ChatRequest):
             # Continue without RAG
 
         # Call LLM
-        response_text, tokens_used = call_llm_chat(
-            messages, 
+        response_text, tokens_used, model_used, fallback_used = call_llm_chat(
+            messages,
             model_id=request.model_id or DEFAULT_MODEL_ID,
             provider=request.provider or DEFAULT_PROVIDER,
-            max_tokens=2000, 
+            max_tokens=2000,
             temperature=0.7
         )
 
+        # ---- Save exchange to memory (non-blocking; failures must not break chat) ----
+        try:
+            save_memory_after_response(
+                user_message=request.message,
+                ai_response=response_text,
+                conversation_memory=conversation_memory,
+                project_memory=project_memory,
+                model_manager=model_manager,
+            )
+            print(f"💾 Memory saved ({'project' if project_memory else 'session'} mode)")
+        except Exception as mem_err:
+            print(f"⚠️ Memory save failed (non-critical): {mem_err}")
+
         return ChatResponse(
-            response=response_text, 
-            tokens_used=tokens_used, 
-            model=request.model_id or DEFAULT_MODEL_ID
+            response=response_text,
+            tokens_used=tokens_used,
+            model=model_used,
+            fallback_used=fallback_used
         )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== MEMORY MANAGEMENT ENDPOINTS ====================
+
+
+@app.post("/api/memory/summarize", response_model=AddMemoryResponse)
+async def add_memory(request: AddMemoryRequest):
+    """
+    Manually add a memory entry for a project.
+    Use when: user explicitly says 'remember this' or AI extracts a key fact.
+
+    Usage:
+    POST /api/memory/summarize
+    {
+        "project_id": 42,
+        "text": "The project uses JWT for authentication",
+        "memory_type": "entity"
+    }
+    """
+    try:
+        project_memory = get_project_memory(request.project_id)
+        success = project_memory.add_manual_memory(
+            text=request.text,
+            memory_type=request.memory_type or "conversation"
+        )
+        if success:
+            return AddMemoryResponse(
+                project_id=request.project_id,
+                success=True,
+                message=f"Memory added ({request.memory_type})"
+            )
+        else:
+            return AddMemoryResponse(
+                project_id=request.project_id,
+                success=False,
+                message="Failed to add memory"
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/memory/{project_id}", response_model=GetMemoryResponse)
+async def get_project_memories(project_id: int):
+    """
+    Retrieve all stored memories for a project.
+    Use for: debugging, frontend memory display.
+
+    Usage:
+    GET /api/memory/42
+    """
+    try:
+        project_memory = get_project_memory(project_id)
+        memories = project_memory.get_all_memories()
+        return GetMemoryResponse(
+            project_id=project_id,
+            total_memories=len(memories),
+            memories=[
+                MemoryEntry(
+                    content=m["content"],
+                    metadata=m.get("metadata", {}),
+                    relevance_score=None
+                )
+                for m in memories
+            ]
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/memory/{project_id}", response_model=ClearMemoryResponse)
+async def clear_project_memory(project_id: int):
+    """
+    Delete all memories for a project.
+    Use when: user wants to reset project memory.
+
+    Usage:
+    DELETE /api/memory/42
+    """
+    try:
+        project_memory = get_project_memory(project_id)
+        success = project_memory.clear()
+        if success:
+            return ClearMemoryResponse(
+                project_id=project_id,
+                success=True,
+                message=f"All memories cleared for project {project_id}"
+            )
+        else:
+            return ClearMemoryResponse(
+                project_id=project_id,
+                success=False,
+                message="Failed to clear memories"
+            )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1506,7 +1864,7 @@ async def extract_requirements(request: ExtractionRequest):
         ]
 
         # Use lower temperature for more consistent JSON output
-        response_text, tokens_used = call_llm_chat(
+        response_text, tokens_used, _, _ = call_llm_chat(
             messages, max_tokens=3000, temperature=0.3
         )
         parsed_data = parse_json_response(response_text)
@@ -1550,7 +1908,7 @@ async def generate_persona_view(request: PersonaGenerationRequest):
             {"role": "user", "content": prompt},
         ]
 
-        response_text, tokens_used = call_llm_chat(
+        response_text, tokens_used, _, _ = call_llm_chat(
             messages, max_tokens=2000, temperature=0.7
         )
 
@@ -1640,7 +1998,7 @@ async def resolve_conflict(request: ConflictResolutionRequest):
             {"role": "user", "content": prompt},
         ]
 
-        response_text, tokens_used = call_llm_chat(
+        response_text, tokens_used, _, _ = call_llm_chat(
             messages, max_tokens=1500, temperature=0.4
         )
         parsed_data = parse_json_response(response_text)
@@ -1696,7 +2054,7 @@ async def process_document(
             {"role": "user", "content": prompt},
         ]
 
-        response_text, tokens_used = call_llm_chat(
+        response_text, tokens_used, _, _ = call_llm_chat(
             messages, max_tokens=3000, temperature=0.3
         )
         parsed_data = parse_json_response(response_text)
@@ -2041,11 +2399,25 @@ async def generate_story_graph(request: StoryGraphRequest):
         messages = [
             HumanMessage(content=prompt_content)
         ]
-        
+
         # Use low temp for strict JSON adherence
-        response = chat_model_low_temp.invoke(messages)
+        # Try Groq first, fallback to Gemini if fails
+        try:
+            response = chat_model_low_temp.invoke(messages)
+        except Exception as groq_error:
+            print(f"⚠️ Groq failed in story graph: {groq_error}, trying Gemini...")
+            if chat_model_gemini:
+                try:
+                    response = chat_model_gemini.invoke(messages)
+                    print("✅ Gemini fallback successful for story graph")
+                except Exception as gemini_error:
+                    print(f"❌ Gemini also failed: {gemini_error}")
+                    raise Exception(f"Groq failed: {groq_error}. Gemini fallback also failed: {gemini_error}")
+            else:
+                raise groq_error
+
         content = response.content.strip()
-        
+
         # Parse JSON (Handle markdown code blocks)
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0].strip()
@@ -2104,6 +2476,221 @@ async def generate_story_graph(request: StoryGraphRequest):
             error=str(e),
             mermaid_code=f"graph TD\n Error[\"Error generating graph: {str(e)}\"]"
         )
+
+
+# ==================== AGENT EXECUTION ENDPOINTS ====================
+
+
+class AgentExecuteRequest(BaseModel):
+    task: str
+    project_id: Optional[int] = None
+    model: Optional[str] = None
+    tools: Optional[List[str]] = None
+
+
+class AgentToolResult(BaseModel):
+    tool: str
+    result: Any
+    success: bool
+
+
+@app.post("/api/agent/execute")
+async def agent_execute(request: AgentExecuteRequest):
+    """
+    Execute an agent task with streaming support.
+
+    Usage:
+    POST /api/agent/execute
+    Headers: X-API-Key: your-api-key
+    {
+        "task": "Summarize requirements",
+        "project_id": 1,
+        "model": "groq/mixtral-8x7b-32768",
+        "tools": ["rag_query", "extract_requirements"]
+    }
+    """
+    try:
+        async def generate():
+            task_id = str(uuid.uuid4())[:12]
+            model_id = request.model or DEFAULT_MODEL_ID
+            provider = "groq"
+
+            # Send status event
+            yield f"data: {json.dumps({'type': 'status', 'status': 'starting', 'task_id': task_id})}\n\n"
+
+            # Build system prompt
+            system_prompt = (
+                "You are an expert requirements analysis agent named Fishy. "
+                "Your role is to help analyze, extract, and manage software requirements. "
+                "Be thorough, precise, and always respond with valid JSON when structured output is expected."
+            )
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": request.task},
+            ]
+
+            # Load project context if project_id provided
+            project_context = ""
+            if request.project_id:
+                yield f"data: {json.dumps({'type': 'status', 'status': 'loading_project', 'project_id': request.project_id})}\n\n"
+                try:
+                    from build_faiss import build_index_for_project
+                    import os as _os
+                    p_dir = _os.path.join(KB_BASE_DIR, str(request.project_id))
+                    p_index = _os.path.join(p_dir, "index.faiss")
+                    p_meta = _os.path.join(p_dir, "meta.pkl")
+                    if _os.path.exists(p_index) and _os.path.exists(p_meta):
+                        yield f"data: {json.dumps({'type': 'status', 'status': 'using_rag', 'project_id': request.project_id})}\n\n"
+                except Exception as e:
+                    print(f"Agent project context load error: {e}")
+
+            yield f"data: {json.dumps({'type': 'status', 'status': 'calling_llm'})}\n\n"
+
+            # Stream the LLM response
+            response_text, tokens_used, model_used, fallback_used = call_llm_chat(
+                messages,
+                model_id=model_id,
+                provider=provider,
+                max_tokens=2000,
+                temperature=0.7,
+            )
+
+            # Send chunks of the response
+            for i in range(0, len(response_text), 20):
+                chunk = response_text[i:i + 20]
+                yield f"data: {json.dumps({'type': 'message', 'content': chunk})}\n\n"
+
+            # Send final result
+            yield f"data: {json.dumps({'type': 'done', 'task_id': task_id, 'tokens_used': tokens_used, 'model': model_used, 'fallback_used': fallback_used})}\n\n"
+
+        return StreamingResponse(
+            generate(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/agent/tools")
+async def agent_list_tools():
+    """Return available tools for agent execution."""
+    return {
+        "tools": [
+            {
+                "name": "rag_query",
+                "description": "Query the project knowledge base for relevant requirements",
+                "parameters": {"type": "object", "properties": {"query": {"type": "string"}}},
+            },
+            {
+                "name": "extract_requirements",
+                "description": "Extract structured requirements from natural language text",
+                "parameters": {"type": "object", "properties": {"text": {"type": "string"}}},
+            },
+            {
+                "name": "detect_conflicts",
+                "description": "Detect conflicts between requirements",
+                "parameters": {"type": "object", "properties": {"requirements": {"type": "array"}}},
+            },
+            {
+                "name": "generate_persona",
+                "description": "Generate a persona-specific view of a requirement",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "requirement_text": {"type": "string"},
+                        "persona_name": {"type": "string"},
+                    },
+                },
+            },
+        ]
+    }
+
+
+@app.post("/api/agent/tools/{tool_name}/execute")
+async def agent_execute_tool(tool_name: str, params: Dict[str, Any]):
+    """Execute a specific tool by name."""
+    tool_map = {
+        "rag_query": lambda p: _rag_query_tool(p.get("query", "")),
+        "extract_requirements": lambda p: _extract_tool(p.get("text", "")),
+        "detect_conflicts": lambda p: _detect_conflicts_tool(p.get("requirements", [])),
+        "generate_persona": lambda p: _generate_persona_tool(
+            p.get("requirement_text", ""), p.get("persona_name", "Developer")
+        ),
+    }
+    if tool_name not in tool_map:
+        raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found")
+    try:
+        result = tool_map[tool_name](params)
+        return {"tool": tool_name, "result": result, "success": True}
+    except Exception as e:
+        return {"tool": tool_name, "result": None, "success": False, "error": str(e)}
+
+
+@app.get("/api/agent/history")
+async def agent_history(project_id: Optional[int] = None):
+    """Return agent execution history (in-memory for now)."""
+    return {"executions": [], "note": "History not yet persisted"}
+
+
+@app.post("/api/agent/tasks/{task_id}/cancel")
+async def agent_cancel_task(task_id: str):
+    """Cancel an ongoing agent task."""
+    return {"task_id": task_id, "status": "cancelled"}
+
+
+# ---- Agent tool helpers ----
+
+def _rag_query_tool(query: str) -> Any:
+    avail, index, chunks = _load_rag_artifacts()
+    if not avail or _rag_manager is None:
+        return {"error": "RAG not available", "results": []}
+    results = _rag_manager.query(query, index, chunks, top_k=5)
+    return {"results": results}
+
+
+def _extract_tool(text: str) -> Any:
+    req = ExtractionRequest(text=text)
+    resp = ExtractionResponse(
+        requirements=[], total_extracted=0, tokens_used=0
+    )
+    prompt = EXTRACTION_PROMPT.format(text=req.text)
+    messages = [
+        {
+            "role": "system",
+            "content": "You are Fishy, a requirements extraction expert. Always return valid JSON.",
+        },
+        {"role": "user", "content": prompt},
+    ]
+    response_text, tokens_used, _, _ = call_llm_chat(messages, max_tokens=3000, temperature=0.3)
+    parsed_data = parse_json_response(response_text)
+    return {
+        "requirements": parsed_data.get("requirements", []),
+        "total_extracted": len(parsed_data.get("requirements", [])),
+        "tokens_used": tokens_used,
+    }
+
+
+def _detect_conflicts_tool(requirements: List[Any]) -> Any:
+    req = ConflictDetectionRequest(requirements=requirements)
+    if CONFLICT_DETECTION_AVAILABLE:
+        return asyncio.run(_detect_conflicts_semantic(req))
+    return asyncio.run(_detect_conflicts_simple(req))
+
+
+def _generate_persona_tool(text: str, persona_name: str) -> Any:
+    prompt = PERSONA_PROMPT_TEMPLATE.format(persona_name=persona_name, requirement_text=text)
+    messages = [
+        {"role": "system", "content": f"You are a {persona_name} analyzing requirements."},
+        {"role": "user", "content": prompt},
+    ]
+    response_text, tokens_used, _, _ = call_llm_chat(messages, max_tokens=2000, temperature=0.7)
+    return {"persona_view": response_text, "tokens_used": tokens_used}
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ use App\Models\KnowledgeBase;
 use App\Models\Message;
 use App\Utils\TextCommons;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class ConversationService
@@ -32,12 +33,21 @@ class ConversationService
         ]);
     }
 
-    public function getMessages($conversationId, int $limit = 50)
+    public function getMessages($conversationId, int $limit = 50, $before = null)
     {
-        return Message::where('conversation_id', $conversationId)
-            ->orderBy('created_at', 'asc')
-            ->limit($limit)
-            ->get();
+        $query = Message::where('conversation_id', $conversationId)
+            ->orderBy('created_at', 'asc');
+
+        // Cursor-based pagination: fetch messages BEFORE the given message ID
+        // This loads older messages for "load earlier messages" feature
+        if ($before !== null) {
+            $cursorMessage = Message::find($before);
+            if ($cursorMessage) {
+                $query->where('created_at', '<', $cursorMessage->created_at);
+            }
+        }
+
+        return $query->limit($limit)->get();
     }
 
     public function sendMessage($conversationId, $messageData)
@@ -97,6 +107,10 @@ class ConversationService
         if (isset($messageData['model_id'])) {
             $history['model_id'] = $messageData['model_id'];
         }
+        // Pass provider if specified
+        if (isset($messageData['provider'])) {
+            $history['provider'] = $messageData['provider'];
+        }
             
         $documentContext = '';
         $kbContext = '';
@@ -113,8 +127,15 @@ class ConversationService
                         'query' => mb_substr($displayMessage, 0, 100)
                     ]);
                     
-                    // Query KB for relevant chunks
-                    $kbResults = $this->llmService->queryKB($conversation->project_id, $displayMessage, 5);
+                    // Query KB for relevant chunks (cached for 60s on non-trivial queries)
+                    if (strlen($displayMessage) > 10) {
+                        $kbQueryCacheKey = "kb_query_{$conversation->project_id}_" . md5($displayMessage);
+                        $kbResults = Cache::remember($kbQueryCacheKey, 60, function () use ($conversation, $displayMessage) {
+                            return $this->llmService->queryKB($conversation->project_id, $displayMessage, 5);
+                        });
+                    } else {
+                        $kbResults = $this->llmService->queryKB($conversation->project_id, $displayMessage, 5);
+                    }
                     
                     Log::info('KB query results', [
                         'results_count' => count($kbResults['results'] ?? []),
@@ -312,7 +333,7 @@ class ConversationService
         // No need to save it again here to avoid duplicates
         
         $conversation = Conversation::with(['documents' => function($query) {
-            $query->where('status', 'uploaded')
+            $query->whereNotIn('status', ['failed'])
                     ->whereNotNull('content')
                     ->where('content', '!=', '');
         }])->findOrFail($conversationId);
@@ -339,6 +360,10 @@ class ConversationService
         if (isset($messageData['model_id'])) {
             $history['model_id'] = $messageData['model_id'];
         }
+        // Pass provider if specified
+        if (isset($messageData['provider'])) {
+            $history['provider'] = $messageData['provider'];
+        }
             
         $documentContext = '';
         $kbContext = '';
@@ -349,14 +374,22 @@ class ConversationService
             
             if ($kb && $kb->isReady()) {
                 try {
-                    $kbResults = $this->llmService->queryKB($conversation->project_id, $displayMessage, 5);
-                    
+                    // Query KB for relevant chunks (cached for 60s on non-trivial queries)
+                    if (strlen($displayMessage) > 10) {
+                        $kbQueryCacheKey = "kb_query_{$conversation->project_id}_" . md5($displayMessage);
+                        $kbResults = Cache::remember($kbQueryCacheKey, 60, function () use ($conversation, $displayMessage) {
+                            return $this->llmService->queryKB($conversation->project_id, $displayMessage, 5);
+                        });
+                    } else {
+                        $kbResults = $this->llmService->queryKB($conversation->project_id, $displayMessage, 5);
+                    }
+
                     if (!empty($kbResults['results']) && is_array($kbResults['results'])) {
                         $kbContext = "\n\n=== KNOWLEDGE BASE CONTEXT (Relevant Requirements) ===\n";
-                        
+
                         foreach ($kbResults['results'] as $index => $result) {
                             $score = $kbResults['scores'][$index] ?? 0;
-                            
+
                             if (is_array($result)) {
                                 $content = $result['content'] ?? $result['text'] ?? json_encode($result);
                                 $metadata = $result['metadata'] ?? $result['meta'] ?? [];
@@ -364,21 +397,21 @@ class ConversationService
                                 $content = (string)$result;
                                 $metadata = [];
                             }
-                            
+
                             $kbContext .= sprintf(
                                 "\n[Chunk %d - Relevance: %.2f]\n%s\n",
                                 $index + 1,
                                 $score,
                                 $content
                             );
-                            
+
                             if (!empty($metadata)) {
                                 if (isset($metadata['filename'])) {
                                     $kbContext .= "  Source: " . $metadata['filename'] . "\n";
                                 }
                             }
                         }
-                        
+
                         $kbContext .= "\n=== END KNOWLEDGE BASE CONTEXT ===\n";
                     }
                 } catch (\Exception $e) {
@@ -386,7 +419,7 @@ class ConversationService
                 }
             }
         }
-        
+
         // Fallback to documents if no KB context
         if (empty($kbContext) && $conversation->documents->count() > 0) {
             $documentContext = "\n\n=== UPLOADED DOCUMENTS CONTEXT ===\n";
@@ -464,47 +497,71 @@ class ConversationService
         ));
 
         // Stream the response with callback
-        $llmResponse = $this->llmService->chatStream(
-            $aiContextMessage,
-            $history,
-            $enhancedContext,
-            $personaData,
-            function($chunk) use ($conversationId, $tempMessageId) {
-                // Broadcast each chunk via WebSocket
-                broadcast(new MessageChunk(
-                    $conversationId,
-                    $tempMessageId,
-                    $chunk,
-                    false
-                ));
-            },
-            $conversation->project_id
-        );
+        try {
+            $llmResponse = $this->llmService->chatStream(
+                $aiContextMessage,
+                $history,
+                $enhancedContext,
+                $personaData,
+                function($chunk) use ($conversationId, $tempMessageId) {
+                    // Broadcast each chunk via WebSocket
+                    broadcast(new MessageChunk(
+                        $conversationId,
+                        $tempMessageId,
+                        $chunk,
+                        false
+                    ));
+                },
+                $conversation->project_id
+            );
 
-        // Save the complete AI response
-        $aiMessage = $this->saveMessage($conversationId, [
-            'content' => $this->textCommons->cleanUtf8Content($llmResponse['response']),
-            'role' => 'assistant',
-            'model_used' => $llmResponse['model'] ?? null,
-            'tokens_used' => $llmResponse['tokens_used'] ?? null,
-            'persona_id' => $messageData['persona_id'] ?? null
-        ]);
+            // Save the complete AI response
+            $aiMessage = $this->saveMessage($conversationId, [
+                'content' => $this->textCommons->cleanUtf8Content($llmResponse['response']),
+                'role' => 'assistant',
+                'model_used' => $llmResponse['model'] ?? null,
+                'tokens_used' => $llmResponse['tokens_used'] ?? null,
+                'persona_id' => $messageData['persona_id'] ?? null
+            ]);
 
-        // Broadcast completion with real message ID
-        broadcast(new MessageChunk(
-            $conversationId,
-            (string)$aiMessage->id,
-            '',
-            true,
-            ['message' => $aiMessage->toArray()]
-        ));
+            // Broadcast completion with real message ID
+            broadcast(new MessageChunk(
+                $conversationId,
+                (string)$aiMessage->id,
+                '',
+                true,
+                ['message' => $aiMessage->toArray()]
+            ));
 
-        return [
-            'user_message' => null,
-            'ai_message' => $aiMessage,
-            'success' => true,
-            'streaming' => true
-        ];
+            return [
+                'user_message' => null,
+                'ai_message' => $aiMessage,
+                'success' => true,
+                'streaming' => true
+            ];
+        } catch (\Exception $e) {
+            Log::error('LLM chat stream failed in sendMessageStream', [
+                'conversation_id' => $conversationId,
+                'error' => $e->getMessage()
+            ]);
+
+            // Broadcast error to frontend
+            broadcast(new MessageChunk(
+                $conversationId,
+                'error',
+                '',
+                true,
+                ['error' => $e->getMessage()]
+            ));
+
+            return [
+                'user_message' => null,
+                'ai_message' => null,
+                'success' => false,
+                'streaming' => true,
+                'error' => $e->getMessage()
+            ];
+        }
     }
 
     /**

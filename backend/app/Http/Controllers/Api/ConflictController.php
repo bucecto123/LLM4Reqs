@@ -37,11 +37,15 @@ class ConflictController extends Controller
         try {
             $result = $this->conflictService->detectConflictsForProject($projectId);
 
+            // Return the full result including conflicts info
             return response()->json([
                 'success' => true,
-                'job_id' => $result['job_id'] ?? null,
-                'status' => $result['status'] ?? null,
-                'message' => $result['message'] ?? null,
+                'status' => $result['status'] ?? 'completed',
+                'total_conflicts' => $result['total_conflicts'] ?? 0,
+                'conflicts_saved' => $result['conflicts_saved'] ?? 0,
+                'message' => ($result['total_conflicts'] ?? 0) > 0
+                    ? "Found {$result['total_conflicts']} conflicts"
+                    : "No conflicts detected",
             ]);
         } catch (\Exception $e) {
             Log::error('Conflict detection failed', [
@@ -128,6 +132,7 @@ class ConflictController extends Controller
     /**
      * Get all conflicts for a project.
      * GET /api/projects/{projectId}/conflicts
+     * Supports pagination via ?page=1&per_page=10
      */
     public function getProjectConflicts(Request $request, int $projectId)
     {
@@ -141,12 +146,18 @@ class ConflictController extends Controller
         }
 
         try {
-            $conflicts = $this->conflictService->getProjectConflicts($projectId);
+            $page     = (int) $request->query('page', 1);
+            $perPage  = (int) $request->query('per_page', 10);
+
+            $conflicts = $this->conflictService->getProjectConflicts($projectId, $perPage, $page);
 
             return response()->json([
-                'success' => true,
-                'data' => $conflicts,
-                'total' => $conflicts->count(),
+                'success'      => true,
+                'data'         => $conflicts->items(),
+                'total'        => $conflicts->total(),
+                'per_page'     => $conflicts->perPage(),
+                'current_page' => $conflicts->currentPage(),
+                'last_page'    => $conflicts->lastPage(),
             ]);
         } catch (\Exception $e) {
             return response()->json([

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -27,6 +27,10 @@ export default function ProjectsPage() {
   const [newProjectDescription, setNewProjectDescription] = useState("");
   const [error, setError] = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  // Client-side pagination for projects list
+  const [projectPage, setProjectPage] = useState(1);
+  const PROJECTS_PER_PAGE = 12;
 
   // Delete project confirmation modal
   const [projectToDelete, setProjectToDelete] = useState(null);
@@ -182,6 +186,22 @@ export default function ProjectsPage() {
       return a.name.localeCompare(b.name);
     }
   });
+
+  // Paginated projects slice
+  const visibleProjects = useMemo(
+    () => sortedProjects.slice(0, projectPage * PROJECTS_PER_PAGE),
+    [sortedProjects, projectPage],
+  );
+  const hasMoreProjects = sortedProjects.length > visibleProjects.length;
+
+  const handleLoadMoreProjects = useCallback(() => {
+    setProjectPage((prev) => prev + 1);
+  }, []);
+
+  // Reset pagination when filter/sort changes
+  useEffect(() => {
+    setProjectPage(1);
+  }, [searchQuery, sortBy]);
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -364,8 +384,9 @@ export default function ProjectsPage() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {sortedProjects.map((project) => (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {visibleProjects.map((project) => (
                 <div
                   key={project.id}
                   onClick={() => openProject(project.id)}
@@ -434,6 +455,19 @@ export default function ProjectsPage() {
                 </div>
               ))}
             </div>
+
+              {/* Load More */}
+              {hasMoreProjects && (
+                <div className="mt-8 flex justify-center">
+                  <button
+                    onClick={handleLoadMoreProjects}
+                    className="px-6 py-2.5 rounded-lg border-2 border-indigo-200 text-indigo-700 font-semibold hover:bg-indigo-50 hover:shadow-md transition-all"
+                  >
+                    Load more ({sortedProjects.length - visibleProjects.length} remaining)
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </main>
       </div>

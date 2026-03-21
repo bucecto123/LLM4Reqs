@@ -6,7 +6,6 @@ import {
   Grid3x3,
   Globe,
   Paperclip,
-  Mic,
   X,
 } from "lucide-react";
 import ModelSelector from "./ModelSelector";
@@ -38,7 +37,7 @@ const WelcomeScreen = ({
   onSelectModel,
 }) => {
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col relative z-10">
       <div className="flex-1 flex flex-col items-center justify-center p-8 relative overflow-hidden">
         {/* Animated background elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -100,51 +99,54 @@ const WelcomeScreen = ({
               </div>
             )}
 
-            {/* Model Selector - Above chat input */}
-            {models && models.length > 0 && (
-              <div className="mb-3 flex justify-end">
-                <ModelSelector
-                  models={models}
-                  selectedModelId={selectedModelId}
-                  onSelect={onSelectModel}
-                  isLoading={isLoading}
-                  compact={false}
-                  dropUp={true}
-                />
-              </div>
-            )}
-
             <div
-              className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-200 p-4 backdrop-blur-sm bg-white/80 animate-fade-in"
+              className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-200 backdrop-blur-sm bg-white/80 animate-fade-in"
               style={{ animationDelay: "0.4s" }}
             >
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={openFileUpload}
-                  disabled={isLoading || isInitializing}
-                  className="p-2 hover:bg-gray-100 rounded-xl text-gray-600 transition-all duration-200 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-110 active:scale-95"
-                >
-                  <Paperclip size={20} />
-                </button>
-                <textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={handleKeyPress}
-                  placeholder={
-                    isInitializing
-                      ? "Initializing..."
-                      : "How can I help you today?"
-                  }
-                  className="flex-1 bg-transparent border-none outline-none resize-none text-gray-800 placeholder-gray-500 text-base font-medium"
-                  rows={1}
-                  disabled={isLoading || isInitializing}
-                  style={{ minHeight: "24px", maxHeight: "120px" }}
-                  onInput={(e) => {
-                    e.target.style.height = "auto";
-                    e.target.style.height =
-                      Math.min(e.target.scrollHeight, 120) + "px";
-                  }}
-                />
+              {/* Textarea */}
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={handleKeyPress}
+                placeholder={
+                  isInitializing
+                    ? "Initializing..."
+                    : "How can I help you today?"
+                }
+                className="w-full px-4 pt-3 pb-1 bg-transparent focus:outline-none resize-none text-gray-800 placeholder-gray-500 text-base font-medium"
+                rows={3}
+                disabled={isLoading || isInitializing}
+              />
+
+              {/* Bottom toolbar */}
+              <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100">
+                {/* Left — attach + model */}
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={openFileUpload}
+                    disabled={isLoading || isInitializing}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Paperclip size={15} />
+                    <span className="hidden sm:inline">Attach</span>
+                  </button>
+
+                  {/* Model Selector */}
+                  {models && models.length > 0 && (
+                    <div className="flex items-center" title="Select AI model">
+                      <ModelSelector
+                        models={models}
+                        selectedModelId={selectedModelId}
+                        onSelect={onSelectModel}
+                        isLoading={isLoading}
+                        compact={true}
+                        dropUp={true}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Right — send button */}
                 <button
                   onClick={handleSendMessage}
                   disabled={
@@ -153,19 +155,22 @@ const WelcomeScreen = ({
                     isInitializing ||
                     !currentProjectId
                   }
-                  className={`p-2.5 rounded-xl text-white transition-all duration-300 flex-shrink-0 shadow-md hover:shadow-lg transform ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all text-white ${
                     (message.trim() || attachedFiles.length > 0) &&
                     !isLoading &&
                     !isInitializing
-                      ? "hover:scale-105 active:scale-95 opacity-100"
+                      ? "hover:shadow-md opacity-100"
                       : "opacity-40 cursor-not-allowed"
                   }`}
                   style={{ backgroundColor: "#4A7BA7" }}
                 >
                   {isLoading ? (
-                    <Loader2 className="animate-spin" size={18} />
+                    <Loader2 className="animate-spin" size={14} />
                   ) : (
-                    <Send size={18} />
+                    <>
+                      <span className="hidden sm:inline">Send</span>
+                      <Send size={14} />
+                    </>
                   )}
                 </button>
               </div>

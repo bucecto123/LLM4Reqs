@@ -1,17 +1,20 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, lazy, Suspense } from "react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./index.css";
-import LLMDashboard from "./pages/DashBoard";
-import ProjectsPage from "./pages/ProjectsPage";
-import ProjectDetailPage from "./pages/ProjectDetailPage";
-import AuthPages from "./pages/Login_SignUp";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
 import { AuthProvider, useAuth } from "./hooks/useAuth.jsx";
 import { isAuthenticated, getAccessToken } from "./utils/auth";
 import ErrorBoundary from "./components/ErrorBoundary";
+
+// Route-based code splitting — heavy pages are lazy-loaded
+const LLMDashboard = lazy(() => import("./pages/DashBoard"));
+const ProjectsPage = lazy(() => import("./pages/ProjectsPage"));
+const ProjectDetailPage = lazy(() => import("./pages/ProjectDetailPage"));
+const AuthPages = lazy(() => import("./pages/Login_SignUp"));
+// Public pages — keep static (small, rarely visited)
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 // Loading component
 function LoadingScreen() {
@@ -34,18 +37,24 @@ function AppContent() {
   }
 
   if (!authState) {
-    return <AuthPages />;
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <AuthPages />
+      </Suspense>
+    );
   }
 
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="/projects" element={<ProjectsPage />} />
-      <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
-      <Route path="/dashboard" element={<LLMDashboard />} />
+    <Suspense fallback={<LoadingScreen />}>
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/projects" element={<ProjectsPage />} />
+        <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
+        <Route path="/dashboard" element={<LLMDashboard />} />
 
-      <Route path="*" element={<Navigate to="/projects" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/projects" replace />} />
+      </Routes>
+    </Suspense>
   );
 }
 

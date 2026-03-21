@@ -9,6 +9,12 @@ services:
     volumes:
       - ./llm:/app
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   backend:
     build:
@@ -21,9 +27,15 @@ services:
       LLM_SERVICE_URL: http://llm:8000
       REVERB_SERVER_HOST: 0.0.0.0
       REVERB_SERVER_PORT: 8081
+      # REVERB_HOST must be the Docker service name "reverb" for inter-container
+      # communication. Using "localhost" here would make Reverb unreachable inside
+      # the container network.
       REVERB_HOST: reverb
       REVERB_PORT: 8081
       REVERB_SCHEME: http
+      REVERB_APP_KEY: llm4reqs-reverb-key
+      REVERB_APP_ID: llm4reqs
+      BROADCAST_CONNECTION: reverb
       APP_URL: http://localhost:8001
       SESSION_DRIVER: file
       CACHE_STORE: file
@@ -34,7 +46,14 @@ services:
       - ./backend:/var/www/html
       - sqlite_data:/var/db
     depends_on:
-      - llm
+      llm:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8001/api/health || wget -qO- http://localhost:8001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     command: >
       sh -c "chmod 777 /var/db &&
              touch /var/db/database.sqlite &&
@@ -54,9 +73,13 @@ services:
       LLM_SERVICE_URL: http://llm:8000
       REVERB_SERVER_HOST: 0.0.0.0
       REVERB_SERVER_PORT: 8081
-      REVERB_HOST: localhost
+      # REVERB_HOST advertises this service's address to connected clients.
+      # Must be "reverb" so backend and frontend reach it via Docker DNS.
+      REVERB_HOST: reverb
       REVERB_PORT: 8081
       REVERB_SCHEME: http
+      REVERB_APP_KEY: llm4reqs-reverb-key
+      REVERB_APP_ID: llm4reqs
       APP_URL: http://localhost:8001
     ports:
       - "8081:8081"
@@ -65,7 +88,7 @@ services:
       - sqlite_data:/var/db
     depends_on:
       - backend
-    command: php artisan reverb:start
+    command: php artisan reverb:start --hostname=0.0.0.0
 
   queue:
     build:
@@ -93,6 +116,12 @@ services:
   frontend:
     build:
       context: ./frontend
+      args:
+        # In Docker, the Reverb service is accessed via the 'reverb' hostname,
+        # not 'localhost'. Override with --build-arg for local dev builds.
+        VITE_REVERB_HOST: reverb
+        VITE_REVERB_PORT: "8081"
+        VITE_REVERB_SCHEME: http
     env_file:
       - ./frontend/.env
     environment:

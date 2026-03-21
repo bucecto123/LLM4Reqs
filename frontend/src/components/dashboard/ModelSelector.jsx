@@ -43,6 +43,9 @@ const ModelSelector = ({
   const otherModels = models.filter(
     (m) => !featuredModelIds.includes(m.model_id),
   );
+  // Combine models based on showAllModels state
+  const displayedModels = showAllModels ? [...featuredModels, ...otherModels] : featuredModels;
+
   // Set a high z-index and ensure it creates a stacking context
   return (
     <div className="relative z-[9999]" ref={dropdownRef}>
@@ -67,7 +70,7 @@ const ModelSelector = ({
 
       {isOpen && (
         <div
-          className={`absolute right-0 w-72 bg-white rounded-xl shadow-lg border border-gray-100 z-[100] overflow-hidden ${dropUp ? "bottom-full mb-2" : "mt-2"}`}
+          className={`absolute left-0 w-72 bg-white rounded-xl shadow-lg border border-gray-100 z-[9999] overflow-hidden ${dropUp ? "bottom-full mb-2" : "mt-2"}`}
         >
           <div className="py-2">
             <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50 border-b border-gray-100">

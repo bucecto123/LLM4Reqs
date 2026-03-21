@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   FileText,
   AlertCircle,
@@ -12,8 +12,37 @@ import {
 import { apiFetch } from "../utils/auth.js";
 import ExportModal from "./ExportModal.jsx";
 
+// Skeleton row placeholder shown while loading more items
+function RequirementSkeletonRow() {
+  return (
+    <div className="border-2 rounded-xl p-5 bg-white/80 animate-pulse">
+      <div className="flex items-start space-x-3">
+        <div className="w-5 h-5 rounded bg-slate-200 flex-shrink-0 mt-0.5" />
+        <div className="flex-1 space-y-2">
+          <div className="flex items-start justify-between">
+            <div className="h-4 w-24 rounded bg-slate-200" />
+            <div className="flex space-x-2">
+              <div className="h-5 w-16 rounded bg-slate-200" />
+              <div className="h-5 w-20 rounded bg-slate-200" />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <div className="h-3 w-full rounded bg-slate-200" />
+            <div className="h-3 w-3/4 rounded bg-slate-200" />
+          </div>
+          <div className="flex items-center justify-between mt-2">
+            <div className="h-3 w-32 rounded bg-slate-200" />
+            <div className="h-3 w-24 rounded bg-slate-200" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
-  const [requirements, setRequirements] = useState([]);
+  const [requirements, setRequirements] = useState([]);       // full dataset for current filter
+  const [displayedRequirements, setDisplayedRequirements] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
@@ -22,18 +51,97 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
     search: "",
   });
   const [selectedRequirement, setSelectedRequirement] = useState(null);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [page, setPage] = useState(1);                          // next page to fetch
+  const [totalCount, setTotalCount] = useState(0);              // total items (from API)
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const loadMoreRef = useRef(null);
+  const isFetchingRef = useRef(false);
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const [isPriorityDropdownOpen, setIsPriorityDropdownOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [projectName, setProjectName] = useState("");
 
   useEffect(() => {
+    // Reset pagination state on filter changes so we start fresh
+    setPage(1);
+    setDisplayedRequirements([]);
+    setRequirements([]);
+    setHasMore(true);
     fetchRequirements();
     fetchProjectName();
     // eslint-disable-next-line
-  }, [projectId, filters, page, refreshKey]);
+  }, [projectId, filters, refreshKey]);
+
+  // Fetch a single page of requirements and append to displayed list
+  const fetchPage = useCallback(async (pageNum) => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
+    try {
+      const params = new URLSearchParams({
+        type: filters.type,
+        priority: filters.priority,
+        search: filters.search,
+        per_page: 10,
+        page: pageNum,
+      });
+
+      const response = await apiFetch(
+        `/api/projects/${projectId}/requirements?${params}`,
+      );
+
+      if (!response || response.success === false) {
+        throw new Error(response?.message || "Failed to fetch requirements");
+      }
+
+      const newItems = response.data || [];
+      const total = response.total || 0;
+
+      setRequirements((prev) =>
+        pageNum === 1 ? newItems : [...prev, ...newItems],
+      );
+      setDisplayedRequirements((prev) =>
+        pageNum === 1 ? newItems : [...prev, ...newItems],
+      );
+      setTotalCount(total);
+      setHasMore(pageNum < (response.last_page || 1));
+    } catch (err) {
+      console.error("Failed to load requirements:", err);
+      setError(err.message || "Failed to load requirements.");
+    } finally {
+      isFetchingRef.current = false;
+    }
+  }, [projectId, filters]);
+
+  // IntersectionObserver for auto-load on scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore && !isFetchingRef.current) {
+          handleLoadMore();
+        }
+      },
+      { threshold: 0.1, rootMargin: "100px" },
+    );
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      if (loadMoreRef.current) observer.unobserve(loadMoreRef.current);
+    };
+  }, [hasMore, isLoadingMore]);
+
+  const handleLoadMore = async () => {
+    if (isLoadingMore || !hasMore) return;
+    setIsLoadingMore(true);
+    const nextPage = page + 1;
+    await fetchPage(nextPage);
+    setPage(nextPage);
+    setIsLoadingMore(false);
+  };
 
   const fetchProjectName = async () => {
     try {
@@ -50,53 +158,12 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
   const fetchRequirements = async () => {
     setIsLoading(true);
     setError(null);
-    try {
-      const params = new URLSearchParams({
-        type: filters.type,
-        priority: filters.priority,
-        search: filters.search,
-        per_page: 10,
-        page,
-      });
-      console.log("Fetching requirements with params:", {
-        projectId,
-        filters,
-        page,
-        params: params.toString(),
-      });
-
-      const response = await apiFetch(
-        `/api/projects/${projectId}/requirements?${params}`,
-      );
-      console.log("Requirements API Response:", {
-        success: response?.success,
-        total: response?.total,
-        dataLength: response?.data?.length,
-        fullResponse: response,
-      });
-
-      if (!response || response.success === false) {
-        console.error("API Error Response:", response);
-        throw new Error(response?.message || "Failed to fetch requirements");
-      }
-
-      // Ensure we're always using the data array from the response
-      const requirementsData = response.data || [];
-      console.log("Requirements data:", requirementsData); // Debug log
-
-      setRequirements(requirementsData);
-      setTotalPages(response.last_page || 1);
-    } catch (err) {
-      console.error("Failed to load requirements:", err);
-      setError(err.message || "Failed to load requirements.");
-    } finally {
-      setIsLoading(false);
-    }
+    await fetchPage(1);
+    setIsLoading(false);
   };
 
   const handleFilterChange = (e) => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
-    setPage(1);
   };
 
   return (
@@ -118,7 +185,13 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
             Export
           </button>
           <button
-            onClick={fetchRequirements}
+            onClick={() => {
+              setPage(1);
+              setDisplayedRequirements([]);
+              setRequirements([]);
+              setHasMore(true);
+              fetchRequirements();
+            }}
             className="px-4 py-2 rounded-lg bg-white hover:bg-blue-50 transition-colors font-medium text-blue-600 hover:text-blue-700 border border-blue-200 shadow-sm hover:shadow-md"
           >
             Refresh
@@ -366,7 +439,7 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
               </div>
             </div>
           </div>
-        ) : requirements.length === 0 ? (
+        ) : displayedRequirements.length === 0 ? (
           <div className="p-8 text-center">
             <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
             <h3 className="text-lg font-medium text-gray-900 mb-1">
@@ -378,7 +451,7 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
           </div>
         ) : (
           <div className="space-y-3">
-            {requirements.map((req) => {
+            {displayedRequirements.map((req) => {
               const priorityColors = {
                 high: "border-red-300 bg-red-50/50",
                 medium: "border-orange-300 bg-orange-50/50",
@@ -461,26 +534,31 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
           </div>
         )}
       </div>
-      {/* Pagination */}
-      <div className="p-4 bg-white/90 backdrop-blur-sm border-t border-slate-200 shadow-lg flex items-center justify-between">
-        <span className="text-sm font-medium text-slate-600">
-          Page {page} of {totalPages}
-        </span>
-        <div className="flex space-x-2">
-          <button
-            disabled={page <= 1}
-            onClick={() => setPage(page - 1)}
-            className="px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium text-sm shadow-sm hover:shadow-md"
-          >
-            Previous
-          </button>
-          <button
-            disabled={page >= totalPages}
-            onClick={() => setPage(page + 1)}
-            className="px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium text-sm shadow-sm hover:shadow-md"
-          >
-            Next
-          </button>
+      {/* Infinite scroll load-more footer */}
+      <div className="p-4 bg-white/90 backdrop-blur-sm border-t border-slate-200 shadow-lg">
+        {totalCount > 0 && (
+          <p className="text-xs text-slate-500 text-center mb-2">
+            Showing {displayedRequirements.length} of {totalCount} requirements
+          </p>
+        )}
+        <div ref={loadMoreRef} className="flex justify-center py-2">
+          {isLoadingMore ? (
+            <div className="flex items-center space-x-2 text-blue-600">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600" />
+              <span className="text-sm font-medium">Loading more...</span>
+            </div>
+          ) : hasMore ? (
+            <button
+              onClick={handleLoadMore}
+              className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+            >
+              Load more ({totalCount - displayedRequirements.length} remaining)
+            </button>
+          ) : displayedRequirements.length > 0 ? (
+            <span className="text-sm text-slate-400 italic">
+              All requirements loaded
+            </span>
+          ) : null}
         </div>
       </div>
       {/* Detail Modal */}

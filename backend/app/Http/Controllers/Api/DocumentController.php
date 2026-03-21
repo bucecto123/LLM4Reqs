@@ -137,12 +137,22 @@ class DocumentController extends Controller
         } catch (\Exception $e) {
             Log::error('Document upload failed', [
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
+            // Check for common issues
+            $detailedMessage = $e->getMessage();
+            if (Str::contains($detailedMessage, 'storage')) {
+                $detailedMessage = 'Storage error: Unable to save file. Please check storage permissions.';
+            } elseif (Str::contains($detailedMessage, 'permission')) {
+                $detailedMessage = 'Permission denied: Unable to save file.';
+            }
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to upload document: ' . $e->getMessage()
+                'message' => 'Failed to upload document: ' . $detailedMessage
             ], 500);
         }
     }

@@ -1,11 +1,28 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { tomorrow } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { User, Bot } from "lucide-react";
+import { User, Bot, ChevronDown, ChevronUp } from "lucide-react";
 import GraphRenderer from "../GraphRenderer";
+
+const MERMAID_RE = /```mermaid\n([\s\S]*?)```/g;
+
+/**
+ * Strip Mermaid code blocks from content before rendering as Markdown.
+ * Returns { cleaned: string, mermaidBlocks: [{code, rawMatch}] }
+ */
+function extractMermaidBlocks(content) {
+  const mermaidBlocks = [];
+  // Remove mermaid blocks from markdown content; they'll be rendered
+  // as GraphRenderer cards below the bubble instead.
+  const cleaned = content.replace(MERMAID_RE, (match, code) => {
+    mermaidBlocks.push({ code: code.trim(), rawMatch: match });
+    return "";
+  });
+  return { cleaned, mermaidBlocks };
+}
 
 const TYPING_SPEED = 20; // ms per character
 
@@ -175,31 +192,25 @@ const MessageBubble = ({
     },
   };
 
-  // Check for duplicate content (if content is literally repeated)
-  const cleanedContent = React.useMemo(() => {
-    if (!finalContent || isUser) return finalContent;
+  // Strip mermaid code blocks from markdown render; they'll be rendered by GraphRenderer below
+  // Also guard against duplicate content.
+  const { cleaned: contentWithoutMermaid, mermaidBlocks } = useMemo(() => {
+    if (!finalContent || isUser) return { cleaned: finalContent, mermaidBlocks: [] };
+    const { cleaned, mermaidBlocks: blocks } = extractMermaidBlocks(finalContent);
 
-    // Check if content is duplicated by splitting in half and comparing
-    const halfLength = Math.floor(finalContent.length / 2);
+    // Detect literal duplicate content (common LLM hallucination)
+    const halfLength = Math.floor(cleaned.length / 2);
     if (halfLength > 50) {
-      // Only check for substantial content
-      const firstHalf = finalContent.substring(0, halfLength).trim();
-      const secondHalf = finalContent.substring(halfLength).trim();
-
-      // If second half starts with the same content as first half, it's likely a duplicate
+      const firstHalf = cleaned.substring(0, halfLength).trim();
+      const secondHalf = cleaned.substring(halfLength).trim();
       if (
-        secondHalf.startsWith(
-          firstHalf.substring(0, Math.min(100, firstHalf.length)),
-        )
+        secondHalf.startsWith(firstHalf.substring(0, Math.min(100, firstHalf.length)))
       ) {
-        console.warn(
-          "Detected duplicate content in message, using first half only",
-        );
-        return firstHalf;
+        console.warn("Detected duplicate content in message, using first half only");
+        return { cleaned: firstHalf, mermaidBlocks: blocks };
       }
     }
-
-    return finalContent;
+    return { cleaned, mermaidBlocks: blocks };
   }, [finalContent, isUser]);
 
   // Don't render an empty assistant bubble while streaming;
@@ -265,15 +276,30 @@ const MessageBubble = ({
               {isUser ? (
                 <div className="whitespace-pre-wrap break-words">{content}</div>
               ) : (
-                <div className="prose prose-sm max-w-none text-gray-800">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    rehypePlugins={[rehypeRaw]}
-                    components={markdownComponents}
-                  >
-                    {cleanedContent || " "}
-                  </ReactMarkdown>
-                </div>
+                <>
+                  <div className="prose prose-sm max-w-none text-gray-800">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeRaw]}
+                      components={markdownComponents}
+                    >
+                      {contentWithoutMermaid || " "}
+                    </ReactMarkdown>
+                  </div>
+                  {/* Render extracted Mermaid diagrams as standalone GraphRenderer cards */}
+                  {mermaidBlocks.length > 0 && (
+                    <div className="mt-3 flex flex-col gap-2">
+                      {mermaidBlocks.map((block, i) => (
+                        <div key={i} className="border border-gray-200 rounded-lg overflow-hidden">
+                          <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-200 flex items-center gap-2">
+                            <span className="text-xs text-gray-400 font-medium">Diagram</span>
+                          </div>
+                          <GraphRenderer type="mermaid" mermaidCode={block.code} height="300px" interactive={true} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

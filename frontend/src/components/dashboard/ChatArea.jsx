@@ -56,7 +56,7 @@ const ChatArea = ({
       : { backgroundColor: "#DBE2EF", color: "#112D4E" };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden relative z-[60]">
       {/* Header */}
       <header
         className={`bg-white border-b-2 border-indigo-100 py-6 ${

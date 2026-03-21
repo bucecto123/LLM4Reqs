@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
-import { 
-  ReactFlow, 
-  Controls, 
-  Background, 
+import {
+  ReactFlow,
+  Controls,
+  Background,
   MiniMap,
   Panel,
   useNodesState,
@@ -11,7 +11,7 @@ import {
   MarkerType
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Download, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { Download, ZoomIn, ZoomOut, Maximize2, X, AlertTriangle } from 'lucide-react';
 
 /**
  * Sanitize AI-generated Mermaid code to fix common parse errors.
@@ -23,26 +23,26 @@ import { Download, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 function sanitizeMermaidCode(code) {
   if (!code) return code;
 
+  // NOTE: Do NOT attempt to "fix" bare ">" into "-->" arrows here.
+  // That heuristic is destructive — it converts valid syntax like "A --> B"
+  // (where the ">" is the end of "-->", not a bare arrow) into "A -- -> B".
+  // If the AI produces bad mermaid, let it fail loudly so the error display
+  // shows the actual broken code rather than silently producing new errors.
+  //
+  // The only sanitization we apply is escaping < and > inside text labels
+  // (inside [...] or (...)) so HTML-like text doesn't confuse the parser.
   const lines = code.split('\n');
   const sanitized = lines.map(line => {
-    // 1) Fix bare ">" used as arrow: A[label]> B → A[label] --> B
-    // Only if it's after a node definition and not part of an existing arrow
-    line = line.replace(/([\]\)])\s*>(?!\s*>|\s*-)\s*/g, '$1 --> ');
-
-    // 2) Fix `<` and `>` inside text labels by replacing them with HTML entities
-    // Mermaid chokes on bare `<` or `>` inside brackets unless they are in quotes.
-    // However, quoting can break if there are already quotes. Safest is HTML entities.
-    // We match text inside brackets [...] or parens (...)
+    // Escape < and > inside node labels [...] so "<Customer>" etc. parse cleanly
     line = line.replace(/\[([^\]]+)\]/g, (match, inner) => {
       const sanitized = inner.replace(/</g, '&lt;').replace(/>/g, '&gt;');
       return `[${sanitized}]`;
     });
-    
+    // Escape < and > inside edge labels (...)
     line = line.replace(/\(([^)]+)\)/g, (match, inner) => {
       const sanitized = inner.replace(/</g, '&lt;').replace(/>/g, '&gt;');
       return `(${sanitized})`;
     });
-
     return line;
   });
 
@@ -71,12 +71,12 @@ mermaid.initialize({
 
 /**
  * GraphRenderer Component
- * 
+ *
  * Supports multiple graph formats:
  * 1. Mermaid syntax (flowchart, sequence, etc.)
  * 2. React Flow (nodes/edges format)
  * 3. Story Map format
- * 
+ *
  * @param {Object} props
  * @param {string} props.type - 'mermaid' | 'flow' | 'storymap'
  * @param {string} props.mermaidCode - Mermaid diagram code
@@ -86,7 +86,7 @@ mermaid.initialize({
  * @param {boolean} props.interactive - Enable zoom/pan controls
  * @param {string} props.height - Container height (default: 600px)
  */
-const GraphRenderer = ({ 
+const GraphRenderer = ({
   type = 'mermaid',
   mermaidCode = '',
   nodes = [],
@@ -100,7 +100,8 @@ const GraphRenderer = ({
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [mermaidSvg, setMermaidSvg] = useState('');
-  
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   // React Flow state
   const [flowNodes, setFlowNodes, onNodesChange] = useNodesState([]);
   const [flowEdges, setFlowEdges, onEdgesChange] = useEdgesState([]);
@@ -110,19 +111,19 @@ const GraphRenderer = ({
     if (type === 'mermaid' && mermaidCode && mermaidRef.current) {
       setLoading(true);
       setError(null);
-      
+
       const renderMermaid = async () => {
         try {
           // Clear previous content
           mermaidRef.current.innerHTML = '';
-          
+
           // Generate unique ID
           const id = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          
+
           // Sanitize and render diagram
           const cleanCode = sanitizeMermaidCode(mermaidCode);
           const { svg } = await mermaid.render(id, cleanCode);
-          
+
           setMermaidSvg(svg);
           mermaidRef.current.innerHTML = svg;
           setLoading(false);
@@ -141,12 +142,12 @@ const GraphRenderer = ({
   useEffect(() => {
     if (type === 'flow' && (nodes.length > 0 || edges.length > 0)) {
       setLoading(true);
-      
+
       // Convert nodes to React Flow format
       const formattedNodes = nodes.map(node => ({
         id: node.id,
         type: node.type || 'default',
-        data: { 
+        data: {
           label: node.label || node.name || node.id,
           ...node
         },
@@ -191,7 +192,7 @@ const GraphRenderer = ({
   useEffect(() => {
     if (type === 'storymap' && storyMap) {
       setLoading(true);
-      
+
       const convertedNodes = [];
       const convertedEdges = [];
       let yOffset = 0;
@@ -359,18 +360,46 @@ const GraphRenderer = ({
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       const img = new Image();
-      
+
       const svgData = new XMLSerializer().serializeToString(svg);
+
+      // Get SVG dimensions from viewBox or width/height attributes
+      const getSvgDimensions = (svgString) => {
+        let width = 800;
+        let height = 600;
+
+        // Try width/height attributes first
+        const wMatch = svgString.match(/width=["'](\d+)/);
+        const hMatch = svgString.match(/height=["'](\d+)/);
+        if (wMatch) width = parseInt(wMatch[1]);
+        if (hMatch) height = parseInt(hMatch[1]);
+
+        // Fall back to viewBox
+        const vbMatch = svgString.match(/viewBox=["']([\d\s.]+)["']/);
+        if (vbMatch) {
+          const parts = vbMatch[1].trim().split(/\s+/);
+          if (parts.length === 4) {
+            if (!wMatch) width = parseFloat(parts[2]);
+            if (!hMatch) height = parseFloat(parts[3]);
+          }
+        }
+
+        return { width, height };
+      };
+
       const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
       const url = URL.createObjectURL(svgBlob);
 
       img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
+        const { width, height } = getSvgDimensions(svgData);
+        const scale = 2;
+        canvas.width = width * scale;
+        canvas.height = height * scale;
+        ctx.scale(scale, scale);
         ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
-        
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+
         canvas.toBlob((blob) => {
           const pngUrl = URL.createObjectURL(blob);
           const a = document.createElement('a');
@@ -393,10 +422,18 @@ const GraphRenderer = ({
 
   if (error) {
     return (
-      <div className={`flex items-center justify-center ${className}`} style={{ height }}>
-        <div className="text-center text-red-600">
-          <p className="font-semibold mb-2">Graph Rendering Error</p>
-          <p className="text-sm">{error}</p>
+      <div className={`flex flex-col items-center justify-center p-4 ${className}`} style={{ height }}>
+        <div className="w-full max-w-2xl p-4 border border-gray-200 rounded-lg bg-gray-50">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle size={14} className="text-gray-400" />
+            <span className="text-xs text-gray-500 font-medium">Diagram could not be rendered</span>
+          </div>
+          <pre className="text-xs text-gray-700 bg-white border rounded p-2 overflow-auto max-h-48 whitespace-pre-wrap font-mono">
+            {mermaidCode}
+          </pre>
+          {interactive && (
+            <p className="text-xs text-gray-400 mt-2">Check mermaid syntax</p>
+          )}
         </div>
       </div>
     );
@@ -433,8 +470,8 @@ const GraphRenderer = ({
             </button>
           </div>
         )}
-        <div 
-          ref={mermaidRef} 
+        <div
+          ref={mermaidRef}
           className="w-full h-full overflow-auto p-8 bg-white flex items-center justify-center"
           style={{ minHeight: height }}
         />
@@ -457,7 +494,7 @@ const GraphRenderer = ({
           {interactive && (
             <>
               <Controls />
-              <MiniMap 
+              <MiniMap
                 nodeColor={(node) => node.style?.background || '#6b7280'}
                 maskColor="rgba(0, 0, 0, 0.1)"
               />

@@ -110,7 +110,11 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
       // Upload complete, WebSocket already listening
     } catch (err) {
       console.error("KB upload failed:", err);
-      setError(err.message || "Failed to upload documents. Please try again.");
+      // Log detailed error info
+      const errorMessage = err.message || err.body?.message || "Failed to upload documents. Please try again.";
+      const errorDetails = err.body ? JSON.stringify(err.body) : '';
+      console.error("Upload error details:", errorDetails);
+      setError(errorMessage);
       setIsUploading(false);
       setIsListening(false); // Stop listening on error
     }

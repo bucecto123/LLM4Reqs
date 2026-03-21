@@ -64,13 +64,22 @@ class LLMService
                 'context' => $context,
             ];
 
-            // Extract model_id from history or personaData if present
+            // Extract model_id and provider from history or personaData if present
             $modelId = $history['model_id'] ?? $personaData['model_id'] ?? null;
+            $provider = $history['provider'] ?? $personaData['provider'] ?? null;
             if ($modelId) {
                 $payload['model_id'] = $modelId;
                 // Remove from history if it was passed there
                 if (isset($history['model_id'])) {
                     unset($history['model_id']);
+                    $payload['conversation_history'] = array_values($history); // Re-index array
+                }
+            }
+            if ($provider) {
+                $payload['provider'] = $provider;
+                // Remove from history if it was passed there
+                if (isset($history['provider'])) {
+                    unset($history['provider']);
                     $payload['conversation_history'] = array_values($history); // Re-index array
                 }
             }
@@ -117,13 +126,22 @@ class LLMService
                 'context' => $context,
             ];
             
-            // Extract model_id from history or personaData if present
+            // Extract model_id and provider from history or personaData if present
             $modelId = $history['model_id'] ?? $personaData['model_id'] ?? null;
+            $provider = $history['provider'] ?? $personaData['provider'] ?? null;
             if ($modelId) {
                 $payload['model_id'] = $modelId;
                 // Remove from history if it was passed there
                 if (isset($history['model_id'])) {
                     unset($history['model_id']);
+                    $payload['conversation_history'] = array_values($history);
+                }
+            }
+            if ($provider) {
+                $payload['provider'] = $provider;
+                // Remove from history if it was passed there
+                if (isset($history['provider'])) {
+                    unset($history['provider']);
                     $payload['conversation_history'] = array_values($history);
                 }
             }

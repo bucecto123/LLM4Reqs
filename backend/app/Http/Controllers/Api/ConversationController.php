@@ -8,6 +8,7 @@ use App\Http\Requests\MessageRequest;
 use App\Models\Conversation;
 use App\Services\ConversationService;
 use App\Services\LLMService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
@@ -28,10 +29,15 @@ class ConversationController extends Controller
      */
     public function getUserConversations()
     {
-        $conversations = Conversation::where('user_id', Auth::id())
-            ->whereNull('project_id')
-            ->orderBy('updated_at', 'desc')
-            ->get();
+        $cacheKey = "user_conversations_" . Auth::id();
+
+        $conversations = Cache::remember($cacheKey, 30, function () {
+            return Conversation::where('user_id', Auth::id())
+                ->whereNull('project_id')
+                ->orderBy('updated_at', 'desc')
+                ->get();
+        });
+
         return response()->json($conversations);
     }
 
@@ -75,15 +81,23 @@ class ConversationController extends Controller
     public function store(ConversationRequest $request)
     {
         $new_conversation = $this->conversationService->createConversation($request->validated());
+
+        // Invalidate conversation list caches
+        Cache::forget("user_conversations_" . Auth::id());
+        if ($new_conversation->project_id) {
+            Cache::forget("project_conversations_{$new_conversation->project_id}_" . Auth::id());
+        }
+
         return response()->json($new_conversation, 201);
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(\Illuminate\Http\Request $request, string $id)
     {
-        $messages = $this->conversationService->getMessages($id);
+        $before = $request->query('before');
+        $messages = $this->conversationService->getMessages($id, 50, $before);
         return response()->json(['messages' => $messages]);
     }
     
@@ -181,7 +195,13 @@ class ConversationController extends Controller
         // Only update the fields that are provided and validated
         $validatedData = $request->validated();
         $conversation->update($validatedData);
-        
+
+        // Invalidate conversation list caches
+        Cache::forget("user_conversations_" . Auth::id());
+        if ($conversation->project_id) {
+            Cache::forget("project_conversations_{$conversation->project_id}_" . Auth::id());
+        }
+
         return response()->json([
             'message' => 'Conversation updated successfully',
             'conversation' => $conversation
@@ -208,6 +228,12 @@ class ConversationController extends Controller
             }
         }
         
+        // Invalidate conversation list caches before deleting
+        Cache::forget("user_conversations_" . Auth::id());
+        if ($conversation->project_id) {
+            Cache::forget("project_conversations_{$conversation->project_id}_" . Auth::id());
+        }
+
         $conversation->delete();
         return response()->json(['message' => 'Conversation deleted successfully']);
     }

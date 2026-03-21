@@ -1,6 +1,7 @@
 import os
 import json
 import pickle
+import time
 from typing import List, Dict, Any, Tuple, Optional
 from datetime import datetime
 import threading
@@ -20,6 +21,36 @@ try:
 except Exception:
     faiss = None
 
+# ---------------------------------------------------------------------------
+# 1) Global embedding model singleton — loaded once, reused for all requests
+# ---------------------------------------------------------------------------
+_embedding_model = None
+_embedding_lock = threading.Lock()
+
+
+def get_embedding_model(model_name: str = "all-MiniLM-L6-v2") -> SentenceTransformer:
+    """Load and cache the SentenceTransformer at module level (one per process)."""
+    global _embedding_model
+    if _embedding_model is None:
+        with _embedding_lock:
+            if _embedding_model is None:
+                if SentenceTransformer is None:
+                    raise RuntimeError(
+                        "sentence-transformers not installed. "
+                        "pip install sentence-transformers"
+                    )
+                _embedding_model = SentenceTransformer(model_name)
+    return _embedding_model
+
+
+# ---------------------------------------------------------------------------
+# 2) Per-project FAISS index + metadata cache with TTL
+#    Avoids re-loading from disk on every /kb/query call
+# ---------------------------------------------------------------------------
+_FAISS_CACHE: Dict[str, Dict[str, Any]] = {}   # project_id → {index, meta, loaded_at}
+_CACHE_TTL = 300                              # 5 minutes
+_faiss_lock = threading.Lock()
+
 # Thread lock for safe concurrent access to FAISS indexes
 _index_locks = {}
 _locks_lock = threading.Lock()
@@ -33,14 +64,58 @@ def get_project_lock(project_id: str) -> threading.Lock:
         return _index_locks[project_id]
 
 
-class RagManager:
-    def __init__(self, model_name: str = 'all-MiniLM-L6-v2'):
-        if SentenceTransformer is None:
-            raise RuntimeError('sentence-transformers not installed. pip install sentence-transformers')
-        if faiss is None:
-            raise RuntimeError('faiss not installed. pip install faiss-cpu')
+def get_faiss_index(
+    project_id: str,
+    index_path: str,
+    meta_path: str,
+    ttl: int = _CACHE_TTL,
+) -> Tuple[Any, List[Dict[str, Any]]]:
+    """
+    Return a cached (index, chunks) tuple for *project_id*.
+    Loads from disk and populates the cache on first call or after TTL expiry.
+    """
+    now = time.time()
+    with _faiss_lock:
+        if project_id in _FAISS_CACHE:
+            cached = _FAISS_CACHE[project_id]
+            if now - cached["loaded_at"] < ttl:
+                return cached["index"], cached["meta"]
+            else:
+                # Expired — remove stale entry so we reload below
+                del _FAISS_CACHE[project_id]
 
-        self.model = SentenceTransformer(model_name)
+        # Load from disk
+        index, meta = RagManager.load_index_and_meta_static(index_path, meta_path)
+        _FAISS_CACHE[project_id] = {
+            "index": index,
+            "meta": meta,
+            "loaded_at": now,
+        }
+        return index, meta
+
+
+def clear_faiss_cache(project_id: Optional[str] = None) -> None:
+    """Invalidate cache for a specific project (or all projects if project_id is None)."""
+    global _FAISS_CACHE
+    with _faiss_lock:
+        if project_id is None:
+            _FAISS_CACHE.clear()
+        elif project_id in _FAISS_CACHE:
+            del _FAISS_CACHE[project_id]
+
+
+class RagManager:
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
+        if SentenceTransformer is None:
+            raise RuntimeError(
+                "sentence-transformers not installed. "
+                "pip install sentence-transformers"
+            )
+        if faiss is None:
+            raise RuntimeError("faiss not installed. pip install faiss-cpu")
+
+        # Use the global singleton so the model is loaded once per process
+        self.model = get_embedding_model(model_name)
 
     def prepare_chunks(self, df: pd.DataFrame) -> List[Dict[str, Any]]:
         """Turn each row into a single text chunk and return list of dicts with id,text,meta."""
@@ -89,12 +164,12 @@ class RagManager:
         return rows
 
     def embed_texts(self, texts: List[str]) -> np.ndarray:
-        """Return numpy array of embeddings."""
-        embs = self.model.encode(texts, show_progress_bar=True, convert_to_numpy=True)
+        """Return numpy array of embeddings (uses the cached global model)."""
+        embs = self.model.encode(texts, show_progress_bar=False, convert_to_numpy=True)
         # ensure 2D
         if embs.ndim == 1:
             embs = np.expand_dims(embs, 0)
-        return embs.astype('float32')
+        return embs.astype("float32")
 
     def build_faiss_index(self, embeddings: np.ndarray, index_path: str) -> Any:
         d = embeddings.shape[1]
@@ -118,22 +193,27 @@ class RagManager:
         with open(meta_path, 'wb') as f:
             pickle.dump(metadata, f)
 
-    def load_index_and_meta(self, index_path: str, meta_path: str) -> Tuple[Any, List[Dict[str, Any]]]:
-        """Load index and metadata. Returns (index, chunks)."""
+    @staticmethod
+    def load_index_and_meta_static(index_path: str, meta_path: str) -> Tuple[Any, List[Dict[str, Any]]]:
+        """Load index and metadata (static, no instance needed). Returns (index, chunks)."""
         if not os.path.exists(index_path) or not os.path.exists(meta_path):
             raise FileNotFoundError(f"Index or metadata file not found: {index_path}, {meta_path}")
-        
+
         index = faiss.read_index(index_path)
-        with open(meta_path, 'rb') as f:
+        with open(meta_path, "rb") as f:
             metadata = pickle.load(f)
-        
+
         # Handle both old format (list) and new format (dict with version)
         if isinstance(metadata, list):
             chunks = metadata
         else:
-            chunks = metadata.get('chunks', [])
-        
+            chunks = metadata.get("chunks", [])
+
         return index, chunks
+
+    def load_index_and_meta(self, index_path: str, meta_path: str) -> Tuple[Any, List[Dict[str, Any]]]:
+        """Load index and metadata. Returns (index, chunks)."""
+        return self.load_index_and_meta_static(index_path, meta_path)
 
     def incremental_add(self, index_path: str, meta_path: str, new_chunks: List[Dict[str, Any]], 
                         project_id: Optional[str] = None) -> Tuple[Any, List[Dict[str, Any]]]:

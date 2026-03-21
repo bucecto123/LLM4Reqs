@@ -15,6 +15,20 @@ from typing import List, Dict, Any, Optional
 import requests
 import json
 
+# ---------------------------------------------------------------------------
+# Shared httpx client for Groq — connection pool reused across all requests
+# ---------------------------------------------------------------------------
+try:
+    import httpx
+
+    _groq_http_client: Optional[httpx.AsyncClient] = httpx.AsyncClient(
+        timeout=httpx.Timeout(120.0, connect=10.0),
+        limits=httpx.Limits(max_keepalive_connections=20, max_connections=100),
+    )
+except Exception:
+    _groq_http_client: Optional[httpx.AsyncClient] = None
+
+
 class ModelManager:
     def __init__(self):
         self.groq_api_key = os.getenv("GROQ_API_KEY")
@@ -32,9 +46,21 @@ class ModelManager:
         {"model_id": "llama-3.1-8b-instant",       "name": "Llama 3.1 8B Instant",       "context_window": 131072, "supports_tools": True},
         {"model_id": "llama3-70b-8192",            "name": "Llama 3 70B",                "context_window": 8192,   "supports_tools": True},
         {"model_id": "llama3-8b-8192",             "name": "Llama 3 8B",                 "context_window": 8192,   "supports_tools": True},
-        {"model_id": "mixtral-8x7b-32768",         "name": "Mixtral 8x7B",               "context_window": 32768,  "supports_tools": True},
+        {"model_id": "mixtral-8x7b-32768",         "name": "Mixtral 8x7B (Deprecated)",  "context_window": 32768,  "supports_tools": True},
         {"model_id": "gemma2-9b-it",               "name": "Gemma 2 9B",                 "context_window": 8192,   "supports_tools": False},
         {"model_id": "deepseek-r1-distill-llama-70b", "name": "DeepSeek R1 Distill 70B", "context_window": 131072, "supports_tools": False},
+    ]
+
+    # Gemini models to exclude (image generation, video, etc.)
+    EXCLUDED_GEMINI_PATTERNS = [
+        'imagen',   # Image generation
+        'veo',      # Video generation
+        'embedding', # Embedding models
+        'nano',     # Nano models (not for chat)
+        'aqa',      # AQA model
+        'robotics', # Robotics models
+        'deep-research', # Research models
+        'computer-use', # Computer use models
     ]
 
     def get_available_models(self) -> List[Dict[str, Any]]:
@@ -73,7 +99,7 @@ class ModelManager:
                     for m in self.GROQ_FALLBACK_MODELS
                 ]
 
-        # 2. Fetch Gemini Models
+        # 2. Fetch Gemini Models (only chat/text models)
         if self.gemini_client and GEMINI_AVAILABLE:
             try:
                 for m in self.gemini_client.models.list():
@@ -82,6 +108,16 @@ class ModelManager:
                     if 'generateContent' in supported:
                         # Extract clean name, e.g. models/gemini-1.5-pro -> gemini-1.5-pro
                         model_id = m.name.replace('models/', '')
+
+                        # Filter out non-chat models (image, video, embedding, etc.)
+                        excluded = any(pattern in model_id.lower() for pattern in self.EXCLUDED_GEMINI_PATTERNS)
+                        if excluded:
+                            continue
+
+                        # Only include gemini and gemma models (chat models)
+                        if not (model_id.startswith('gemini-') or model_id.startswith('gemma-')):
+                            continue
+
                         models.append({
                             'provider': 'gemini',
                             'model_id': model_id,
@@ -95,14 +131,22 @@ class ModelManager:
         return models
 
     def get_chat_model(self, provider: str, model_id: str, temperature: float = 0.7):
-        if provider == 'groq':
+        if provider == "groq":
             if not self.groq_api_key:
                 raise ValueError("GROQ_API_KEY not set")
-            return ChatGroq(
-                groq_api_key=self.groq_api_key,
-                model_name=model_id,
-                temperature=temperature
-            )
+            kwargs = {
+                "groq_api_key": self.groq_api_key,
+                "model_name": model_id,
+                "temperature": temperature,
+            }
+            # Attempt to use the shared httpx connection pool when available
+            if _groq_http_client is not None:
+                try:
+                    kwargs["client"] = _groq_http_client
+                except TypeError:
+                    # Older langchain-groq doesn't accept a `client` kwarg — fall back silently
+                    pass
+            return ChatGroq(**kwargs)
         elif provider == 'gemini':
             if not GEMINI_AVAILABLE:
                 raise ValueError("Gemini dependencies not installed. Please install google-genai and langchain-google-genai")

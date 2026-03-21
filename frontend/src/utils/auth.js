@@ -117,6 +117,13 @@ class AuthManager {
     let body = null;
     const contentType = response.headers.get("content-type") || "";
 
+    // SSE / streaming responses must be returned as the raw Response object
+    // so the caller can read response.body for streaming. Do NOT try to
+    // JSON-parse or text-parse it here.
+    if (contentType.includes("text/event-stream")) {
+      return response;
+    }
+
     try {
       if (contentType.includes("application/json")) {
         body = await response.json();

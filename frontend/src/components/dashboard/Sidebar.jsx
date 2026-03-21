@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   FolderKanban,
@@ -12,10 +12,13 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  ChevronsDown,
 } from "lucide-react";
 import { useLogout } from "../../hooks/useAuth.jsx";
 
-const NavItem = ({ icon, label, active, isOpen, onClick }) => {
+const CONVERSATIONS_PER_PAGE = 20;
+
+const NavItem = memo(({ icon, label, active, isOpen, onClick }) => {
   const activeStyle = active
     ? { backgroundColor: "#112D4E", color: "#DBE2EF" }
     : {};
@@ -43,9 +46,9 @@ const NavItem = ({ icon, label, active, isOpen, onClick }) => {
       )}
     </button>
   );
-};
+});
 
-const ConversationItem = ({
+const ConversationItem = memo(({
   conversation,
   isSelected,
   isEditing,
@@ -59,7 +62,7 @@ const ConversationItem = ({
   onTitleChange,
   onToggleDropdown,
   onKeyPress,
-}) => (
+}) => {
   <div
     className={`group flex items-center rounded-xl cursor-pointer transition-all duration-300 ${
       isSelected
@@ -153,7 +156,7 @@ const ConversationItem = ({
       </div>
     )}
   </div>
-);
+});
 
 const Sidebar = ({
   isSidebarOpen,
@@ -189,6 +192,31 @@ const Sidebar = ({
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const accountRef = useRef();
 
+  // Conversation pagination state
+  const [conversationPage, setConversationPage] = useState(1);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  // Visible conversations slice (paginated)
+  const visibleConversations = useMemo(
+    () => conversations.slice(0, conversationPage * CONVERSATIONS_PER_PAGE),
+    [conversations, conversationPage],
+  );
+  const hasMoreConversations = conversations.length > visibleConversations.length;
+
+  // Reset page when conversations change (new conversation added)
+  useEffect(() => {
+    setConversationPage(1);
+  }, [conversations.length]);
+
+  const handleLoadMoreConversations = useCallback(() => {
+    setIsLoadingMore(true);
+    // Simulate brief delay for visual feedback then increment page
+    setTimeout(() => {
+      setConversationPage((prev) => prev + 1);
+      setIsLoadingMore(false);
+    }, 200);
+  }, []);
+
   useEffect(() => {
     function handleClickOutside(e) {
       if (accountRef.current && !accountRef.current.contains(e.target)) {
@@ -202,12 +230,12 @@ const Sidebar = ({
     return () => window.removeEventListener("click", handleClickOutside);
   }, [onToggleDropdown]);
 
-  const handleSelectConversation = (conversation) => {
+  const handleSelectConversation = useCallback((conversation) => {
     onSelectConversation(conversation);
     if (isMobile) {
       onToggleSidebar();
     }
-  };
+  }, [onSelectConversation, isMobile, onToggleSidebar]);
 
   return (
     <>
@@ -484,7 +512,8 @@ const Sidebar = ({
                       </p>
                     </div>
                   ) : (
-                    conversations.map((conversation) => (
+                    <>
+                      {visibleConversations.map((conversation) => (
                       <ConversationItem
                         key={conversation.id}
                         conversation={conversation}
@@ -503,8 +532,31 @@ const Sidebar = ({
                         onToggleDropdown={onToggleDropdown}
                         onKeyPress={onEditKeyPress}
                       />
-                    ))
-                  )}
+                    ))}
+
+                    {/* Load More button */}
+                    {hasMoreConversations && (
+                      <button
+                        onClick={handleLoadMoreConversations}
+                        disabled={isLoadingMore}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {isLoadingMore ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" />
+                            <span>Loading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <ChevronsDown size={14} />
+                            <span className="font-medium">
+                              Load more ({conversations.length - visibleConversations.length} remaining)
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </>
                 </div>
               </div>
             )}

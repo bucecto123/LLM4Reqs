@@ -151,7 +151,7 @@ class ProjectKBController extends Controller
         ]);
 
         $project = Project::findOrFail($projectId);
-        
+
         // Get KB record
         $kb = KnowledgeBase::where('project_id', $project->id)->first();
 
@@ -162,9 +162,13 @@ class ProjectKBController extends Controller
             ], 400);
         }
 
-        // Get documents to reindex
+        // Get documents to reindex:
+        // - If document_ids is provided and non-empty → reindex only those documents (selective reindex)
+        // - If document_ids is absent or empty → reindex ALL documents (auto-detect new ones via LLM service dedup)
+        $hasSelectiveIds = $request->has('document_ids') && count($request->document_ids) > 0;
+
         $documents = $project->documents()
-            ->when($request->has('document_ids'), function ($query) use ($request) {
+            ->when($hasSelectiveIds, function ($query) use ($request) {
                 return $query->whereIn('id', $request->document_ids);
             })
             ->get();

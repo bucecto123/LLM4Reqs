@@ -7,10 +7,10 @@ window.Pusher = Pusher;
 // Create Echo instance
 const echo = new Echo({
     broadcaster: 'reverb',
-    key: import.meta.env.VITE_REVERB_APP_KEY || 'local-app-key',
+    key: import.meta.env.VITE_REVERB_APP_KEY || 'llm4reqs-reverb-key',
     wsHost: import.meta.env.VITE_REVERB_HOST || 'localhost',
-    wsPort: import.meta.env.VITE_REVERB_PORT || 8080,
-    wssPort: import.meta.env.VITE_REVERB_PORT || 8080,
+    wsPort: import.meta.env.VITE_REVERB_PORT || 8081,
+    wssPort: import.meta.env.VITE_REVERB_PORT || 8081,
     forceTLS: (import.meta.env.VITE_REVERB_SCHEME || 'http') === 'https',
     enabledTransports: ['ws', 'wss'],
     disableStats: true,
