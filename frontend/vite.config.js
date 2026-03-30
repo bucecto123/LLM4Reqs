@@ -14,6 +14,10 @@ export default defineConfig({
           // Split vendor code into separate chunks
           "react-vendor": ["react", "react-dom", "react-router-dom"],
           "ui-vendor": ["lucide-react"],
+          // Code-split heavy libraries — loaded only when needed
+          "mermaid": ["mermaid"],
+          "react-flow": ["@xyflow/react"],
+          "echo-pusher": ["laravel-echo", "pusher-js"],
         },
       },
     },

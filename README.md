@@ -34,6 +34,63 @@ Then open **http://localhost:5173** in your browser!
 
 ---
 
+## 🆕 What's New (March 2026)
+
+This update brings **5 major performance & UX improvements** — the app is significantly faster, more responsive, and more observable than before.
+
+### ⚡ Performance Optimizations
+
+| Change | Impact |
+|---|---|
+| **API Performance Monitoring** | Every API call (frontend → backend → LLM service) is now instrumented with timing. Open DevTools console — you'll see `🚀` (<500ms), `⚡` (<1s), or `🐌` (>1s) grades for every request |
+| **DevTools Performance Overlay** | Press `Ctrl+Shift+P` anywhere in the app to open a live panel showing recent API calls with timing, success/failure status, and cache hit rate |
+| **Backend Request Timing Middleware** | Laravel now logs `X-Response-Time` header + structured timing data (`method`, `uri`, `duration_ms`, `status`) for every request to `storage/logs/laravel.log` |
+| **Slow Query Logging** | Database queries taking >100ms are automatically logged to Laravel's log with the SQL, bindings, and duration |
+| **N+1 Query Fix** | Conversation loading now eager-loads messages and documents in a single query instead of N+1 separate queries |
+
+### 💾 Smart LocalStorage Caching
+
+Data now loads **instantly** from localStorage cache, then refreshes silently in the background:
+
+| Resource | Cache TTL | What you'll notice |
+|---|---|---|
+| Projects list | 5 minutes | Projects appear immediately on page load |
+| Conversations list | 2 minutes | Conversation list shows instantly; no blank flash |
+| LLM Models list | 1 hour | Model selector loads without a network request |
+| Requirements | Per-filter cache | Requirements appear instantly when you switch filters |
+| Conflicts | 5 minutes | Conflict panel shows cached results immediately |
+
+**Cache busting is automatic** — when you create, update, or delete a conversation, project, or requirement, the cache is invalidated immediately so you never see stale data.
+
+### 🎨 Animations & Responsive Feel
+
+| Component | Improvement |
+|---|---|
+| **Skeleton loaders** | Shimmer gradient animation replaces pulsing grey blocks — looks much more polished |
+| **Thinking indicator** | 🐟 now has a CSS wave wiggle, bubble trail, and thinking dots animation |
+| **Message bubbles** | Spring-eased entrance animation with GPU acceleration |
+| **Activity feed** | New items slide in from the right with stagger |
+| **Conversation list** | Items slide in from the left when loaded |
+| **Requirements list** | Rows fade up with stagger on load |
+| **Toast notifications** | Error and success messages now slide in as toasts (top-right) instead of console-only |
+| **Accessibility** | Animations respect `prefers-reduced-motion` — users who prefer reduced motion see no animations |
+
+### 🔧 Docker Production Build
+
+All three Docker containers have been converted from dev-mode to production:
+
+| Container | Before | After |
+|---|---|---|
+| **frontend** | `npm run dev` (live reload, source mount) | **Multi-stage nginx build** — served as static assets, gzip compressed, 1-year cache on hashed assets |
+| **backend** | `php artisan serve` (single-threaded) | **PHP-FPM + nginx** — OPcache enabled, realpath cache tuned, `--no-dev` Composer, hardened security headers |
+| **llm** | `uvicorn --reload` + bind mount | **Built once, no reload** — stable production uvicorn |
+
+### 🔐 Bug Fixes
+
+- **`sharingService.js` & `graphService.js`** — Fixed import bug where these files were calling `api.js` (bare fetch, no JWT auth) instead of `auth.js` (JWT + auto-refresh). Collaborator and story graph requests now carry proper authentication.
+
+---
+
 ## 📖 How to Use (Step-by-Step)
 
 ### 1️⃣ Sign Up & Login

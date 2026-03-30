@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Tuple
 import os
 import json
+import math
 import uuid
 import asyncio
 import threading
@@ -38,6 +39,7 @@ except ImportError:
 
 from rag import RagManager, get_faiss_index
 from build_faiss import build_index_for_project
+from sklearn.metrics.pairwise import cosine_similarity as _sklearn_cosine_sim
 from story_graph import UserStoryMap, STORY_MAP_PROMPT_TEMPLATE, generate_mermaid_chart
 from memory_service import (
     ConversationMemory,
@@ -60,6 +62,58 @@ except Exception:
     SentenceTransformer = None
     cosine_similarity = None
     CONFLICT_DETECTION_AVAILABLE = False
+
+# Web search tool
+try:
+    from tools.web_search import should_web_search, run_web_search, format_search_results
+    WEB_SEARCH_AVAILABLE = True
+except ImportError:
+    should_web_search = lambda msg: False
+    run_web_search = None
+    format_search_results = lambda q, r: ""
+    WEB_SEARCH_AVAILABLE = False
+
+# ---- Conflict context helper ----
+
+# Shared constants for conflict resolution status and severity ordering
+RESOLVED_STATUSES = frozenset(["resolved", "resolved_by_ai", "resolved_manual"])
+SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}  # lower = more severe
+
+def get_conflict_context(project_id: str, top_k: int = 5) -> str:
+    """
+    Load unresolved conflicts for a project from the conflict JSON file.
+    Returns a formatted string suitable for injection as a system message.
+    """
+    # Path: backend/storage/app/conflicts/{project_id}.json
+    # Walk up from llm/ to project root
+    # Use /tmp — /app is root-owned and backend/storage/app/conflicts doesn't exist in Docker
+    _conflict_path = f"/tmp/conflicts/{project_id}.json"
+    try:
+        with open(_conflict_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        conflicts = data.get("conflicts", data) if isinstance(data, dict) else data
+        if not isinstance(conflicts, list):
+            conflicts = []
+        # Filter unresolved using shared constant
+        unresolved = [c for c in conflicts if str(c.get("status", "")).lower() not in RESOLVED_STATUSES]
+        # Sort by severity using shared constant
+        unresolved.sort(key=lambda c: SEVERITY_ORDER.get(str(c.get("severity", "low")).lower(), 3))
+        top = unresolved[:top_k]
+        if not top:
+            return ""
+        lines = ["--- Existing Conflicts in This Project ---"]
+        for i, c in enumerate(top, 1):
+            sev = (c.get("severity") or "UNKNOWN").upper()
+            title = c.get("title") or c.get("description", "Conflict")[:120]
+            req_ids = c.get("requirement_ids", [])
+            req_str = f" (Reqs: {', '.join(str(r) for r in req_ids[:3])})" if req_ids else ""
+            lines.append(f"  {i}. [{sev}]{req_str} {title}")
+        lines.append("--- End of Conflicts Context ---")
+        return "\n".join(lines)
+    except FileNotFoundError:
+        return ""
+    except Exception:
+        return ""
 
 load_dotenv()
 
@@ -266,6 +320,73 @@ _RAG_CACHE_SIZE = int(os.getenv("RAG_CACHE_SIZE", "100"))
 _rag_result_cache: Dict[str, Tuple[List[Dict[str, Any]], List[float], float]] = {}
 _rag_cache_lock = threading.Lock()
 
+# ---------------------------------------------------------------------------
+# Semantic LLM response cache
+# Keyed by project_id + query embedding; uses cosine similarity to match
+# semantically similar cached responses (threshold 0.88), skipping LLM call on hit.
+# ---------------------------------------------------------------------------
+_SEM_CACHE_MAX = int(os.getenv("SEM_CACHE_MAX_ENTRIES", "200"))
+_SEM_CACHE_TTL = int(os.getenv("SEM_CACHE_TTL_SECONDS", "600"))   # 10-min TTL
+_SEM_SIM_THRESHOLD = float(os.getenv("SEM_SIM_THRESHOLD", "0.88"))
+_embed_model_sem = None
+_embed_lock_sem = threading.Lock()
+_semantic_cache: Dict[str, dict] = {}
+_sem_cache_lock = threading.Lock()
+
+
+def _semantic_cosine_sim(a: list, b: list) -> float:
+    """Vectorized cosine similarity using sklearn (handles zero vectors safely)."""
+    try:
+        return float(_sklearn_cosine_sim([a], [b])[0][0])
+    except Exception:
+        return 0.0
+
+
+def _get_embed_for_sem_cache(text: str) -> Optional[list]:
+    """Lazily load MiniLM and embed text for semantic cache lookup."""
+    global _embed_model_sem
+    if _embed_model_sem is None:
+        try:
+            with _embed_lock_sem:
+                if _embed_model_sem is None:
+                    _embed_model_sem = SentenceTransformer("all-MiniLM-L6-v2")
+        except Exception:
+            return None
+    try:
+        emb = _embed_model_sem.encode([text], convert_to_numpy=True)[0].tolist()
+        return emb
+    except Exception:
+        return None
+
+
+def _sem_cache_key(project_id: Optional[str], query: str, model_id: str, provider: str) -> str:
+    qhash = hashlib.md5(query.encode()).hexdigest()
+    return f"{project_id or 'global'}:{model_id}:{provider}:{qhash}"
+
+
+def _sem_cache_get(key: str, query_emb: list):
+    """Return cached entry if similarity >= threshold and fresh, else None."""
+    with _sem_cache_lock:
+        entry = _semantic_cache.get(key)
+        if entry:
+            sim = _semantic_cosine_sim(query_emb, entry.get("embedding", []))
+            age = _time.time() - entry.get("_ts", 0)
+            if sim >= _SEM_SIM_THRESHOLD and age < _SEM_CACHE_TTL:
+                print(f"✅ Semantic cache HIT sim={sim:.3f} age={age:.0f}s — skipping LLM call")
+                return entry
+            elif sim < _SEM_SIM_THRESHOLD:
+                print(f"🔄 Semantic cache SKIP sim={sim:.3f} < {_SEM_SIM_THRESHOLD}")
+        return None
+
+
+def _sem_cache_set(key: str, query_emb: list, response_text: str, tokens: int, model_used: str):
+    entry = {"embedding": query_emb, "response": response_text, "tokens_used": tokens, "model_used": model_used, "_ts": _time.time()}
+    with _sem_cache_lock:
+        if len(_semantic_cache) >= _SEM_CACHE_MAX:
+            oldest = min(_semantic_cache, key=lambda k: _semantic_cache[k].get("_ts", 0))
+            del _semantic_cache[oldest]
+        _semantic_cache[key] = entry
+
 
 def _rag_cache_key(project_id: Optional[str], query: str, top_k: int) -> str:
     """Stable cache key: project_id:md5(query):top_k."""
@@ -308,6 +429,7 @@ class ChatRequest(BaseModel):
     project_id: Optional[str] = None  # Add support for project-specific context
     model_id: Optional[str] = None
     provider: Optional[str] = None
+    include_web_search: bool = False  # Enable real-time web search for this request
 
 
 class ChatResponse(BaseModel):
@@ -1174,6 +1296,31 @@ async def _detect_conflicts_simple(request: ConflictDetectionRequest) -> Conflic
             confidence="medium"
         ))
 
+    # Write conflicts to JSON file for LLM context consumption
+    if request.project_id is not None:
+        _conflict_dir = "/tmp/conflicts"
+        os.makedirs(_conflict_dir, exist_ok=True)
+        _conflict_path = os.path.join(_conflict_dir, f"{request.project_id}.json")
+        try:
+            with open(_conflict_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "project_id": request.project_id,
+                    "generated_at": _datetime.now().isoformat(),
+                    "conflicts": [
+                        {
+                            "requirement_id_1": c.requirement_id_1,
+                            "requirement_id_2": c.requirement_id_2,
+                            "conflict_description": c.conflict_description,
+                            "severity": c.severity,
+                            "confidence": c.confidence,
+                        }
+                        for c in conflicts
+                    ],
+                }, f, indent=2, ensure_ascii=False)
+            print(f"✅ Conflicts written to {_conflict_path}")
+        except Exception as e:
+            print(f"⚠️  Failed to write conflicts JSON: {e}")
+
     return ConflictDetectionResponse(
         conflicts=conflicts,
         total_conflicts=len(conflicts),
@@ -1266,7 +1413,32 @@ async def _detect_conflicts_semantic(request: ConflictDetectionRequest) -> Confl
                 all_conflicts.extend(conflicts)
     
     print(f"✅ Found {len(all_conflicts)} conflicts")
-    
+
+    # Write conflicts to JSON file for LLM context consumption
+    if request.project_id is not None:
+        _conflict_dir = "/tmp/conflicts"
+        os.makedirs(_conflict_dir, exist_ok=True)
+        _conflict_path = os.path.join(_conflict_dir, f"{request.project_id}.json")
+        try:
+            with open(_conflict_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "project_id": request.project_id,
+                    "generated_at": _datetime.now().isoformat(),
+                    "conflicts": [
+                        {
+                            "requirement_id_1": c.requirement_id_1,
+                            "requirement_id_2": c.requirement_id_2,
+                            "conflict_description": c.conflict_description,
+                            "severity": c.severity,
+                            "confidence": c.confidence,
+                        }
+                        for c in all_conflicts
+                    ],
+                }, f, indent=2, ensure_ascii=False)
+            print(f"✅ Conflicts written to {_conflict_path}")
+        except Exception as e:
+            print(f"⚠️  Failed to write conflicts JSON: {e}")
+
     return ConflictDetectionResponse(
         conflicts=all_conflicts,
         total_conflicts=len(all_conflicts),
@@ -1622,6 +1794,34 @@ async def chat(request: ChatRequest):
         # Add current message
         messages.append({"role": "user", "content": request.message})
 
+        # ---- Web search: inject real-time results if enabled and triggered ----
+        web_search_context = None
+        if (
+            WEB_SEARCH_AVAILABLE
+            and run_web_search is not None
+            and request.include_web_search
+            and should_web_search(request.message)
+        ):
+            try:
+                print(f"🌐 Web search triggered for: {request.message[:80]}")
+                search_results = await run_web_search(request.message, top_k=5)
+                if search_results:
+                    web_search_context = format_search_results(request.message, search_results)
+                    messages.append({"role": "system", "content": web_search_context})
+                    print(f"✅ Web search: {len(search_results)} results injected")
+            except Exception as ws_err:
+                print(f"⚠️ Web search failed (non-critical): {ws_err}")
+
+        # ---- Conflict context: inject unresolved conflicts if in project mode ----
+        if request.project_id:
+            try:
+                conflict_ctx = get_conflict_context(request.project_id, top_k=5)
+                if conflict_ctx:
+                    messages.append({"role": "system", "content": conflict_ctx})
+                    print(f"⚠️  Injected conflict context for project {request.project_id}")
+            except Exception as cf_err:
+                print(f"⚠️ Conflict context injection failed (non-critical): {cf_err}")
+
         # RAG decision: decide whether to enrich with retrieved context
         rag_system_msg = None
 
@@ -1713,14 +1913,44 @@ async def chat(request: ChatRequest):
             print(f"Global RAG logic error: {e}")
             # Continue without RAG
 
-        # Call LLM
-        response_text, tokens_used, model_used, fallback_used = call_llm_chat(
-            messages,
-            model_id=request.model_id or DEFAULT_MODEL_ID,
-            provider=request.provider or DEFAULT_PROVIDER,
-            max_tokens=2000,
-            temperature=0.7
-        )
+        # ---- Semantic LLM response cache: skip LLM call if semantically similar response cached ----
+        _resolved_model = request.model_id or DEFAULT_MODEL_ID
+        _resolved_provider = request.provider or DEFAULT_PROVIDER
+        _embed_text = f"{request.project_id or ''}|{request.message}"
+        _sem_emb = _get_embed_for_sem_cache(_embed_text)
+        _sem_key = _sem_cache_key(request.project_id, request.message, _resolved_model, _resolved_provider)
+
+        _cached = _sem_cache_get(_sem_key, _sem_emb or []) if _sem_emb else None
+        fallback_used = False
+
+        if _cached:
+            # Cache hit — return immediately, skip LLM call entirely
+            _cached_resp = _cached["response"]
+            _cached_tokens = _cached["tokens_used"]
+            _cached_model = _cached["model_used"]
+            print(f"⚡ Semantic cache HIT sim={_SEM_SIM_THRESHOLD}+ — responding from cache")
+        else:
+            _cached_resp = None
+            _cached_tokens = None
+            _cached_model = None
+            # Call LLM
+            _raw_resp = call_llm_chat(
+                messages,
+                model_id=_resolved_model,
+                provider=_resolved_provider,
+                max_tokens=2000,
+                temperature=0.7,
+            )
+            _cached_resp, _cached_tokens, _cached_model, _fallback_flag = _raw_resp
+            fallback_used = _fallback_flag
+
+            # Cache the LLM response (save even on fallback)
+            if _sem_emb and _cached_resp:
+                _sem_cache_set(_sem_key, _sem_emb, _cached_resp, _cached_tokens, _cached_model)
+
+        response_text = _cached_resp
+        tokens_used = _cached_tokens
+        model_used = _cached_model
 
         # ---- Save exchange to memory (non-blocking; failures must not break chat) ----
         try:
@@ -2483,7 +2713,7 @@ async def generate_story_graph(request: StoryGraphRequest):
 
 class AgentExecuteRequest(BaseModel):
     task: str
-    project_id: Optional[int] = None
+    project_id: Optional[str] = None
     model: Optional[str] = None
     tools: Optional[List[str]] = None
 
@@ -2530,6 +2760,28 @@ async def agent_execute(request: AgentExecuteRequest):
                 {"role": "user", "content": request.task},
             ]
 
+            # Add web search support for agent execution
+            if WEB_SEARCH_AVAILABLE and should_web_search(request.task):
+                try:
+                    from tools.web_search import get_orchestrator
+                    orch = get_orchestrator()
+                    results = orch.search(request.task, top_k=5)
+                    if results:
+                        from tools.web_search import format_search_results
+                        ws_ctx = format_search_results(request.task, results)
+                        messages.append({"role": "system", "content": ws_ctx})
+                except Exception as ws_err:
+                    print(f"⚠️ Agent web search failed: {ws_err}")
+
+            # Add conflict context if project_id provided
+            if request.project_id:
+                try:
+                    conflict_ctx = get_conflict_context(str(request.project_id), top_k=5)
+                    if conflict_ctx:
+                        messages.append({"role": "system", "content": conflict_ctx})
+                except Exception as cf_err:
+                    print(f"⚠️ Agent conflict context failed: {cf_err}")
+
             # Load project context if project_id provided
             project_context = ""
             if request.project_id:
@@ -2537,10 +2789,10 @@ async def agent_execute(request: AgentExecuteRequest):
                 try:
                     from build_faiss import build_index_for_project
                     import os as _os
-                    p_dir = _os.path.join(KB_BASE_DIR, str(request.project_id))
-                    p_index = _os.path.join(p_dir, "index.faiss")
-                    p_meta = _os.path.join(p_dir, "meta.pkl")
-                    if _os.path.exists(p_index) and _os.path.exists(p_meta):
+                    p_dir = os.path.join(KB_BASE_DIR, str(request.project_id))
+                    p_index = os.path.join(p_dir, "index.faiss")
+                    p_meta = os.path.join(p_dir, "meta.pkl")
+                    if os.path.exists(p_index) and os.path.exists(p_meta):
                         yield f"data: {json.dumps({'type': 'status', 'status': 'using_rag', 'project_id': request.project_id})}\n\n"
                 except Exception as e:
                     print(f"Agent project context load error: {e}")

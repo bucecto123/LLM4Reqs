@@ -6,15 +6,14 @@ services:
       - ./llm/.env
     ports:
       - "8000:8000"
-    volumes:
-      - ./llm:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    # Production mode: no source bind mount, no --reload
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/ || exit 1"]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 60s
 
   backend:
     build:
@@ -23,7 +22,7 @@ services:
       - ./backend/.env
     environment:
       DB_CONNECTION: sqlite
-      DB_DATABASE: /var/db/database.sqlite
+      DB_DATABASE: /var/www/html/database/database.sqlite
       LLM_SERVICE_URL: http://llm:8000
       REVERB_SERVER_HOST: 0.0.0.0
       REVERB_SERVER_PORT: 8081
@@ -36,31 +35,31 @@ services:
       REVERB_APP_KEY: llm4reqs-reverb-key
       REVERB_APP_ID: llm4reqs
       BROADCAST_CONNECTION: reverb
-      APP_URL: http://localhost:8001
+      APP_URL: http://backend
       SESSION_DRIVER: file
       CACHE_STORE: file
-      QUEUE_CONNECTION: sync
+      QUEUE_CONNECTION: database
     ports:
-      - "8001:8001"
+      - "8001:80"
     volumes:
-      - ./backend:/var/www/html
-      - sqlite_data:/var/db
+      - sqlite_data:/var/www/html/database
     depends_on:
       llm:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8001/api/health || wget -qO- http://localhost:8001/api/health"]
+      test: ["CMD-SHELL", "curl -sf http://localhost/api/health || exit 1"]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
       retries: 3
-      start_period: 15s
+      start_period: 20s
     command: >
-      sh -c "chmod 777 /var/db &&
-             touch /var/db/database.sqlite &&
-             chmod 666 /var/db/database.sqlite &&
+      sh -c "mkdir -p /var/www/html/database &&
+             touch /var/www/html/database/database.sqlite &&
+             chmod 666 /var/www/html/database/database.sqlite &&
              php artisan migrate --force &&
-             chmod 666 /var/db/database.sqlite &&
-             php -d memory_limit=512M -d upload_max_filesize=20M -d post_max_size=25M artisan serve --host 0.0.0.0 --port=8001 --no-reload"
+             chmod 666 /var/www/html/database/database.sqlite &&
+             php-fpm -D &&
+             nginx -g 'daemon off;'"
 
   reverb:
     build:
@@ -69,23 +68,22 @@ services:
       - ./backend/.env
     environment:
       DB_CONNECTION: sqlite
-      DB_DATABASE: /var/db/database.sqlite
+      DB_DATABASE: /var/www/html/database/database.sqlite
       LLM_SERVICE_URL: http://llm:8000
       REVERB_SERVER_HOST: 0.0.0.0
       REVERB_SERVER_PORT: 8081
-      # REVERB_HOST advertises this service's address to connected clients.
-      # Must be "reverb" so backend and frontend reach it via Docker DNS.
       REVERB_HOST: reverb
       REVERB_PORT: 8081
       REVERB_SCHEME: http
       REVERB_APP_KEY: llm4reqs-reverb-key
       REVERB_APP_ID: llm4reqs
-      APP_URL: http://localhost:8001
+      APP_URL: http://backend
+      BROADCAST_CONNECTION: reverb
+      QUEUE_CONNECTION: database
     ports:
       - "8081:8081"
     volumes:
-      - ./backend:/var/www/html
-      - sqlite_data:/var/db
+      - sqlite_data:/var/www/html/database
     depends_on:
       - backend
     command: php artisan reverb:start --hostname=0.0.0.0
@@ -97,7 +95,7 @@ services:
       - ./backend/.env
     environment:
       DB_CONNECTION: sqlite
-      DB_DATABASE: /var/db/database.sqlite
+      DB_DATABASE: /var/www/html/database/database.sqlite
       CACHE_STORE: file
       LLM_SERVICE_URL: http://llm:8000
       REVERB_SERVER_HOST: 0.0.0.0
@@ -105,35 +103,32 @@ services:
       REVERB_HOST: reverb
       REVERB_PORT: 8081
       REVERB_SCHEME: http
-      APP_URL: http://localhost:8001
+      REVERB_APP_KEY: llm4reqs-reverb-key
+      REVERB_APP_ID: llm4reqs
+      APP_URL: http://backend
+      BROADCAST_CONNECTION: reverb
     volumes:
-      - ./backend:/var/www/html
-      - sqlite_data:/var/db
+      - sqlite_data:/var/www/html/database
     depends_on:
       - backend
-    command: sleep infinity
+    command: php artisan queue:work --tries=3 --sleep=1 --max-time=3600
 
   frontend:
     build:
       context: ./frontend
       args:
-        # In Docker, the Reverb service is accessed via the 'reverb' hostname,
-        # not 'localhost'. Override with --build-arg for local dev builds.
-        VITE_REVERB_HOST: reverb
+        # Build-time vars baked into the bundle via nginx/Vite multi-stage build.
+        # Must match backend's REVERB_APP_KEY (set via docker-compose environment overrides).
+        VITE_API_BASE: http://backend:80
+        VITE_REVERB_HOST: localhost
         VITE_REVERB_PORT: "8081"
         VITE_REVERB_SCHEME: http
-    env_file:
-      - ./frontend/.env
-    environment:
-      CHOKIDAR_USEPOLLING: "true"
+        VITE_REVERB_APP_KEY: llm4reqs-reverb-key
     ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - "5173:80"
     depends_on:
       - backend
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+      - reverb
 
 volumes:
   sqlite_data:

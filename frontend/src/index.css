@@ -29,4 +29,57 @@
   .animate-fade-in {
     animation: fadeIn 0.6s ease-out forwards;
   }
+
+  /* Shimmer animation */
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .animate-shimmer {
+    background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  /* Toast slide-in */
+  @keyframes toastSlideIn {
+    from { transform: translateX(110%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  /* Thinking indicator animations */
+  @keyframes fishWiggle {
+    0%, 100% { transform: rotate(-5deg) translateY(0); }
+    50% { transform: rotate(5deg) translateY(-3px); }
+  }
+  @keyframes bubbleFloat {
+    0% { transform: translateY(0); opacity: .6; }
+    100% { transform: translateY(-8px); opacity: 0; }
+  }
+  @keyframes thinkingBounce {
+    0%, 100% { transform: scaleY(0.6); }
+    50% { transform: scaleY(1.2); }
+  }
+  @keyframes waveOscillate {
+    0%, 100% { height: 4px; }
+    50% { height: 10px; }
+  }
+}
+
+/* Performance: GPU acceleration for animated elements */
+.animate-in,
+.animate-shimmer,
+.animate-fade,
+.message-bubble-enter {
+  will-change: transform, opacity;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  .animate-shimmer,
+  .animate-pulse,
+  .animate-bounce {
+    animation: none !important;
+    transition: none !important;
+  }
 }

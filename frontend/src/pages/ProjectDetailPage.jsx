@@ -40,6 +40,8 @@ import InviteForm from "../components/InviteForm.jsx";
 import { canEdit } from "../services/sharingService";
 import echo from "../utils/echo.js";
 import ModelSelector from "../components/dashboard/ModelSelector.jsx";
+import ProjectDashboardCard from "../components/ProjectDashboardCard.jsx";
+import ActivityFeed from "../components/ActivityFeed.jsx";
 
 import {
   ProjectDetailSkeleton,
@@ -264,6 +266,13 @@ export default function ProjectDetailPage() {
   // Model state
   const [models, setModels] = useState([]);
   const [selectedModelId, setSelectedModelId] = useState(null);
+  const [dashboard, setDashboard] = useState(null);
+  const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
+
+  // Activity Feed state
+  const [activities, setActivities] = useState([]);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+
   const isLoadingModelsRef = useRef(false);
 
   // PERFORMANCE: Track which conversations have had their messages loaded this session
@@ -275,6 +284,7 @@ export default function ProjectDetailPage() {
   const isGraphTabInitializedRef = useRef(false);
 
   // Load available models
+  const loadModels = async () => {
     if (isLoadingModelsRef.current) return;
     isLoadingModelsRef.current = true;
     try {
@@ -519,6 +529,27 @@ export default function ProjectDetailPage() {
     }
   }, [activeTab, projectId]);
 
+  // Load activity feed when switching to activity tab
+  useEffect(() => {
+    if (activeTab === "activity" && projectId) {
+      loadActivities();
+    }
+  }, [activeTab, projectId]);
+
+  // Load project dashboard metrics
+  const refreshDashboard = useCallback(() => {
+    if (!projectId) return;
+    setIsLoadingDashboard(true);
+    apiFetch(`/api/projects/${projectId}/dashboard`)
+      .then(setDashboard)
+      .catch(() => setDashboard(null))
+      .finally(() => setIsLoadingDashboard(false));
+  }, [projectId]);
+
+  useEffect(() => {
+    refreshDashboard();
+  }, [refreshDashboard]);
+
   // Auto-scroll effect
   useEffect(() => {
     if (messagesEndRef.current && !isUserScrolling) {
@@ -665,6 +696,19 @@ export default function ProjectDetailPage() {
       console.error("Failed to load collaborators:", err);
     } finally {
       setIsLoadingCollaborators(false);
+    }
+  };
+
+  const loadActivities = async () => {
+    if (!projectId) return;
+    setIsLoadingActivities(true);
+    try {
+      const data = await apiFetch(`/api/projects/${projectId}/activity?per_page=20`);
+      setActivities(data.data || []);
+    } catch {
+      setActivities([]);
+    } finally {
+      setIsLoadingActivities(false);
     }
   };
 
@@ -1480,6 +1524,9 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
+        {/* Dashboard */}
+        <ProjectDashboardCard dashboard={dashboard} isLoading={isLoadingDashboard} />
+
         {/* Tabs */}
         <div className="border-b border-gray-200 bg-white px-6">
           <div className="flex space-x-8">
@@ -1522,6 +1569,19 @@ export default function ProjectDetailPage() {
               <div className="flex items-center space-x-2">
                 <Users size={18} />
                 <span>Sharing</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab("activity")}
+              className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === "activity"
+                  ? "border-blue-600 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <Eye size={18} />
+                <span>Activity</span>
               </div>
             </button>
             <button
@@ -1955,7 +2015,8 @@ export default function ProjectDetailPage() {
                     await import("../services/sharingService");
                   try {
                     await addCollaborator(projectId, data);
-                    // Reload collaborators (when API ready)
+                    // Reload collaborators so the new member appears immediately
+                    await loadCollaborators();
                     alert(`Invited ${data.email} as ${data.role}`);
                   } catch (err) {
                     const errorMessage =
@@ -1985,6 +2046,7 @@ export default function ProjectDetailPage() {
                       await import("../services/sharingService");
                     try {
                       await updateCollaboratorRole(projectId, userId, newRole);
+                      await loadCollaborators();
                       alert(`Role updated to ${newRole}`);
                     } catch (err) {
                       alert("Failed to update role: " + err.message);
@@ -2000,6 +2062,7 @@ export default function ProjectDetailPage() {
                       await import("../services/sharingService");
                     try {
                       await removeCollaborator(projectId, userId);
+                      await loadCollaborators();
                       alert(`${memberName} removed`);
                     } catch (err) {
                       alert("Failed to remove member: " + err.message);
@@ -2007,6 +2070,13 @@ export default function ProjectDetailPage() {
                   }}
                 />
               </div>
+            </div>
+          )}
+
+          {activeTab === "activity" && (
+            <div className="p-4">
+              <h2 className="text-lg font-semibold mb-4 text-slate-800">Activity Feed</h2>
+              <ActivityFeed activities={activities} isLoading={isLoadingActivities} />
             </div>
           )}
 
@@ -2103,6 +2173,7 @@ export default function ProjectDetailPage() {
           onUpload={handleKBUpload}
           projectId={projectId}
           projectName={project.name}
+          onBuildComplete={refreshDashboard}
         />
       )}
 

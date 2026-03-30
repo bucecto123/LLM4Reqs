@@ -29,27 +29,52 @@ class LLMService
     }
 
     /**
+     * Time an HTTP call and log duration for both success and failure paths.
+     * Throws on any non-2xx status (including 404) so callers handle it explicitly.
+     *
+     * @param  string        $methodName  e.g. "extractRequirements" used as log context
+     * @param  string        $endpoint    e.g. "/api/extract"
+     * @param  callable      $requestFn  must return an Illuminate\Http\Client\Response
+     * @return array                     decoded JSON on 2xx
+     * @throws \Exception                rethrows on failure (timing is still logged)
+     */
+    private function timedRequest(string $methodName, string $endpoint, callable $requestFn): array
+    {
+        $start = microtime(true);
+        $response = $requestFn();
+        $duration = round((microtime(true) - $start) * 1000, 2);
+
+        if ($response->successful()) {
+            Log::info("LLMService::{$methodName}", [
+                'endpoint' => $endpoint,
+                'duration_ms' => $duration,
+                'status' => $response->status(),
+            ]);
+            return $response->json();
+        }
+
+        Log::error("LLMService::{$methodName}", [
+            'endpoint' => $endpoint,
+            'duration_ms' => $duration,
+            'status' => $response->status(),
+            'error' => $response->body(),
+        ]);
+        throw new \Exception("HTTP {$response->status()}: {$response->body()}");
+    }
+
+    /**
      * Extract requirements from text
      */
     public function extractRequirements(string $text, string $documentType = 'meeting_notes'): array
     {
-        try {
-            $response = Http::withHeaders($this->getHeaders())
+        return $this->timedRequest('extractRequirements', "{$this->baseUrl}/api/extract", function () use ($text, $documentType) {
+            return Http::withHeaders($this->getHeaders())
                 ->timeout(90)
                 ->post("{$this->baseUrl}/api/extract", [
                     'text' => $text,
                     'document_type' => $documentType,
                 ]);
-
-            if ($response->successful()) {
-                return $response->json();
-            }
-
-            throw new \Exception('LLM API failed: ' . $response->body());
-        } catch (\Exception $e) {
-            Log::error('LLM extraction failed', ['error' => $e->getMessage()]);
-            throw $e;
-        }
+        });
     }
 
     /**
@@ -57,54 +82,41 @@ class LLMService
      */
     public function chat(string $message, array $history = [], ?string $context = null, ?array $personaData = null, ?int $projectId = null): array
     {
-        try {
-            $payload = [
-                'message' => $message,
-                'conversation_history' => $history,
-                'context' => $context,
-            ];
+        $payload = [
+            'message' => $message,
+            'conversation_history' => $history,
+            'context' => $context,
+        ];
 
-            // Extract model_id and provider from history or personaData if present
-            $modelId = $history['model_id'] ?? $personaData['model_id'] ?? null;
-            $provider = $history['provider'] ?? $personaData['provider'] ?? null;
-            if ($modelId) {
-                $payload['model_id'] = $modelId;
-                // Remove from history if it was passed there
-                if (isset($history['model_id'])) {
-                    unset($history['model_id']);
-                    $payload['conversation_history'] = array_values($history); // Re-index array
-                }
+        $modelId = $history['model_id'] ?? $personaData['model_id'] ?? null;
+        $provider = $history['provider'] ?? $personaData['provider'] ?? null;
+        if ($modelId) {
+            $payload['model_id'] = $modelId;
+            if (isset($history['model_id'])) {
+                unset($history['model_id']);
+                $payload['conversation_history'] = array_values($history);
             }
-            if ($provider) {
-                $payload['provider'] = $provider;
-                // Remove from history if it was passed there
-                if (isset($history['provider'])) {
-                    unset($history['provider']);
-                    $payload['conversation_history'] = array_values($history); // Re-index array
-                }
-            }
-            
-            if ($projectId) {
-                $payload['project_id'] = (string)$projectId;
-            }
-            
-            // Add persona data if provided
-            if ($personaData) {
-                $payload['persona_id'] = $personaData['id'] ?? null;
-                $payload['persona_data'] = $personaData;
-            }
-            
-            $response = Http::timeout(60)->post("{$this->baseUrl}/api/chat", $payload);
-
-            if ($response->successful()) {
-                return $response->json();
-            }
-
-            throw new \Exception('LLM chat failed: ' . $response->body());
-        } catch (\Exception $e) {
-            Log::error('LLM chat failed', ['error' => $e->getMessage()]);
-            throw $e;
         }
+        if ($provider) {
+            $payload['provider'] = $provider;
+            if (isset($history['provider'])) {
+                unset($history['provider']);
+                $payload['conversation_history'] = array_values($history);
+            }
+        }
+        if ($projectId) {
+            $payload['project_id'] = (string)$projectId;
+        }
+        if ($personaData) {
+            $payload['persona_id'] = $personaData['id'] ?? null;
+            $payload['persona_data'] = $personaData;
+        }
+
+        return $this->timedRequest('chat', "{$this->baseUrl}/api/chat", function () use ($payload) {
+            return Http::withHeaders($this->getHeaders())
+                ->timeout(60)
+                ->post("{$this->baseUrl}/api/chat", $payload);
+        });
     }
 
     /**
@@ -112,70 +124,55 @@ class LLMService
      * Callback receives complete response in one chunk for instant display
      */
     public function chatStream(
-        string $message, 
-        array $history = [], 
-        ?string $context = null, 
+        string $message,
+        array $history = [],
+        ?string $context = null,
         ?array $personaData = null,
         ?callable $onChunk = null,
         ?int $projectId = null
     ): array {
-        try {
-            $payload = [
-                'message' => $message,
-                'conversation_history' => $history,
-                'context' => $context,
-            ];
-            
-            // Extract model_id and provider from history or personaData if present
-            $modelId = $history['model_id'] ?? $personaData['model_id'] ?? null;
-            $provider = $history['provider'] ?? $personaData['provider'] ?? null;
-            if ($modelId) {
-                $payload['model_id'] = $modelId;
-                // Remove from history if it was passed there
-                if (isset($history['model_id'])) {
-                    unset($history['model_id']);
-                    $payload['conversation_history'] = array_values($history);
-                }
-            }
-            if ($provider) {
-                $payload['provider'] = $provider;
-                // Remove from history if it was passed there
-                if (isset($history['provider'])) {
-                    unset($history['provider']);
-                    $payload['conversation_history'] = array_values($history);
-                }
-            }
+        $payload = [
+            'message' => $message,
+            'conversation_history' => $history,
+            'context' => $context,
+        ];
 
-            if ($projectId) {
-                $payload['project_id'] = (string)$projectId;
+        $modelId = $history['model_id'] ?? $personaData['model_id'] ?? null;
+        $provider = $history['provider'] ?? $personaData['provider'] ?? null;
+        if ($modelId) {
+            $payload['model_id'] = $modelId;
+            if (isset($history['model_id'])) {
+                unset($history['model_id']);
+                $payload['conversation_history'] = array_values($history);
             }
-            
-            // Add persona data if provided
-            if ($personaData) {
-                $payload['persona_id'] = $personaData['id'] ?? null;
-                $payload['persona_data'] = $personaData;
-            }
-            
-            // Get full response from LLM
-            $response = Http::timeout(120)->post("{$this->baseUrl}/api/chat", $payload);
-
-            if ($response->successful()) {
-                $data = $response->json();
-                $fullResponse = $data['response'] ?? '';
-                
-                // Send complete response in one chunk for instant display
-                if ($onChunk && !empty($fullResponse)) {
-                    $onChunk($fullResponse);
-                }
-                
-                return $data;
-            }
-
-            throw new \Exception('LLM chat stream failed: ' . $response->body());
-        } catch (\Exception $e) {
-            Log::error('LLM chat stream failed', ['error' => $e->getMessage()]);
-            throw $e;
         }
+        if ($provider) {
+            $payload['provider'] = $provider;
+            if (isset($history['provider'])) {
+                unset($history['provider']);
+                $payload['conversation_history'] = array_values($history);
+            }
+        }
+        if ($projectId) {
+            $payload['project_id'] = (string)$projectId;
+        }
+        if ($personaData) {
+            $payload['persona_id'] = $personaData['id'] ?? null;
+            $payload['persona_data'] = $personaData;
+        }
+
+        $data = $this->timedRequest('chatStream', "{$this->baseUrl}/api/chat", function () use ($payload) {
+            return Http::withHeaders($this->getHeaders())
+                ->timeout(120)
+                ->post("{$this->baseUrl}/api/chat", $payload);
+        });
+
+        // Deliver complete response in one chunk for instant display
+        if ($onChunk && !empty($data['response'])) {
+            $onChunk($data['response']);
+        }
+
+        return $data;
     }
 
     /**
@@ -183,22 +180,13 @@ class LLMService
      */
     public function generatePersonaView(string $requirementText, string $personaName, string $personaPrompt): array
     {
-        try {
-            $response = Http::timeout(60)->post("{$this->baseUrl}/api/persona/generate", [
+        return $this->timedRequest('generatePersonaView', "{$this->baseUrl}/api/persona/generate", function () use ($requirementText, $personaName, $personaPrompt) {
+            return Http::timeout(60)->post("{$this->baseUrl}/api/persona/generate", [
                 'requirement_text' => $requirementText,
                 'persona_name' => $personaName,
                 'persona_prompt' => $personaPrompt,
             ]);
-
-            if ($response->successful()) {
-                return $response->json();
-            }
-
-            throw new \Exception('Persona generation failed');
-        } catch (\Exception $e) {
-            Log::error('Persona generation failed', ['error' => $e->getMessage()]);
-            throw $e;
-        }
+        });
     }
 
     /**
@@ -207,8 +195,10 @@ class LLMService
     public function testConnection(): bool
     {
         try {
-            $response = Http::timeout(10)->get("{$this->baseUrl}/health");
-            return $response->successful();
+            $this->timedRequest('testConnection', "{$this->baseUrl}/health", function () {
+                return Http::timeout(10)->get("{$this->baseUrl}/health");
+            });
+            return true;
         } catch (\Exception $e) {
             return false;
         }
@@ -226,24 +216,15 @@ class LLMService
      */
     public function buildKnowledgeBase(int $projectId, array $documents, string $mode = 'async'): array
     {
-        try {
-            $response = Http::withHeaders($this->getHeaders())
+        return $this->timedRequest('buildKnowledgeBase', "{$this->baseUrl}/kb/build", function () use ($projectId, $documents, $mode) {
+            return Http::withHeaders($this->getHeaders())
                 ->timeout(120)
                 ->post("{$this->baseUrl}/kb/build", [
                     'project_id' => (string) $projectId,
                     'documents' => $documents,
                     'mode' => $mode,
                 ]);
-
-            if ($response->successful()) {
-                return $response->json();
-            }
-
-            throw new \Exception('LLM KB build failed: ' . $response->body());
-        } catch (\Exception $e) {
-            Log::error('LLM KB build failed', ['error' => $e->getMessage()]);
-            throw $e;
-        }
+        });
     }
 
     /**
@@ -258,20 +239,18 @@ class LLMService
     public function queryKB(int $projectId, string $query, int $topK = 5): array
     {
         try {
-            $response = Http::withHeaders($this->getHeaders())
-                ->timeout(30)
-                ->post("{$this->baseUrl}/kb/query", [
-                    'project_id' => (string) $projectId,
-                    'query' => $query,
-                    'top_k' => $topK,
-                ]);
-
-            if ($response->successful()) {
-                return $response->json();
-            }
-
-            // If KB not found, return empty results
-            if ($response->status() === 404) {
+            return $this->timedRequest('queryKB', "{$this->baseUrl}/kb/query", function () use ($projectId, $query, $topK) {
+                return Http::withHeaders($this->getHeaders())
+                    ->timeout(30)
+                    ->post("{$this->baseUrl}/kb/query", [
+                        'project_id' => (string) $projectId,
+                        'query' => $query,
+                        'top_k' => $topK,
+                    ]);
+            });
+        } catch (\Exception $e) {
+            // 404 = KB not built yet — return empty results gracefully
+            if (str_contains($e->getMessage(), '404')) {
                 return [
                     'project_id' => (string) $projectId,
                     'query' => $query,
@@ -280,10 +259,6 @@ class LLMService
                     'total_results' => 0,
                 ];
             }
-
-            throw new \Exception('LLM KB query failed: ' . $response->body());
-        } catch (\Exception $e) {
-            Log::error('LLM KB query failed', ['error' => $e->getMessage()]);
             throw $e;
         }
     }
@@ -297,20 +272,11 @@ class LLMService
      */
     public function getKBStatus(int $projectId): array
     {
-        try {
-            $response = Http::withHeaders($this->getHeaders())
+        return $this->timedRequest('getKBStatus', "{$this->baseUrl}/kb/status/{$projectId}", function () use ($projectId) {
+            return Http::withHeaders($this->getHeaders())
                 ->timeout(10)
                 ->get("{$this->baseUrl}/kb/status/{$projectId}");
-
-            if ($response->successful()) {
-                return $response->json();
-            }
-
-            throw new \Exception('LLM KB status check failed: ' . $response->body());
-        } catch (\Exception $e) {
-            Log::error('LLM KB status check failed', ['error' => $e->getMessage()]);
-            throw $e;
-        }
+        });
     }
 
     /**
@@ -323,29 +289,18 @@ class LLMService
      */
     public function incrementalKBUpdate(int $projectId, array $documents): array
     {
-        try {
-            $response = Http::withHeaders($this->getHeaders())
+        return $this->timedRequest('incrementalKBUpdate', "{$this->baseUrl}/kb/incremental", function () use ($projectId, $documents) {
+            return Http::withHeaders($this->getHeaders())
                 ->timeout(60)
                 ->post("{$this->baseUrl}/kb/incremental", [
                     'project_id' => (string) $projectId,
                     'documents' => $documents,
                 ]);
-
-            if ($response->successful()) {
-                return $response->json();
-            }
-
-            throw new \Exception('LLM KB incremental update failed: ' . $response->body());
-        } catch (\Exception $e) {
-            Log::error('LLM KB incremental update failed', ['error' => $e->getMessage()]);
-            throw $e;
-        }
+        });
     }
 
     /**
      * Remove documents from the KB for a project.
-     * The LLM backend should accept a payload with filters or explicit document identifiers.
-     * Example payload: ['project_id' => '1', 'filters' => ['meta_conflict_ids' => ['123']]]
      *
      * @param int $projectId
      * @param array $filters
@@ -354,26 +309,14 @@ class LLMService
      */
     public function removeFromKB(int $projectId, array $filters): array
     {
-        try {
-            $payload = [
-                'project_id' => (string) $projectId,
-                'filters' => $filters,
-            ];
-
-            $response = Http::withHeaders($this->getHeaders())
+        return $this->timedRequest('removeFromKB', "{$this->baseUrl}/kb/remove", function () use ($projectId, $filters) {
+            return Http::withHeaders($this->getHeaders())
                 ->timeout(30)
-                ->post("{$this->baseUrl}/kb/remove", $payload);
-
-            if ($response->successful()) {
-                return $response->json();
-            }
-
-            // If endpoint not implemented on LLM side, log and return error array
-            throw new \Exception('LLM KB remove failed: ' . $response->body());
-        } catch (\Exception $e) {
-            Log::error('LLM KB remove failed', ['error' => $e->getMessage(), 'project_id' => $projectId, 'filters' => $filters]);
-            throw $e;
-        }
+                ->post("{$this->baseUrl}/kb/remove", [
+                    'project_id' => (string) $projectId,
+                    'filters' => $filters,
+                ]);
+        });
     }
 
     /**
@@ -385,20 +328,11 @@ class LLMService
      */
     public function getJobStatus(string $jobId): array
     {
-        try {
-            $response = Http::withHeaders($this->getHeaders())
+        return $this->timedRequest('getJobStatus', "{$this->baseUrl}/kb/job/{$jobId}", function () use ($jobId) {
+            return Http::withHeaders($this->getHeaders())
                 ->timeout(10)
                 ->get("{$this->baseUrl}/kb/job/{$jobId}");
-
-            if ($response->successful()) {
-                return $response->json();
-            }
-
-            throw new \Exception('LLM job status check failed: ' . $response->body());
-        } catch (\Exception $e) {
-            Log::error('LLM job status check failed', ['error' => $e->getMessage()]);
-            throw $e;
-        }
+        });
     }
 
     /**
@@ -409,18 +343,13 @@ class LLMService
     public function syncModels(): array
     {
         try {
-            // Call Python service to get models
-            $response = Http::withHeaders($this->getHeaders())
-                ->timeout(30)
-                ->get("{$this->baseUrl}/models");
+            $models = $this->timedRequest('syncModels', "{$this->baseUrl}/models", function () {
+                return Http::withHeaders($this->getHeaders())
+                    ->timeout(30)
+                    ->get("{$this->baseUrl}/models");
+            });
 
-            if (!$response->successful()) {
-                throw new \Exception('Failed to fetch models from LLM service: ' . $response->body());
-            }
-
-            $models = $response->json(); 
             $synced = [];
-
             foreach ($models as $modelData) {
                 $model = LLMModel::updateOrCreate(
                     ['model_id' => $modelData['model_id']],
@@ -431,10 +360,10 @@ class LLMService
                         'context_window' => $modelData['context_window'] ?? null,
                         'input_price' => $modelData['input_price'] ?? null,
                         'output_price' => $modelData['output_price'] ?? null,
-                        'supports_tools' => $modelData['supports_tools'] ?? null, 
+                        'supports_tools' => $modelData['supports_tools'] ?? null,
                     ]
                 );
-                
+
                 if (is_null($model->supports_tools)) {
                     $this->checkToolCapability($model);
                 }
@@ -443,7 +372,6 @@ class LLMService
             }
 
             return ['synced_count' => count($synced), 'models' => $synced];
-
         } catch (\Exception $e) {
             Log::error('Model sync failed', ['error' => $e->getMessage()]);
             return ['error' => $e->getMessage()];
@@ -456,18 +384,16 @@ class LLMService
     public function checkToolCapability(LLMModel $model): void
     {
         try {
-            $response = Http::withHeaders($this->getHeaders())
-                ->timeout(45)
-                ->post("{$this->baseUrl}/models/check-tools", [
-                    'model_id' => $model->model_id,
-                    'provider' => $model->provider,
-                ]);
-
-            if ($response->successful()) {
-                $result = $response->json();
-                $model->supports_tools = $result['supports_tools'] ?? false;
-                $model->save();
-            }
+            $result = $this->timedRequest('checkToolCapability', "{$this->baseUrl}/models/check-tools", function () use ($model) {
+                return Http::withHeaders($this->getHeaders())
+                    ->timeout(45)
+                    ->post("{$this->baseUrl}/models/check-tools", [
+                        'model_id' => $model->model_id,
+                        'provider' => $model->provider,
+                    ]);
+            });
+            $model->supports_tools = $result['supports_tools'] ?? false;
+            $model->save();
         } catch (\Exception $e) {
             Log::warning("Failed to check tool capability for {$model->model_id}", ['error' => $e->getMessage()]);
         }

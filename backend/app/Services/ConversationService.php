@@ -52,10 +52,12 @@ class ConversationService
 
     public function sendMessage($conversationId, $messageData)
     {
-        // Clean the incoming message content
-        if (isset($messageData['content'])) {
-            $messageData['content'] = $this->textCommons->cleanUtf8Content($messageData['content']);
-        }
+        $start = microtime(true);
+        try {
+            // Clean the incoming message content
+            if (isset($messageData['content'])) {
+                $messageData['content'] = $this->textCommons->cleanUtf8Content($messageData['content']);
+            }
 
         // Separate display message from AI context message
         $displayMessage = $messageData['content'];
@@ -304,6 +306,13 @@ class ConversationService
             'ai_message' => $aiMessage,
             'success' => true
         ];
+        } finally {
+            $duration = round((microtime(true) - $start) * 1000, 2);
+            Log::info('ConversationService::sendMessage', [
+                'conversation_id' => $conversationId,
+                'duration_ms' => $duration,
+            ]);
+        }
     }
 
     /**

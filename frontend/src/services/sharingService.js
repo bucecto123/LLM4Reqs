@@ -3,7 +3,7 @@
  * Management collaborators (members) of project
  */
 
-import { apiFetch } from '../utils/api';
+import { apiFetch } from '../utils/auth';
 
 /*List collaborators of project*/
 export async function getProjectCollaborators(projectId) {
@@ -18,17 +18,17 @@ export async function addCollaborator(projectId, { email, role = 'viewer' }) {
   });
 }
 
-/*Role of collaborator */
+/*Role of collaborator — {userId} is the collaborator's user_id (not the collaborator PK) */
 export async function updateCollaboratorRole(projectId, userId, newRole) {
-  return await apiFetch(`/api/projects/${projectId}/collaborators/${userId}`, {
+  return await apiFetch(`/api/projects/${projectId}/collaborators/user/${userId}`, {
     method: 'PUT',
     body: { role: newRole }
   });
 }
 
-/* DELETED collaborator*/
+/* DELETED collaborator — {userId} is the collaborator's user_id (not the collaborator PK) */
 export async function removeCollaborator(projectId, userId) {
-  return await apiFetch(`/api/projects/${projectId}/collaborators/${userId}`, {
+  return await apiFetch(`/api/projects/${projectId}/collaborators/user/${userId}`, {
     method: 'DELETE'
   });
 }

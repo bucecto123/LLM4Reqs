@@ -41,6 +41,11 @@ const ChatArea = ({
   selectedModelId,
   onSelectModel,
   user,
+  webSearchEnabled,
+  setWebSearchEnabled,
+  showContextPanel,
+  setShowContextPanel,
+  conflictCount = 0,
 }) => {
   const [showGraphs, setShowGraphs] = useState(false);
 
@@ -140,9 +145,61 @@ const ChatArea = ({
                 <span className="hidden sm:inline">Graphs</span>
               </button>
             )}
+            <button
+              onClick={() => setShowContextPanel((v) => !v)}
+              title={showContextPanel ? "Hide context panel" : "Show context panel"}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                showContextPanel
+                  ? "bg-indigo-600 text-white border-indigo-600"
+                  : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+              }`}
+            >
+              <span className="text-base leading-none">📋</span>
+              <span className="hidden sm:inline">Context</span>
+            </button>
           </div>
         </div>
       </header>
+
+      {/* Collapsible Context Panel */}
+      {showContextPanel && (
+        <div className="bg-indigo-50 border-b border-indigo-100 px-6 py-3 space-y-1">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">Context Panel</span>
+            <button
+              onClick={() => setShowContextPanel(false)}
+              className="text-indigo-400 hover:text-indigo-700 text-xs"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-3 text-xs">
+            <span className="flex items-center gap-1 bg-white px-2 py-1 rounded border border-indigo-200">
+              <span>🧠</span>
+              <span className="text-gray-600">Memory</span>
+              <span className="font-medium text-indigo-700">ON</span>
+            </span>
+            <span className={`flex items-center gap-1 px-2 py-1 rounded border ${
+              webSearchEnabled ? "bg-green-100 border-green-300" : "bg-white border-gray-200"
+            }`}>
+              <span>🌐</span>
+              <span className="text-gray-600">Web Search</span>
+              <span className={`font-medium ${webSearchEnabled ? "text-green-700" : "text-gray-400"}`}>
+                {webSearchEnabled ? "ON" : "OFF"}
+              </span>
+            </span>
+            <span className={`flex items-center gap-1 px-2 py-1 rounded border ${
+              conflictCount > 0 ? "bg-amber-100 border-amber-300" : "bg-white border-gray-200"
+            }`}>
+              <span>⚠️</span>
+              <span className="text-gray-600">Conflicts</span>
+              <span className={`font-medium ${conflictCount > 0 ? "text-amber-700" : "text-gray-400"}`}>
+                {conflictCount > 0 ? `${conflictCount} unresolved` : "None"}
+              </span>
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Chat Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -210,6 +267,10 @@ const ChatArea = ({
               models={models}
               selectedModelId={selectedModelId}
               onSelectModel={onSelectModel}
+              webSearchEnabled={webSearchEnabled}
+              setWebSearchEnabled={setWebSearchEnabled}
+              conflictCount={conflictCount}
+              onConflictBadgeClick={() => setShowContextPanel(true)}
             />
           </>
         )}

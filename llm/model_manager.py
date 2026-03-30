@@ -15,19 +15,6 @@ from typing import List, Dict, Any, Optional
 import requests
 import json
 
-# ---------------------------------------------------------------------------
-# Shared httpx client for Groq — connection pool reused across all requests
-# ---------------------------------------------------------------------------
-try:
-    import httpx
-
-    _groq_http_client: Optional[httpx.AsyncClient] = httpx.AsyncClient(
-        timeout=httpx.Timeout(120.0, connect=10.0),
-        limits=httpx.Limits(max_keepalive_connections=20, max_connections=100),
-    )
-except Exception:
-    _groq_http_client: Optional[httpx.AsyncClient] = None
-
 
 class ModelManager:
     def __init__(self):
@@ -134,19 +121,11 @@ class ModelManager:
         if provider == "groq":
             if not self.groq_api_key:
                 raise ValueError("GROQ_API_KEY not set")
-            kwargs = {
-                "groq_api_key": self.groq_api_key,
-                "model_name": model_id,
-                "temperature": temperature,
-            }
-            # Attempt to use the shared httpx connection pool when available
-            if _groq_http_client is not None:
-                try:
-                    kwargs["client"] = _groq_http_client
-                except TypeError:
-                    # Older langchain-groq doesn't accept a `client` kwarg — fall back silently
-                    pass
-            return ChatGroq(**kwargs)
+            return ChatGroq(
+                groq_api_key=self.groq_api_key,
+                model_name=model_id,
+                temperature=temperature,
+            )
         elif provider == 'gemini':
             if not GEMINI_AVAILABLE:
                 raise ValueError("Gemini dependencies not installed. Please install google-genai and langchain-google-genai")

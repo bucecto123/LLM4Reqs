@@ -72,7 +72,7 @@ class ProjectCollaboratorController extends Controller
 
         $validator = Validator::make($request->all(), [
             'email' => 'required|email|exists:users,email',
-            'role' => ['required', Rule::in(['owner', 'editor', 'viewer'])]
+            'role' => ['required', Rule::in(['editor', 'viewer'])]
         ], [
             'email.exists' => 'User with this email address was not found. Please ask them to sign up first.'
         ]);
@@ -114,6 +114,21 @@ class ProjectCollaboratorController extends Controller
 
         $collaborator->load('user:id,name,email');
 
+        app(\App\Http\Controllers\Api\ActivityLogController::class)->log(
+            $project->id,
+            auth()->id(),
+            \App\Models\ActivityLog::ACTION_COLLABORATOR_ADDED,
+            ucfirst($collaborator->user->name) . " was added as {$collaborator->role}.",
+            ['user_id' => $collaborator->user_id, 'role' => $collaborator->role]
+        );
+
+        // Notify the invited user
+        \App\Models\Notification::collaboratorAdded(
+            $collaborator->user_id,
+            $project->name,
+            auth()->user()->name
+        );
+
         return response()->json([
             'message' => 'Collaborator added successfully',
             'collaborator' => [
@@ -142,7 +157,7 @@ class ProjectCollaboratorController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'role' => ['required', Rule::in(['owner', 'editor', 'viewer'])]
+            'role' => ['required', Rule::in(['editor', 'viewer'])]
         ]);
 
         if ($validator->fails()) {
@@ -188,6 +203,86 @@ class ProjectCollaboratorController extends Controller
 
         $collaborator = ProjectCollaborator::where('project_id', $project->id)
             ->where('id', $collaboratorId)
+            ->firstOrFail();
+
+        $deletedUserId = $collaborator->user_id;
+        $deletedUserName = $collaborator->user->name;
+        $projectId = $project->id;
+        $collaborator->delete();
+        app(\App\Http\Controllers\Api\ActivityLogController::class)->log(
+            $projectId,
+            auth()->id(),
+            \App\Models\ActivityLog::ACTION_COLLABORATOR_REMOVED,
+            ucfirst($deletedUserName ?? "Member") . " was removed from the project.",
+            ['user_id' => $deletedUserId]
+        );
+
+        return response()->json([
+            'message' => 'Collaborator removed successfully'
+        ], 200);
+    }
+
+    /**
+     * Update a collaborator's role by user_id (frontend-friendly endpoint).
+     * PUT /api/projects/{project}/collaborators/user/{userId}
+     */
+    public function updateByUser(Request $request, $projectId, $userId)
+    {
+        $project = Project::findOrFail($projectId);
+
+        if (!$request->user()->can('manageCollaborators', $project)) {
+            return response()->json([
+                'message' => 'Unauthorized to update collaborators'
+            ], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'role' => ['required', Rule::in(['editor', 'viewer'])]
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $collaborator = ProjectCollaborator::where('project_id', $project->id)
+            ->where('user_id', $userId)
+            ->firstOrFail();
+
+        $collaborator->update(['role' => $request->role]);
+        $collaborator->load('user:id,name,email');
+
+        return response()->json([
+            'message' => 'Collaborator role updated successfully',
+            'collaborator' => [
+                'id' => $collaborator->id,
+                'user_id' => $collaborator->user_id,
+                'name' => $collaborator->user->name,
+                'email' => $collaborator->user->email,
+                'role' => $collaborator->role,
+                'joined_at' => $collaborator->created_at
+            ]
+        ]);
+    }
+
+    /**
+     * Remove a collaborator by user_id (frontend-friendly endpoint).
+     * DELETE /api/projects/{project}/collaborators/user/{userId}
+     */
+    public function destroyByUser(Request $request, $projectId, $userId)
+    {
+        $project = Project::findOrFail($projectId);
+
+        if (!$request->user()->can('manageCollaborators', $project)) {
+            return response()->json([
+                'message' => 'Unauthorized to remove collaborators'
+            ], 403);
+        }
+
+        $collaborator = ProjectCollaborator::where('project_id', $project->id)
+            ->where('user_id', $userId)
             ->firstOrFail();
 
         $collaborator->delete();

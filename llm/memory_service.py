@@ -1,8 +1,8 @@
 # memory_service.py - Dual-mode memory system for LLM4Reqs
 """
 Dual-mode memory architecture:
-- Normal Chat Mode: ConversationBufferWindowMemory (in-session, configurable window)
-- Project Mode: VectorStoreRetrieverMemory backed by FAISS (persistent, semantic retrieval)
+- Normal Chat Mode: InMemoryChatMessageHistory (in-session, configurable window)
+- Project Mode: FAISS-backed semantic retrieval (persistent, vector search)
 """
 import os
 import json
@@ -12,18 +12,18 @@ import asyncio
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
-from langchain.memory import ConversationBufferWindowMemory, VectorStoreRetrieverMemory
-from langchain_core.documents import Document
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, get_buffer_string
+from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_core.documents import Document
 
 logger = logging.getLogger(__name__)
 
 # Thread-safe project memory cache
-_project_memory_cache: Dict[str, VectorStoreRetrieverMemory] = {}
+_project_memory_cache: Dict[str, "ProjectMemory"] = {}
 _cache_lock = threading.Lock()
 
 
@@ -42,21 +42,24 @@ MEMORY_EMBEDDING_MODEL = os.getenv("KB_MODEL", "all-MiniLM-L6-v2")
 
 # ==================== EMBEDDING SETUP ====================
 
-_embedding_model: Optional[HuggingFaceEmbeddings] = None
+_embedding_model: Optional[Any] = None
 _embedding_lock = threading.Lock()
 
 
-def get_embedding_model() -> HuggingFaceEmbeddings:
-    """Get or create a singleton embedding model."""
+def get_embedding_model() -> Any:
+    """Get or create a singleton embedding model (sentence-transformers)."""
     global _embedding_model
     if _embedding_model is None:
         with _embedding_lock:
             if _embedding_model is None:
-                _embedding_model = HuggingFaceEmbeddings(
-                    model_name=MEMORY_EMBEDDING_MODEL,
-                    model_kwargs={"device": "cpu"}
-                )
+                from sentence_transformers import SentenceTransformer
+                _embedding_model = SentenceTransformer(MEMORY_EMBEDDING_MODEL)
     return _embedding_model
+
+
+def get_embeddings() -> Any:
+    """Alias for backward compatibility."""
+    return get_embedding_model()
 
 
 # ==================== PROJECT MEMORY STORE ====================
@@ -86,19 +89,9 @@ def get_project_memory_dir(project_id: Any) -> Path:
     return Path(MEMORY_BASE_DIR) / f"project_{pid_str}"
 
 
-def _build_memory_vectorstore(
-    documents: List[Document],
-    embeddings: Optional[HuggingFaceEmbeddings] = None
-) -> FAISS:
-    """Build a FAISS vectorstore from documents."""
-    if embeddings is None:
-        embeddings = get_embedding_model()
-    return FAISS.from_documents(documents, embeddings)
-
-
 def _load_or_create_vectorstore(
     project_dir: Path,
-    embeddings: Optional[HuggingFaceEmbeddings] = None
+    embeddings: Any
 ) -> Tuple[FAISS, bool]:
     """
     Load an existing FAISS vectorstore or create a new one.
@@ -109,8 +102,6 @@ def _load_or_create_vectorstore(
 
     if index_file.exists() and docstore_file.exists():
         try:
-            if embeddings is None:
-                embeddings = get_embedding_model()
             vectorstore = FAISS.load_local(
                 str(project_dir),
                 embeddings,
@@ -121,8 +112,6 @@ def _load_or_create_vectorstore(
             logger.warning(f"Failed to load existing vectorstore, creating new: {e}")
 
     # Create new empty vectorstore
-    if embeddings is None:
-        embeddings = get_embedding_model()
     dummy_doc = Document(page_content="__memory_init__", metadata={})
     vectorstore = FAISS.from_documents([dummy_doc], embeddings)
     # Remove the dummy document
@@ -167,7 +156,7 @@ async def _extract_entities_and_decisions(
     Falls back gracefully if extraction fails.
     """
     try:
-        from langchain_core.messages import SystemMessage, HumanMessage
+        from langchain_core.messages import SystemMessage
         from langchain_groq import ChatGroq
 
         prompt = _ENTITY_EXTRACTION_PROMPT.format(
@@ -211,12 +200,8 @@ async def _extract_entities_and_decisions(
 
 class ProjectMemory:
     """
-    Persistent, semantic memory for a project using VectorStoreRetrieverMemory.
-
-    Stores:
-    - Conversation summaries (after each exchange)
-    - Extracted entities (key nouns: requirements, features, stakeholders)
-    - Extracted decisions (architectural or requirements decisions)
+    Persistent, semantic memory for a project using FAISS vector search.
+    Replaces the removed VectorStoreRetrieverMemory.
     """
 
     def __init__(
@@ -233,7 +218,6 @@ class ProjectMemory:
 
         # Lazy-load the vectorstore
         self._vectorstore: Optional[FAISS] = None
-        self._retriever_memory: Optional[VectorStoreRetrieverMemory] = None
 
     @property
     def vectorstore(self) -> FAISS:
@@ -245,32 +229,12 @@ class ProjectMemory:
             )
         return self._vectorstore
 
-    @property
-    def retriever_memory(self) -> VectorStoreRetrieverMemory:
-        """Get or create the LangChain VectorStoreRetrieverMemory."""
-        if self._retriever_memory is None:
-            from langchain_core.retrievers import VectorStoreRetriever
-
-            retriever = VectorStoreRetriever(
-                vectorstore=self.vectorstore,
-                search_kwargs={"k": self.top_k}
-            )
-            self._retriever_memory = VectorStoreRetrieverMemory(
-                retriever=retriever,
-                memory_key="project_memories",
-                input_key="input",
-                return_docs=True
-            )
-        return self._retriever_memory
-
     def retrieve_for_query(self, query: str) -> List[Dict[str, Any]]:
         """
         Retrieve the top-K most relevant memories for a query.
         Returns a list of memory dicts with content and metadata.
         """
         try:
-            # VectorStoreRetrieverMemory.predict_with_model takes input_key → returns string
-            # Instead, query the vectorstore directly for structured results
             docs_and_scores = self.vectorstore.similarity_search_with_score(query, k=self.top_k)
 
             memories = []
@@ -307,7 +271,7 @@ class ProjectMemory:
                     "project_id": self.project_id,
                     "memory_type": "conversation",
                     "timestamp": timestamp,
-                    "user_message": user_message[:500],  # Truncate for storage
+                    "user_message": user_message[:500],
                     "ai_response": ai_response[:500],
                 }
             )
@@ -320,16 +284,18 @@ class ProjectMemory:
 
             # Also extract and store entities/decisions asynchronously
             if model_manager is not None:
-                asyncio.create_task(
-                    self._add_structured_memories(user_message, ai_response, timestamp)
-                )
+                try:
+                    asyncio.create_task(
+                        self._add_structured_memories(user_message, ai_response, timestamp)
+                    )
+                except Exception:
+                    pass  # Background task creation can fail if no event loop
 
         except Exception as e:
             logger.error(f"Failed to add conversation memory: {e}")
 
     def _build_conversation_summary(self, user_message: str, ai_response: str) -> str:
         """Build a human-readable summary of the conversation exchange."""
-        # Keep it simple: combine first ~200 chars of each
         user_snippet = user_message[:300].replace("\n", " ").strip()
         ai_snippet = ai_response[:300].replace("\n", " ").strip()
         return (
@@ -430,7 +396,6 @@ class ProjectMemory:
             if self.project_dir.exists():
                 shutil.rmtree(self.project_dir)
             self._vectorstore = None
-            self._retriever_memory = None
 
             # Clear from global cache
             with _cache_lock:
@@ -457,12 +422,14 @@ class ProjectMemory:
         return "\n".join(lines)
 
 
-# ==================== NORMAL CHAT MEMORY CLASS ====================
+# ==================== CONVERSATION MEMORY CLASS ====================
+# Replaces the removed ConversationBufferWindowMemory using
+# langchain_core.chat_history.InMemoryChatMessageHistory + get_buffer_string.
 
 class ConversationMemory:
     """
     In-session memory for normal (non-project) chat.
-    Uses ConversationBufferWindowMemory with a configurable window.
+    Uses InMemoryChatMessageHistory with a sliding window.
     """
 
     def __init__(
@@ -471,12 +438,15 @@ class ConversationMemory:
         return_messages: bool = False
     ):
         self.window_size = window_size
-        self.memory = ConversationBufferWindowMemory(
-            k=window_size,
-            return_messages=return_messages,
-            output_key="output",
-            input_key="input"
-        )
+        self.return_messages = return_messages
+        self._history: List[BaseMessage] = []
+
+    def _enforce_window(self) -> None:
+        """Trim to window_size pairs (each pair = user + assistant = 2 messages)."""
+        # Keep window_size exchanges = window_size * 2 messages
+        max_msgs = self.window_size * 2
+        if len(self._history) > max_msgs:
+            self._history = self._history[-max_msgs:]
 
     def load_history(self, conversation_history: List[Dict[str, str]]) -> None:
         """
@@ -484,33 +454,24 @@ class ConversationMemory:
         conversation_history: list of {"role": "user"|"assistant", "content": str}
         """
         try:
-            # ConversationBufferWindowMemory uses .save_context(input, output)
-            # We need to pair up user/assistant messages
-            history = conversation_history[-self.window_size * 2:]  # Keep window pairs
-
-            # Clear existing and rebuild
-            self.memory.clear()
+            history = conversation_history[-self.window_size * 2:]
+            self._history = []
 
             for i in range(0, len(history) - 1, 2):
                 if i + 1 < len(history):
                     msg_a = history[i]
                     msg_b = history[i + 1]
-                    # Expect user then assistant
                     if msg_a.get("role") == "user" and msg_b.get("role") == "assistant":
-                        self.memory.save_context(
-                            {"input": msg_a["content"]},
-                            {"output": msg_b["content"]}
-                        )
+                        self._history.append(HumanMessage(content=msg_a["content"]))
+                        self._history.append(AIMessage(content=msg_b["content"]))
 
             # Handle odd leftover user message at end
             if len(history) % 2 == 1:
                 last = history[-1]
                 if last.get("role") == "user":
-                    # Save as input without output (current conversation trailing)
-                    self.memory.save_context(
-                        {"input": last["content"]},
-                        {"output": ""}
-                    )
+                    self._history.append(HumanMessage(content=last["content"]))
+
+            self._enforce_window()
 
         except Exception as e:
             logger.warning(f"Failed to load conversation history: {e}")
@@ -518,17 +479,20 @@ class ConversationMemory:
     def get_formatted_history(self) -> str:
         """Get the conversation history as a formatted string for context."""
         try:
-            return self.memory.load_memory_variables({}).get("history", "")
+            return get_buffer_string(self._history)
         except Exception:
             return ""
+
+    def get_messages(self) -> List[BaseMessage]:
+        """Return raw message list (for LangChain chain input)."""
+        return list(self._history)
 
     def add_exchange(self, user_message: str, ai_response: str) -> None:
         """Record a new exchange after the AI responds."""
         try:
-            self.memory.save_context(
-                {"input": user_message},
-                {"output": ai_response}
-            )
+            self._history.append(HumanMessage(content=user_message))
+            self._history.append(AIMessage(content=ai_response))
+            self._enforce_window()
         except Exception as e:
             logger.warning(f"Failed to add exchange to memory: {e}")
 

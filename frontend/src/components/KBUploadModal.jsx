@@ -3,7 +3,7 @@ import { X, Upload, FileText, Loader2, Check, AlertCircle } from "lucide-react";
 import { apiFetch } from "../utils/auth";
 import echo from "../utils/echo";
 
-const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
+const KBUploadModal = ({ onClose, onUpload, projectId, projectName, onBuildComplete }) => {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -73,6 +73,7 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
       if (data.status === "ready") {
         setIsListening(false);
         setIsUploading(false);
+        onBuildComplete?.();
         setTimeout(() => {
           onClose();
         }, 1500);
@@ -88,7 +89,7 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
       console.log(`Unsubscribing from project.${projectId} channel`);
       echo.leaveChannel(`project.${projectId}`);
     };
-  }, [isListening, projectId, onClose]);
+  }, [isListening, projectId, onClose, onBuildComplete]);
 
   const handleUpload = async () => {
     if (selectedFiles.length === 0) return;
@@ -302,73 +303,41 @@ const KBUploadModal = ({ onClose, onUpload, projectId, projectName }) => {
             </div>
           )}
 
-          {/* KB Build Progress */}
-          {isListening && (
+          {/* KB Build Progress - only show after "initializing" stage */}
+          {isListening && buildStage !== "initializing" && (
             <div className="mt-6 p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
-              <div className="flex items-center justify-between mb-2">
-                <span
-                  className="text-sm font-medium"
-                  style={{ color: "#112D4E" }}
-                >
-                  {getBuildStageText(buildStage)}
-                </span>
-                <span
-                  className="text-sm font-semibold"
-                  style={{ color: "#4A7BA7" }}
-                >
-                  {buildProgress}%
-                </span>
+              <div className="flex items-center space-x-2 text-sm font-medium" style={{ color: "#112D4E" }}>
+                <Loader2 size={16} className="animate-spin text-purple-600 flex-shrink-0" />
+                <span>{getBuildStageText(buildStage)}</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-3">
-                <div
-                  className="h-3 rounded-full transition-all duration-300 flex items-center justify-end pr-2"
-                  style={{
-                    width: `${buildProgress}%`,
-                    background:
-                      "linear-gradient(90deg, #9333ea 0%, #7c3aed 50%, #6366f1 100%)",
-                  }}
-                >
-                  {buildProgress > 10 && (
-                    <Loader2 size={12} className="text-white animate-spin" />
-                  )}
+              {buildStage === "building_index" && (
+                <p className="mt-1 text-xs text-gray-600">
+                  Processing documents and building knowledge base...
+                </p>
+              )}
+              {buildStage === "detecting_conflicts" && (
+                <p className="mt-1 text-xs text-gray-600">
+                  Starting conflict detection...
+                </p>
+              )}
+              {buildStage === "processing_conflicts" && (
+                <p className="mt-1 text-xs text-gray-600">
+                  Analyzing requirements for conflicts...
+                </p>
+              )}
+              {buildStage === "saving_conflicts" && (
+                <p className="mt-1 text-xs text-gray-600">
+                  Saving detected conflicts...
+                </p>
+              )}
+              {buildStage === "completed" && (
+                <div className="mt-1 flex items-center space-x-2">
+                  <Check size={14} className="text-green-600" />
+                  <span className="text-xs text-green-600">
+                    Build completed successfully!
+                  </span>
                 </div>
-              </div>
-              <div className="mt-2 flex items-center space-x-2 text-xs text-gray-600">
-                {buildStage === "building_index" && (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    <span>
-                      Processing documents and building knowledge base...
-                    </span>
-                  </>
-                )}
-                {buildStage === "detecting_conflicts" && (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    <span>Starting conflict detection...</span>
-                  </>
-                )}
-                {buildStage === "processing_conflicts" && (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    <span>Analyzing requirements for conflicts...</span>
-                  </>
-                )}
-                {buildStage === "saving_conflicts" && (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    <span>Saving detected conflicts...</span>
-                  </>
-                )}
-                {buildStage === "completed" && (
-                  <>
-                    <Check size={14} className="text-green-600" />
-                    <span className="text-green-600">
-                      Build completed successfully!
-                    </span>
-                  </>
-                )}
-              </div>
+              )}
             </div>
           )}
 

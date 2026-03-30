@@ -4,6 +4,7 @@
  */
 
 import { apiFetch } from './api.js';
+import perfMonitor from './performanceMonitor.js';
 
 const LLM_API_BASE = import.meta.env.VITE_LLM_API_BASE || 'http://localhost:8000';
 
@@ -25,7 +26,8 @@ export async function executeAgentTask({
   onStream = null,
 }) {
   try {
-    const response = await fetch(`${LLM_API_BASE}/api/agent/execute`, {
+    const response = await perfMonitor.timed("POST /api/agent/execute", async () =>
+      fetch(`${LLM_API_BASE}/api/agent/execute`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -37,7 +39,8 @@ export async function executeAgentTask({
         model,
         tools,
       }),
-    });
+    })
+    );
 
     if (!response.ok) {
       throw new Error(`Agent execution failed: ${response.statusText}`);
@@ -88,12 +91,14 @@ export async function executeAgentTask({
  */
 export async function getAvailableTools() {
   try {
-    const response = await fetch(`${LLM_API_BASE}/api/agent/tools`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    const response = await perfMonitor.timed("GET /api/agent/tools", () =>
+      fetch(`${LLM_API_BASE}/api/agent/tools`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+    );
 
     if (!response.ok) {
       throw new Error('Failed to fetch tools');
@@ -114,13 +119,15 @@ export async function getAvailableTools() {
  */
 export async function executeTool(toolName, params) {
   try {
-    const response = await fetch(`${LLM_API_BASE}/api/agent/tools/${toolName}/execute`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(params),
-    });
+    const response = await perfMonitor.timed(`POST /api/agent/tools/${toolName}/execute`, () =>
+      fetch(`${LLM_API_BASE}/api/agent/tools/${toolName}/execute`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params),
+      })
+    );
 
     if (!response.ok) {
       throw new Error(`Tool execution failed: ${response.statusText}`);
@@ -140,14 +147,16 @@ export async function executeTool(toolName, params) {
  */
 export async function getAgentHistory(projectId) {
   try {
-    const response = await fetch(
-      `${LLM_API_BASE}/api/agent/history?project_id=${projectId}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
+    const response = await perfMonitor.timed(`GET /api/agent/history`, () =>
+      fetch(
+        `${LLM_API_BASE}/api/agent/history?project_id=${projectId}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      )
     );
 
     if (!response.ok) {
@@ -168,12 +177,14 @@ export async function getAgentHistory(projectId) {
  */
 export async function cancelAgentTask(taskId) {
   try {
-    await fetch(`${LLM_API_BASE}/api/agent/tasks/${taskId}/cancel`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    await perfMonitor.timed(`POST /api/agent/tasks/${taskId}/cancel`, () =>
+      fetch(`${LLM_API_BASE}/api/agent/tasks/${taskId}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+    );
   } catch (error) {
     console.error('Error canceling task:', error);
     throw error;

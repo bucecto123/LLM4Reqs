@@ -17,6 +17,10 @@ const ChatInput = ({
   models,
   selectedModelId,
   onSelectModel,
+  webSearchEnabled,
+  setWebSearchEnabled,
+  conflictCount = 0,
+  onConflictBadgeClick = () => {},
 }) => {
   const isDisabled = isLoading || isInitializing;
   const canSend =
@@ -101,6 +105,32 @@ const ChatInput = ({
                     dropUp={true}
                   />
                 </div>
+              )}
+
+              {/* Web Search Toggle */}
+              <button
+                onClick={() => setWebSearchEnabled(!webSearchEnabled)}
+                title={webSearchEnabled ? "Web Search: ON — click to disable" : "Web Search: OFF — click to enable"}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  webSearchEnabled
+                    ? "bg-green-100 text-green-700 border border-green-300 hover:bg-green-200"
+                    : "bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100"
+                }`}
+              >
+                <span className="text-base leading-none">🌐</span>
+                <span className="hidden sm:inline">Web</span>
+              </button>
+
+              {/* Conflicts Badge */}
+              {conflictCount > 0 && (
+                <button
+                  onClick={onConflictBadgeClick}
+                  title={`${conflictCount} unresolved conflicts`}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-300 hover:bg-amber-100 transition-all"
+                >
+                  <span className="text-base leading-none">⚠️</span>
+                  <span className="hidden sm:inline">{conflictCount}</span>
+                </button>
               )}
             </div>
 

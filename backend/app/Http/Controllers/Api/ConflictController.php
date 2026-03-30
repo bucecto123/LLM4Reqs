@@ -13,6 +13,9 @@ class ConflictController extends Controller
     protected $conflictService;
     protected $llmService;
 
+    /** @var string[] Resolved conflict status values — used across queries and summaries */
+    private const RESOLVED_STATUSES = ['resolved', 'resolved_by_ai', 'resolved_manual'];
+
     public function __construct(ConflictDetectionService $conflictService, LLMService $llmService)
     {
         $this->conflictService = $conflictService;
@@ -380,6 +383,99 @@ class ConflictController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Auto-resolve failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get top-k unresolved conflicts for a project (severity-sorted).
+     * GET /api/conflicts/project/{projectId}?top_k=5
+     */
+    public function getProjectConflictsList(Request $request, int $projectId)
+    {
+        // Check project access authorization
+        $project = \App\Models\Project::findOrFail($projectId);
+        if (!$request->user()->can('viewResources', $project)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to access this project'
+            ], 403);
+        }
+
+        $topK = (int) $request->query('top_k', 5);
+        if ($topK < 1) $topK = 5;
+        if ($topK > 50) $topK = 50;
+
+        try {
+            // Try reading from the conflict JSON file first
+            $conflictPath = base_path("storage/app/conflicts/{$projectId}.json");
+            $conflicts = [];
+            $data = null;
+
+            if (file_exists($conflictPath)) {
+                $data = json_decode(file_get_contents($conflictPath), true);
+                $conflicts = is_array($data) ? $data : ($data['conflicts'] ?? []);
+            }
+
+            // Fallback: query the database if JSON not found
+            if (empty($conflicts)) {
+                $conflictModel = app(\App\Models\RequirementConflict::class);
+                if ($conflictModel) {
+                    $dbConflicts = $conflictModel
+                        ->where('project_id', $projectId)
+                        ->whereNotIn('resolution_status', self::RESOLVED_STATUSES)
+                        ->orderByRaw("FIELD(severity, 'HIGH', 'MEDIUM', 'LOW', 'UNKNOWN')")
+                        ->limit($topK)
+                        ->get();
+
+                    $conflicts = $dbConflicts->map(function ($c) {
+                        return [
+                            'id' => $c->id,
+                            'title' => $c->title,
+                            'description' => $c->description,
+                            'severity' => $c->severity,
+                            'status' => $c->resolution_status,
+                            'requirement_ids' => is_array($c->requirement_ids) ? $c->requirement_ids : [],
+                        ];
+                    })->toArray();
+                }
+            } else {
+                // Filter and sort from JSON using shared constant
+                $unresolved = array_filter($conflicts, fn($c) =>
+                    !in_array(strtolower($c['status'] ?? ''), self::RESOLVED_STATUSES)
+                );
+
+                $severityOrder = ['high' => 0, 'medium' => 1, 'low' => 2];
+                usort($unresolved, fn($a, $b) =>
+                    ($severityOrder[strtolower($a['severity'] ?? 'low')] ?? 3)
+                    <=> ($severityOrder[strtolower($b['severity'] ?? 'low')] ?? 3)
+                );
+
+                $conflicts = array_slice(array_values($unresolved), 0, $topK);
+            }
+
+            // Summary stats — single pass over all conflicts
+            $allConflicts = is_array($data['conflicts'] ?? null) ? $data['conflicts'] : ($conflicts ?: []);
+            $summary = ['total' => 0, 'unresolved' => 0, 'high' => 0, 'medium' => 0, 'low' => 0];
+            foreach ($allConflicts as $c) {
+                $summary['total']++;
+                $status = strtolower($c['status'] ?? '');
+                if (in_array($status, self::RESOLVED_STATUSES)) continue;
+                $summary['unresolved']++;
+                $sev = strtolower($c['severity'] ?? '');
+                if (isset($summary[$sev])) $summary[$sev]++;
+            }
+
+            return response()->json([
+                'success' => true,
+                'project_id' => $projectId,
+                'conflicts' => $conflicts,
+                'summary' => $summary,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve conflicts: ' . $e->getMessage(),
             ], 500);
         }
     }

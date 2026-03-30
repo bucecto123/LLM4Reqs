@@ -32,7 +32,8 @@ class ConversationController extends Controller
         $cacheKey = "user_conversations_" . Auth::id();
 
         $conversations = Cache::remember($cacheKey, 30, function () {
-            return Conversation::where('user_id', Auth::id())
+            return Conversation::with(['messages', 'documents'])
+                ->where('user_id', Auth::id())
                 ->whereNull('project_id')
                 ->orderBy('updated_at', 'desc')
                 ->get();
@@ -57,7 +58,8 @@ class ConversationController extends Controller
         // Cache conversations for 1 minute to improve LCP
         $cacheKey = "project_conversations_{$projectId}_" . Auth::id();
         $conversations = \Cache::remember($cacheKey, 60, function () use ($projectId) {
-            return Conversation::where('project_id', $projectId)
+            return Conversation::with(['messages', 'documents'])
+                ->where('project_id', $projectId)
                 ->where('user_id', Auth::id())
                 ->orderBy('updated_at', 'desc')
                 ->get();

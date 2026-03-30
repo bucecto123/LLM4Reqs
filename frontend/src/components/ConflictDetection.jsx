@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import {
   AlertTriangle,
   X,
@@ -12,35 +12,8 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { apiFetch } from "../utils/auth";
+import { cache } from "../utils/cache.js";
 import ExportModal from "./ExportModal.jsx";
-
-// Skeleton row placeholder while loading
-function ConflictSkeletonRow({ index }) {
-  const widthClass = index % 3 === 0 ? "w-3/4" : index % 3 === 1 ? "w-1/2" : "w-2/3";
-  return (
-    <div className="border-2 rounded-xl p-5 bg-white/80 animate-pulse">
-      <div className="flex items-start space-x-3">
-        <div className="w-5 h-5 rounded bg-slate-200 flex-shrink-0 mt-0.5" />
-        <div className="flex-1 space-y-2">
-          <div className="flex items-start justify-between">
-            <div className="h-4 w-32 rounded bg-slate-200" />
-            <div className="flex space-x-2">
-              <div className="h-5 w-14 rounded bg-slate-200" />
-              <div className="h-4 w-24 rounded bg-slate-200" />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <div className={`h-3 ${widthClass} rounded bg-slate-200`} />
-          </div>
-          <div className="mt-3 space-y-1.5">
-            <div className="h-3 w-full rounded bg-slate-200" />
-            <div className="h-3 w-5/6 rounded bg-slate-200" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // Format resolution notes for better display
 const formatResolutionNotes = (text) => {
@@ -164,20 +137,13 @@ const formatResolutionNotes = (text) => {
 };
 
 export const ConflictsDisplay = ({ projectId, onClose }) => {
-  const [allConflicts, setAllConflicts] = useState([]);           // full dataset
-  const [displayedConflicts, setDisplayedConflicts] = useState([]); // paginated view
+  const [conflicts, setConflicts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
     severity: "",
     search: "",
   });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const loadMoreRef = useRef(null);
-  const isFetchingRef = useRef(false);
   const [isSeverityDropdownOpen, setIsSeverityDropdownOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [projectName, setProjectName] = useState("");
@@ -189,14 +155,19 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
   });
 
   useEffect(() => {
-    // Reset pagination on project or filter changes
-    setCurrentPage(1);
-    setDisplayedConflicts([]);
-    setAllConflicts([]);
-    setHasMore(true);
+    if (!projectId) return;
+
+    // Try cache first for instant render, then refresh in background
+    const cached = cache.getFresh(`conflicts_${projectId}`, 'conflicts');
+    if (cached) {
+      setConflicts(cached);
+      setLoading(false);
+      // Refresh in background
+      loadConflicts();
+    } else {
+      loadConflicts();
+    }
     fetchProjectName();
-    loadPage(1, true);
-    // eslint-disable-next-line
   }, [projectId]);
 
   const fetchProjectName = async () => {
@@ -215,121 +186,70 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
   };
 
-  // Transform a raw conflict from the API into the UI shape
-  const transformConflict = (conflict) => ({
-    id: conflict.id,
-    conflictNumber: conflict.conflict_number,
-    title: conflict.conflict_number
-      ? `Conflict ${conflict.conflict_number}`
-      : `Conflict ${conflict.id}`,
-    description: conflict.conflict_description,
-    severity: conflict.severity,
-    confidence: conflict.confidence || "medium",
-    requirements: [
-      `[${conflict.requirement1?.requirement_number || conflict.requirement1?.id}] ${
-        conflict.requirement1?.title ||
-        conflict.requirement1?.description ||
-        conflict.requirement1?.requirement_text
-      }`,
-      `[${conflict.requirement2?.requirement_number || conflict.requirement2?.id}] ${
-        conflict.requirement2?.title ||
-        conflict.requirement2?.description ||
-        conflict.requirement2?.requirement_text
-      }`,
-    ],
-    suggestion: conflict.resolution_notes,
-    status: conflict.resolution_status,
-    detectedAt: conflict.detected_at,
-  });
-
-  // Fetch a single page of conflicts and append to displayed list
-  const loadPage = useCallback(async (pageNum, isInitial = false) => {
-    if (isFetchingRef.current) return;
-    isFetchingRef.current = true;
-
-    if (isInitial) {
-      setLoading(true);
-    } else {
-      setIsLoadingMore(true);
-    }
-    setError(null);
-
+  const loadConflicts = async () => {
     try {
-      const params = new URLSearchParams({
-        page: pageNum,
-        per_page: 10,
-      });
+      setLoading(true);
+      setError(null);
 
-      const data = await apiFetch(
-        `/api/projects/${projectId}/conflicts?${params}`,
-      );
+      // Load conflicts from the backend API
+      const data = await apiFetch(`/api/projects/${projectId}/conflicts`);
 
-      if (!data.success) {
-        throw new Error(data.message || "Failed to load conflicts");
+      if (data.success && data.data) {
+        // Transform backend conflicts to UI format
+        const formattedConflicts = data.data.map((conflict) => ({
+          id: conflict.id,
+          conflictNumber: conflict.conflict_number,
+          title: conflict.conflict_number
+            ? `Conflict ${conflict.conflict_number}`
+            : `Conflict ${conflict.id}`,
+          description: conflict.conflict_description,
+          severity: conflict.severity,
+          confidence: conflict.confidence || "medium",
+          requirements: [
+            `[${
+              conflict.requirement1?.requirement_number ||
+              conflict.requirement1?.id
+            }] ${
+              conflict.requirement1?.title ||
+              conflict.requirement1?.description ||
+              conflict.requirement1?.requirement_text
+            }`,
+            `[${
+              conflict.requirement2?.requirement_number ||
+              conflict.requirement2?.id
+            }] ${
+              conflict.requirement2?.title ||
+              conflict.requirement2?.description ||
+              conflict.requirement2?.requirement_text
+            }`,
+          ],
+          suggestion: conflict.resolution_notes,
+          status: conflict.resolution_status,
+          detectedAt: conflict.detected_at,
+        }));
+
+        // Sort by severity: high -> medium -> low
+        const severityOrder = { high: 1, medium: 2, low: 3 };
+        formattedConflicts.sort((a, b) => {
+          const orderA = severityOrder[a.severity?.toLowerCase()] || 2;
+          const orderB = severityOrder[b.severity?.toLowerCase()] || 2;
+          return orderA - orderB;
+        });
+
+        // Cache the fresh data
+        cache.set(`conflicts_${projectId}`, formattedConflicts, 5 * 60 * 1000, 'conflicts');
+        setConflicts(formattedConflicts);
+      } else {
+        cache.set(`conflicts_${projectId}`, [], 5 * 60 * 1000, 'conflicts');
+        setConflicts([]);
       }
-
-      const formattedConflicts = (data.data || []).map(transformConflict);
-      const total = data.total || 0;
-
-      setAllConflicts((prev) =>
-        pageNum === 1 ? formattedConflicts : [...prev, ...formattedConflicts],
-      );
-      setDisplayedConflicts((prev) =>
-        pageNum === 1 ? formattedConflicts : [...prev, ...formattedConflicts],
-      );
-      setTotalCount(total);
-      setHasMore(pageNum < (data.last_page || 1));
     } catch (err) {
       console.error("Error loading conflicts:", err);
       setError(err.message || "Failed to load conflicts");
+      setConflicts([]);
     } finally {
       setLoading(false);
-      setIsLoadingMore(false);
-      isFetchingRef.current = false;
     }
-  }, [projectId]);
-
-  // IntersectionObserver for auto-load on scroll
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (
-          entries[0].isIntersecting &&
-          hasMore &&
-          !isLoadingMore &&
-          !isFetchingRef.current
-        ) {
-          handleLoadMore();
-        }
-      },
-      { threshold: 0.1, rootMargin: "100px" },
-    );
-
-    if (loadMoreRef.current) {
-      observer.observe(loadMoreRef.current);
-    }
-
-    return () => {
-      if (loadMoreRef.current) observer.unobserve(loadMoreRef.current);
-    };
-  }, [hasMore, isLoadingMore]);
-
-  const handleLoadMore = async () => {
-    if (isLoadingMore || !hasMore) return;
-    setIsLoadingMore(true);
-    const nextPage = currentPage + 1;
-    await loadPage(nextPage);
-    setCurrentPage(nextPage);
-    setIsLoadingMore(false);
-  };
-
-  // Reload all data after a conflict is resolved
-  const reloadConflicts = () => {
-    setCurrentPage(1);
-    setDisplayedConflicts([]);
-    setAllConflicts([]);
-    setHasMore(true);
-    loadPage(1, true);
   };
 
   const handleResolveWithAI = async (conflict) => {
@@ -395,7 +315,8 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
       );
 
       if (response.success) {
-        await reloadConflicts();
+        cache.invalidate(`conflicts_${projectId}`, 'conflicts');
+        await loadConflicts();
       } else {
         throw new Error(
           response.message || "Failed to resolve conflict with AI",
@@ -429,7 +350,8 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
         body: { resolution_notes: manualNotes.trim() },
       });
 
-      await reloadConflicts();
+      cache.invalidate(`conflicts_${projectId}`, 'conflicts');
+      await loadConflicts();
     } catch (err) {
       console.error("Failed to resolve conflict:", err);
       setError(err.message || "Failed to resolve conflict");
@@ -438,8 +360,8 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
     }
   };
 
-  // Apply filters to the currently displayed (paginated) conflicts
-  const filteredConflicts = displayedConflicts.filter((conflict) => {
+  // Apply filters
+  const filteredConflicts = conflicts.filter((conflict) => {
     // Filter by severity
     if (
       filters.severity &&
@@ -476,7 +398,7 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
         </h2>
         <div className="flex items-center space-x-2">
           <button
-            onClick={reloadConflicts}
+            onClick={loadConflicts}
             className="px-4 py-2 rounded-lg bg-white hover:bg-orange-50 transition-colors font-medium text-orange-600 hover:text-orange-700 border border-orange-200 shadow-sm hover:shadow-md"
           >
             Refresh
@@ -502,13 +424,9 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto p-5">
         {loading ? (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-slate-800">Detected Conflicts</h3>
-            </div>
-            {[0, 1, 2].map((i) => (
-              <ConflictSkeletonRow key={i} index={i} />
-            ))}
+          <div className="flex items-center justify-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+            <span className="ml-3 text-gray-600">Loading conflicts...</span>
           </div>
         ) : error ? (
           <div className="p-6 bg-red-50 border border-red-200 rounded-lg">
@@ -522,7 +440,7 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
               </div>
             </div>
           </div>
-        ) : displayedConflicts.length === 0 ? (
+        ) : conflicts.length === 0 ? (
           <div className="p-8 text-center">
             <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
             <h3 className="text-lg font-medium text-gray-900 mb-1">
@@ -536,8 +454,7 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-bold text-slate-800">
-                Detected Conflicts ({filteredConflicts.length}
-                {hasMore ? ` of ${totalCount}` : ""})
+                Detected Conflicts ({filteredConflicts.length})
               </h3>
             </div>
 
@@ -813,28 +730,8 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
                     </div>
                   );
                 })}
-
-              {/* Infinite scroll sentinel + Load more button */}
-              <div ref={loadMoreRef} className="flex flex-col items-center py-4 gap-3">
-                {isLoadingMore ? (
-                  <div className="flex items-center space-x-2 text-orange-600">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-600" />
-                    <span className="text-sm font-medium">Loading more...</span>
-                  </div>
-                ) : hasMore ? (
-                  <button
-                    onClick={handleLoadMore}
-                    className="px-4 py-2 text-sm font-medium text-orange-600 hover:text-orange-800 hover:underline transition-colors"
-                  >
-                    Load more ({totalCount - displayedConflicts.length} remaining)
-                  </button>
-                ) : displayedConflicts.length > 0 ? (
-                  <span className="text-sm text-slate-400 italic">
-                    All conflicts loaded
-                  </span>
-                ) : null}
               </div>
-            </div>
+            )}
           </div>
         )}
 

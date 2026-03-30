@@ -2,6 +2,8 @@
  * Enhanced JWT Authentication System with Access & Refresh Tokens
  */
 
+import perfMonitor from './performanceMonitor.js';
+
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8001";
 
 // Storage keys
@@ -76,38 +78,44 @@ class AuthManager {
       fetchOptions.body = JSON.stringify(fetchOptions.body);
     }
 
-    try {
-      const response = await fetch(`${API_BASE}${path}`, {
-        ...fetchOptions,
-        headers,
-      });
+    // Wrap fetch with timing and deduplication
+    const dedupeKey = `${options.method || 'GET'} ${path}`;
+    return perfMonitor.dedupe(dedupeKey, async () => {
+      try {
+        const response = await fetch(`${API_BASE}${path}`, {
+          ...fetchOptions,
+          headers,
+        });
 
-      // Handle 401 Unauthorized - attempt token refresh
-      if (response.status === 401 && accessToken && !path.includes("/auth/")) {
-        try {
-          await this.refreshToken();
-          // Retry the original request with new token
-          const newAccessToken = this.getAccessToken();
-          if (newAccessToken) {
-            headers["Authorization"] = `Bearer ${newAccessToken}`;
-            const retryResponse = await fetch(`${API_BASE}${path}`, {
-              ...fetchOptions,
-              headers,
-            });
-            return this.handleResponse(retryResponse);
+        // Handle 401 Unauthorized - attempt token refresh
+        if (response.status === 401 && accessToken && !path.includes("/auth/")) {
+          try {
+            await this.refreshToken();
+            // Retry the original request with new token
+            const newAccessToken = this.getAccessToken();
+            if (newAccessToken) {
+              headers["Authorization"] = `Bearer ${newAccessToken}`;
+              const retryResponse = await fetch(`${API_BASE}${path}`, {
+                ...fetchOptions,
+                headers,
+              });
+              perfMonitor.timed(`${options.method || 'GET'} ${path} [retry]`, async () => retryResponse);
+              return this.handleResponse(retryResponse);
+            }
+          } catch (refreshError) {
+            console.error("Token refresh failed:", refreshError);
+            this.logout();
+            throw new Error("Authentication failed. Please log in again.");
           }
-        } catch (refreshError) {
-          console.error("Token refresh failed:", refreshError);
-          this.logout();
-          throw new Error("Authentication failed. Please log in again.");
         }
-      }
 
-      return this.handleResponse(response);
-    } catch (error) {
-      console.error("API fetch error:", error);
-      throw error;
-    }
+        perfMonitor.timed(`${options.method || 'GET'} ${path}`, async () => response);
+        return this.handleResponse(response);
+      } catch (error) {
+        console.error("API fetch error:", error);
+        throw error;
+      }
+    });
   }
 
   /**

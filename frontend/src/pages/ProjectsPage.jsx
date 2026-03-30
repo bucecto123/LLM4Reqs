@@ -14,6 +14,7 @@ import {
 import { apiFetch } from "../utils/auth.js";
 import { useAuth } from "../hooks/useAuth.jsx";
 import Sidebar from "../components/dashboard/Sidebar.jsx";
+import { timeAgo } from "../utils/time.js";
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
@@ -88,7 +89,7 @@ export default function ProjectsPage() {
     if (!newProjectName.trim()) return;
 
     try {
-      const data = await apiFetch("/api/projects", {
+      await apiFetch("/api/projects", {
         method: "POST",
         body: {
           name: newProjectName.trim(),
@@ -96,7 +97,8 @@ export default function ProjectsPage() {
         },
       });
 
-      setProjects([data, ...projects]);
+      // Re-fetch projects to get accurate document/requirement counts
+      await loadProjects();
       setShowNewProjectModal(false);
       setNewProjectName("");
       setNewProjectDescription("");
@@ -150,7 +152,7 @@ export default function ProjectsPage() {
     if (!editProjectName.trim() || !editingProject) return;
 
     try {
-      const data = await apiFetch(`/api/projects/${editingProject.id}`, {
+      await apiFetch(`/api/projects/${editingProject.id}`, {
         method: "PUT",
         body: {
           name: editProjectName.trim(),
@@ -158,9 +160,8 @@ export default function ProjectsPage() {
         },
       });
 
-      setProjects((prev) =>
-        prev.map((p) => (p.id === editingProject.id ? data : p))
-      );
+      // Re-fetch to get accurate counts after any related changes
+      await loadProjects();
       setShowEditProjectModal(false);
       setEditingProject(null);
       setEditProjectName("");
@@ -433,6 +434,14 @@ export default function ProjectsPage() {
                     <span>{project.documents_count || 0} documents</span>
                     <span>•</span>
                     <span>{project.requirements_count || 0} requirements</span>
+                    {project.last_activity && (
+                      <>
+                        <span>•</span>
+                        <span title={new Date(project.last_activity).toLocaleString()}>
+                          {timeAgo(project.last_activity)}
+                        </span>
+                      </>
+                    )}
                   </div>
 
                   {/* Role Badge & Owner Info */}

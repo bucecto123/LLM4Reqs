@@ -235,7 +235,7 @@ const MessageBubble = ({
     <div
       className={`flex ${
         isUser ? "justify-end" : "justify-start"
-      } mb-4 transition-all duration-300 ease-out transform ${
+      } mb-4 transition-all duration-300 ease-out transform will-change-transform ${
         isVisible
           ? "opacity-100 translate-y-0 scale-100"
           : "opacity-0 translate-y-2 scale-[0.98]"
@@ -317,4 +317,12 @@ const MessageBubble = ({
   );
 };
 
-export default MessageBubble;
+export default React.memo(MessageBubble, (prevProps, nextProps) => {
+  // Only re-render if these specific props change (not deep comparison)
+  return (
+    prevProps.message?.id === nextProps.message?.id &&
+    prevProps.message?.content === nextProps.message?.content &&
+    prevProps.message?.role === nextProps.message?.role &&
+    prevProps.isStreaming === nextProps.isStreaming
+  );
+});

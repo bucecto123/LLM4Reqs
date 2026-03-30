@@ -5,9 +5,13 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- Preconnect to backend API for faster LCP -->
+    <!-- Preconnect to API, LLM service, and WebSocket for faster LCP -->
     <link rel="preconnect" href="http://localhost:8001" />
+    <link rel="preconnect" href="http://localhost:8000" />
+    <link rel="preconnect" href="http://localhost:8081" />
     <link rel="dns-prefetch" href="http://localhost:8001" />
+    <link rel="dns-prefetch" href="http://localhost:8000" />
+    <link rel="dns-prefetch" href="http://localhost:8081" />
 
     <!-- Optimize rendering -->
     <meta name="theme-color" content="#3B82F6" />

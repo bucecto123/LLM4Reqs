@@ -80,4 +80,9 @@ class Project extends Model
     {
         return $this->hasMany(RequirementConflict::class);
     }
+
+    public function activityLogs()
+    {
+        return $this->hasMany(ActivityLog::class);
+    }
 }

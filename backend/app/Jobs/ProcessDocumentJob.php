@@ -280,6 +280,23 @@ class ProcessDocumentJob implements ShouldQueue, ShouldBeUnique
             // This prevents individual incremental updates for each file, which is inefficient
             // The KB will be rebuilt in batch with all documents after upload completes
 
+            // Log activity
+            app(\App\Http\Controllers\Api\ActivityLogController::class)->log(
+                $document->project_id,
+                auth()->id(),
+                \App\Models\ActivityLog::ACTION_DOCUMENT_UPLOADED,
+                "Document '{$document->original_filename}' was uploaded and processed.",
+                ['document_id' => $document->id, 'requirements_extracted' => $savedCount]
+            );
+
+            // Notify the project owner
+            $projectName = $document->project_id !== null ? ($document->project->name ?? "Project #{$document->project_id}") : "a project";
+            \App\Models\Notification::documentProcessed(
+                $document->project_id ?? 0,
+                $projectName,
+                $savedCount
+            );
+
             // ===== Trigger conflict detection for the project (re-run on full requirement set) =====
             try {
                 $conflictService = app(\App\Services\ConflictDetectionService::class);

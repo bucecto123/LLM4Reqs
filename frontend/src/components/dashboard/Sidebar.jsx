@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   FolderKanban,
@@ -12,13 +12,11 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  ChevronsDown,
 } from "lucide-react";
 import { useLogout } from "../../hooks/useAuth.jsx";
+import { AnimateIn } from '../AnimateIn.jsx';
 
-const CONVERSATIONS_PER_PAGE = 20;
-
-const NavItem = memo(({ icon, label, active, isOpen, onClick }) => {
+const NavItem = ({ icon, label, active, isOpen, onClick }) => {
   const activeStyle = active
     ? { backgroundColor: "#112D4E", color: "#DBE2EF" }
     : {};
@@ -46,9 +44,9 @@ const NavItem = memo(({ icon, label, active, isOpen, onClick }) => {
       )}
     </button>
   );
-});
+};
 
-const ConversationItem = memo(({
+const ConversationItem = ({
   conversation,
   isSelected,
   isEditing,
@@ -62,7 +60,7 @@ const ConversationItem = memo(({
   onTitleChange,
   onToggleDropdown,
   onKeyPress,
-}) => {
+}) => (
   <div
     className={`group flex items-center rounded-xl cursor-pointer transition-all duration-300 ${
       isSelected
@@ -156,7 +154,7 @@ const ConversationItem = memo(({
       </div>
     )}
   </div>
-});
+);
 
 const Sidebar = ({
   isSidebarOpen,
@@ -191,31 +189,6 @@ const Sidebar = ({
   const location = useLocation();
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const accountRef = useRef();
-
-  // Conversation pagination state
-  const [conversationPage, setConversationPage] = useState(1);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-
-  // Visible conversations slice (paginated)
-  const visibleConversations = useMemo(
-    () => conversations.slice(0, conversationPage * CONVERSATIONS_PER_PAGE),
-    [conversations, conversationPage],
-  );
-  const hasMoreConversations = conversations.length > visibleConversations.length;
-
-  // Reset page when conversations change (new conversation added)
-  useEffect(() => {
-    setConversationPage(1);
-  }, [conversations.length]);
-
-  const handleLoadMoreConversations = useCallback(() => {
-    setIsLoadingMore(true);
-    // Simulate brief delay for visual feedback then increment page
-    setTimeout(() => {
-      setConversationPage((prev) => prev + 1);
-      setIsLoadingMore(false);
-    }, 200);
-  }, []);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -512,16 +485,15 @@ const Sidebar = ({
                       </p>
                     </div>
                   ) : (
-                    <>
-                      {visibleConversations.map((conversation) => (
-                      <ConversationItem
-                        key={conversation.id}
-                        conversation={conversation}
-                        isSelected={
-                          selectedConversation?.id === conversation.id
-                        }
-                        isEditing={editingConversationId === conversation.id}
-                        editingTitle={editingTitle}
+                    conversations.map((conversation, index) => (
+                      <AnimateIn key={conversation.id} direction="left" delayMs={40 + index * 20}>
+                        <ConversationItem
+                          conversation={conversation}
+                          isSelected={
+                            selectedConversation?.id === conversation.id
+                          }
+                          isEditing={editingConversationId === conversation.id}
+                          editingTitle={editingTitle}
                         showDropdown={showDropdownId === conversation.id}
                         onSelect={handleSelectConversation}
                         onStartEdit={onStartEditingConversation}
@@ -532,31 +504,9 @@ const Sidebar = ({
                         onToggleDropdown={onToggleDropdown}
                         onKeyPress={onEditKeyPress}
                       />
-                    ))}
-
-                    {/* Load More button */}
-                    {hasMoreConversations && (
-                      <button
-                        onClick={handleLoadMoreConversations}
-                        disabled={isLoadingMore}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        {isLoadingMore ? (
-                          <>
-                            <Loader2 size={14} className="animate-spin" />
-                            <span>Loading...</span>
-                          </>
-                        ) : (
-                          <>
-                            <ChevronsDown size={14} />
-                            <span className="font-medium">
-                              Load more ({conversations.length - visibleConversations.length} remaining)
-                            </span>
-                          </>
-                        )}
-                      </button>
-                    )}
-                  </>
+                    </AnimateIn>
+                  ))
+                )}
                 </div>
               </div>
             )}

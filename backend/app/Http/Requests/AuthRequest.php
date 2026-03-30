@@ -32,7 +32,7 @@ class AuthRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
-            'email' => 'required|email:rfc,dns',
+            'email' => 'required|email',
             'password' => 'required',
         ];
 

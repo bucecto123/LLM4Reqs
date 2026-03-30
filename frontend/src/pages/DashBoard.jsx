@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { apiFetch } from "../utils/auth.js";
 import { useDashboard } from "../hooks/useDashboard.js";
 import Sidebar from "../components/dashboard/Sidebar.jsx";
@@ -6,6 +6,14 @@ import ChatArea from "../components/dashboard/ChatArea.jsx";
 import FileUpload from "../components/FileUpload.jsx";
 import { DashboardSkeleton } from "../components/LoadingSkeleton.jsx";
 import echo from "../utils/echo.js";
+import { cache } from "../utils/cache.js";
+
+// Lazy load heavy components
+const GraphRenderer = lazy(() => import("../components/GraphRenderer.jsx"));
+const ConflictDetection = lazy(() => import("../components/ConflictDetection.jsx"));
+const ExportModal = lazy(() => import("../components/ExportModal.jsx"));
+const ImportModal = lazy(() => import("../components/ImportModal.jsx"));
+const PersonaManager = lazy(() => import("../components/dashboard/PersonaManager.jsx"));
 
 export default function LLMDashboard() {
   const {
@@ -60,6 +68,9 @@ export default function LLMDashboard() {
   const [latestAIMessageId, setLatestAIMessageId] = useState(null);
   const [isNewChatMode, setIsNewChatMode] = useState(false);
   const [needsConversationReload, setNeedsConversationReload] = useState(false);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [showContextPanel, setShowContextPanel] = useState(false);
+  const [conflictCount, setConflictCount] = useState(0);
 
   const toggleSidebar = () => {
     const newState = !isSidebarOpen;
@@ -89,6 +100,23 @@ export default function LLMDashboard() {
       });
     }
   }, [messages, isUserScrolling]);
+
+  // Load conflict count for project mode
+  useEffect(() => {
+    if (chatMode !== "project" || !currentProjectId) {
+      setConflictCount(0);
+      return;
+    }
+    const loadConflicts = async () => {
+      try {
+        const data = await apiFetch(`/api/projects/${currentProjectId}/dashboard`);
+        setConflictCount(data?.unresolved_conflicts ?? 0);
+      } catch {
+        setConflictCount(0);
+      }
+    };
+    loadConflicts();
+  }, [chatMode, currentProjectId]);
 
   // WebSocket listener for streaming messages
   useEffect(() => {
@@ -363,6 +391,9 @@ export default function LLMDashboard() {
 
         // Immediately add the new conversation to the list
         setConversations((prev) => [newConversation, ...prev]);
+        // Bust conversations cache so next load picks up the new entry
+        const newConvCacheKey = chatMode === "normal" ? "conversations_normal" : `conversations_project_${currentProjectId}`;
+        cache.invalidate(newConvCacheKey, "conversations");
 
         // Set messages to empty first
         setMessages([]);
@@ -473,6 +504,7 @@ export default function LLMDashboard() {
         ...(modelProvider && { provider: modelProvider }),
         ...(chatMode === "project" &&
           currentProjectId && { project_id: currentProjectId }),
+        ...(webSearchEnabled && { include_web_search: true }),
       };
 
       const response = await apiFetch(
@@ -589,6 +621,9 @@ export default function LLMDashboard() {
 
       setEditingConversationId(null);
       setEditingTitle("");
+      // Bust conversations cache so next load picks up the updated title
+      const updateCacheKey = chatMode === "normal" ? "conversations_normal" : `conversations_project_${currentProjectId}`;
+      cache.invalidate(updateCacheKey, "conversations");
     } catch (err) {
       console.error("Failed to update title:", err);
       setError("Failed to update conversation title");
@@ -613,6 +648,9 @@ export default function LLMDashboard() {
         setIsNewChatMode(false);
       }
       setShowDropdownId(null);
+      // Bust conversations cache so next load removes the deleted entry
+      const deleteCacheKey = chatMode === "normal" ? "conversations_normal" : `conversations_project_${currentProjectId}`;
+      cache.invalidate(deleteCacheKey, "conversations");
     } catch (err) {
       console.error("Failed to delete:", err);
       setError("Failed to delete conversation");
@@ -716,6 +754,11 @@ export default function LLMDashboard() {
         selectedModelId={selectedModelId}
         onSelectModel={setSelectedModelId}
         user={user}
+        webSearchEnabled={webSearchEnabled}
+        setWebSearchEnabled={setWebSearchEnabled}
+        showContextPanel={showContextPanel}
+        setShowContextPanel={setShowContextPanel}
+        conflictCount={conflictCount}
       />
 
       {isFileUploadOpen && (

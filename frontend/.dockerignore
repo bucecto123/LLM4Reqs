@@ -1,2 +1,37 @@
+# Dependencies
 node_modules
+
+# Build output (regenerated at build time)
 dist
+
+# Version control
+.git
+.gitignore
+
+# Editor / IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Tests
+tests
+*.test.js
+*.spec.js
+__tests__
+
+# Docs
+*.md
+!README.md
+
+# CI
+.github
+.gitlab-ci.yml

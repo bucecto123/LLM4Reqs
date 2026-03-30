@@ -6,6 +6,8 @@ import "./index.css";
 import { AuthProvider, useAuth } from "./hooks/useAuth.jsx";
 import { isAuthenticated, getAccessToken } from "./utils/auth";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { ToastProvider } from "./components/Toast.jsx";
+import PerfOverlay from "./components/PerfOverlay.jsx";
 
 // Route-based code splitting — heavy pages are lazy-loaded
 const LLMDashboard = lazy(() => import("./pages/DashBoard"));
@@ -102,6 +104,9 @@ function LegacyApp() {
 // Production builds automatically disable StrictMode anyway
 createRoot(document.getElementById("root")).render(
   // <StrictMode>  // Temporarily disabled - causes duplicate renders
+  <ToastProvider>
   <App />
+  <PerfOverlay />
+  </ToastProvider>
   // </StrictMode>
 );

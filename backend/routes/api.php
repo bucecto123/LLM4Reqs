@@ -15,6 +15,8 @@ use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\ProjectKBController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\LLMController;
+use App\Http\Controllers\Api\ActivityLogController;
+use App\Http\Controllers\Api\NotificationsController;
 
 Route::prefix('llm')->group(function () {
     Route::get('/models', [LLMController::class, 'index']);
@@ -56,14 +58,22 @@ Route::middleware('auth:sanctum')->group(function () {
     // Projects API
     Route::apiResource('projects', ProjectController::class);
     Route::get('/projects/{project}/requirements', [ProjectController::class, 'getRequirements']);
+    Route::get('/projects/{project}/requirements/export', [ProjectController::class, 'exportRequirements']);
+    Route::post('/projects/{project}/requirements/import', [ProjectController::class, 'importRequirements']);
     Route::get('/projects/{project}/conflicts', [ProjectController::class, 'getConflicts']);
+    Route::get('/projects/{project}/dashboard', [ProjectController::class, 'dashboard']);
+    Route::get('/projects/{project}/activity', [ActivityLogController::class, 'index']);
     Route::get('/users/{user}/projects', [ProjectController::class, 'getUserProjects']);
 
     // Project Collaborators (Sharing) API
     Route::get('/projects/{project}/collaborators', [ProjectCollaboratorController::class, 'index']);
     Route::post('/projects/{project}/collaborators', [ProjectCollaboratorController::class, 'store']);
+    // By collaborator PK (legacy — prefer the user-based endpoints below)
     Route::put('/projects/{project}/collaborators/{collaborator}', [ProjectCollaboratorController::class, 'update']);
     Route::delete('/projects/{project}/collaborators/{collaborator}', [ProjectCollaboratorController::class, 'destroy']);
+    // By user_id — used by the frontend sharing service
+    Route::put('/projects/{project}/collaborators/user/{user}', [ProjectCollaboratorController::class, 'updateByUser']);
+    Route::delete('/projects/{project}/collaborators/user/{user}', [ProjectCollaboratorController::class, 'destroyByUser']);
 
     // Story Graph API
     Route::get('/projects/{project}/story-graph', [StoryGraphController::class, 'generate']);
@@ -128,6 +138,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/conflicts/status/{jobId}', [ConflictController::class, 'getJobStatus']);
     Route::post('/conflicts/process/{jobId}', [ConflictController::class, 'processJob']);
     Route::get('/projects/{project}/conflicts', [ConflictController::class, 'getProjectConflicts']);
+    Route::get('/conflicts/project/{projectId}', [ConflictController::class, 'getProjectConflictsList']);
     Route::post('/projects/{project}/conflicts/auto-resolve', [ConflictController::class, 'autoResolveConflicts']);
     Route::post('/conflicts/{conflict}/resolve-ai', [ConflictController::class, 'resolveConflictWithAI']);
     Route::put('/conflicts/{conflict}/resolve', [ConflictController::class, 'resolveConflict']);
@@ -144,4 +155,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Export API (with CORS for file downloads)
     Route::get('/projects/{project}/export', [ExportController::class, 'exportProject'])->middleware('cors');
+
+    // Notifications API
+    Route::get('/notifications', [NotificationsController::class, 'index']);
+    Route::put('/notifications/{id}/read', [NotificationsController::class, 'markAsRead']);
+    Route::put('/notifications/read-all', [NotificationsController::class, 'markAllAsRead']);
+    Route::get('/notifications/unread-count', [NotificationsController::class, 'unreadCount']);
 });

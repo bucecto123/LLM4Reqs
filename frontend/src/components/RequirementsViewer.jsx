@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   FileText,
   AlertCircle,
@@ -8,9 +8,13 @@ import {
   Flag,
   Download,
   Calendar,
+  Upload,
 } from "lucide-react";
 import { apiFetch } from "../utils/auth.js";
+import { cache } from "../utils/cache.js";
+import { AnimateIn } from './AnimateIn.jsx';
 import ExportModal from "./ExportModal.jsx";
+import ImportModal from "./ImportModal.jsx";
 
 // Skeleton row placeholder shown while loading more items
 function RequirementSkeletonRow() {
@@ -40,7 +44,7 @@ function RequirementSkeletonRow() {
   );
 }
 
-export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
+const RequirementsViewer = React.memo(function RequirementsViewer({ projectId, onClose, refreshKey }) {
   const [requirements, setRequirements] = useState([]);       // full dataset for current filter
   const [displayedRequirements, setDisplayedRequirements] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -60,6 +64,7 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const [isPriorityDropdownOpen, setIsPriorityDropdownOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [projectName, setProjectName] = useState("");
 
   useEffect(() => {
@@ -72,6 +77,12 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
     fetchProjectName();
     // eslint-disable-next-line
   }, [projectId, filters, refreshKey]);
+
+  // Build a stable cache key per filter set — memoized to avoid recomputation on every render
+  const cacheKey = useMemo(
+    () => `requirements_${projectId}_${filters.type}_${filters.priority}_${filters.search}`,
+    [projectId, filters.type, filters.priority, filters.search]
+  );
 
   // Fetch a single page of requirements and append to displayed list
   const fetchPage = useCallback(async (pageNum) => {
@@ -106,13 +117,18 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
       );
       setTotalCount(total);
       setHasMore(pageNum < (response.last_page || 1));
+
+      // Cache page 1 so subsequent visits are instant
+      if (pageNum === 1) {
+        cache.set(cacheKey, { data: newItems, total }, 5 * 60 * 1000, 'requirements');
+      }
     } catch (err) {
       console.error("Failed to load requirements:", err);
       setError(err.message || "Failed to load requirements.");
     } finally {
       isFetchingRef.current = false;
     }
-  }, [projectId, filters]);
+  }, [projectId, filters, cacheKey]);
 
   // IntersectionObserver for auto-load on scroll
   useEffect(() => {
@@ -158,6 +174,18 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
   const fetchRequirements = async () => {
     setIsLoading(true);
     setError(null);
+    // Try cache first for instant page-1 render
+    const cached = cache.getFresh(cacheKey, 'requirements');
+    if (cached) {
+      setRequirements(cached.data);
+      setDisplayedRequirements(cached.data);
+      setTotalCount(cached.total);
+      setHasMore(cached.data.length < cached.total);
+      setIsLoading(false);
+      // Refresh in background
+      fetchPage(1);
+      return;
+    }
     await fetchPage(1);
     setIsLoading(false);
   };
@@ -183,6 +211,13 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
           >
             <Download className="w-4 h-4 mr-2 inline" />
             Export
+          </button>
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="px-4 py-2 rounded-lg bg-white hover:bg-indigo-50 transition-colors font-medium text-indigo-600 hover:text-indigo-700 border border-indigo-200 shadow-sm hover:shadow-md"
+          >
+            <Upload className="w-4 h-4 mr-2 inline" />
+            Import
           </button>
           <button
             onClick={() => {
@@ -450,6 +485,7 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
             </p>
           </div>
         ) : (
+          <AnimateIn direction="up" delayMs={40}>
           <div className="space-y-3">
             {displayedRequirements.map((req) => {
               const priorityColors = {
@@ -532,6 +568,7 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
               );
             })}
           </div>
+          </AnimateIn>
         )}
       </div>
       {/* Infinite scroll load-more footer */}
@@ -738,6 +775,27 @@ export default function RequirementsViewer({ projectId, onClose, refreshKey }) {
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
       />
+
+      {/* Import Modal */}
+      {isImportModalOpen && (
+        <ImportModal
+          projectId={projectId}
+          onClose={() => setIsImportModalOpen(false)}
+          onImport={(count) => {
+            setIsImportModalOpen(false);
+            // Bust the requirements cache so the import is reflected immediately
+            cache.invalidateNamespace('requirements');
+            // Refresh requirements list
+            setPage(1);
+            setDisplayedRequirements([]);
+            setRequirements([]);
+            setHasMore(true);
+            fetchRequirements();
+          }}
+        />
+      )}
     </div>
   );
-}
+});
+
+export default RequirementsViewer;

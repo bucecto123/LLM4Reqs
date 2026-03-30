@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { apiFetch } from "../utils/auth";
 import { useAuth, useLogout } from "./useAuth.jsx";
+import { cache } from "../utils/cache.js";
 
 export const useDashboard = () => {
   // Authentication
@@ -59,12 +60,50 @@ export const useDashboard = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // Load projects and set current project
+  // Background refresh for projects — defined FIRST so it can be called by loadProjects
+  const _refreshProjects = async () => {
+    try {
+      const data = await apiFetch("/api/projects");
+      setProjects(Array.isArray(data) ? data : []);
+      cache.set("projects_list", data, 5 * 60 * 1000, "projects");
+    } catch (_) {}
+  };
+
+  // Load projects and set current project — checks cache first for instant UI
   const loadProjects = async () => {
+    // Try cache first for instant UI
+    const cached = cache.getFresh("projects_list", "projects");
+    if (cached) {
+      setProjects(Array.isArray(cached) ? cached : []);
+      // Still refresh in background
+      _refreshProjects();
+      // Set project from URL only on initial cache hit
+      const projectIdFromUrl = searchParams.get("project");
+      if (projectIdFromUrl) {
+        const projectId = parseInt(projectIdFromUrl);
+        const projectExists = cached?.some((p) => p.id === projectId);
+        if (projectExists) {
+          setChatMode("project");
+          setCurrentProjectId(projectId);
+          setSearchParams({});
+        } else {
+          console.warn(`Project ${projectId} not found`);
+        }
+      } else if (chatMode === "project") {
+        if (cached && cached.length > 0) {
+          setCurrentProjectId(cached[0].id);
+        }
+      }
+      setIsInitializing(false);
+      return;
+    }
+
+    // Normal fetch path
     try {
       setIsInitializing(true);
       const data = await apiFetch("/api/projects");
       setProjects(Array.isArray(data) ? data : []);
+      cache.set("projects_list", data, 5 * 60 * 1000, "projects");
 
       const projectIdFromUrl = searchParams.get("project");
 
@@ -109,6 +148,8 @@ export const useDashboard = () => {
       });
       setProjects([defaultProject]);
       setCurrentProjectId(defaultProject.id);
+      // Bust the projects cache so next load picks up the new project
+      cache.invalidate("projects_list", "projects");
     } catch (err) {
       console.error("Failed to create default project:", err);
       let errorMessage =
@@ -125,23 +166,10 @@ export const useDashboard = () => {
     }
   };
 
-  // Load conversations for current project
-  const loadConversations = async (
-    mode = chatMode,
-    projectId = currentProjectId,
-  ) => {
-    // Prevent concurrent loads
-    if (isLoadingConversationsRef.current) {
-      return;
-    }
-
-    // Don't load if in project mode but no project ID yet
-    if (mode === "project" && !projectId) {
-      return;
-    }
-
+  // Background refresh helper for conversations
+  const _refreshConversations = async (mode, projectId, cacheKey) => {
+    if (isLoadingConversationsRef.current) return;
     isLoadingConversationsRef.current = true;
-
     try {
       let data;
       if (mode === "normal") {
@@ -153,28 +181,51 @@ export const useDashboard = () => {
         setIsLoadingConversations(false);
         return;
       }
-
       setConversations(Array.isArray(data) ? data : []);
+      cache.set(cacheKey, data, 2 * 60 * 1000, "conversations");
     } catch (err) {
-      console.error("Failed to load conversations:", err);
-      setError("Failed to load conversations");
-      setConversations([]);
+      // silently handle
     } finally {
       isLoadingConversationsRef.current = false;
       setIsLoadingConversations(false);
     }
   };
 
-  // Load available models
-  const loadModels = async () => {
+  // Load conversations for current project — checks cache first for instant UI
+  const loadConversations = async (
+    mode = chatMode,
+    projectId = currentProjectId,
+  ) => {
+    // Don't load if in project mode but no project ID yet
+    if (mode === "project" && !projectId) {
+      return;
+    }
+
+    // Try cache for instant UI
+    const cacheKey = mode === "normal" ? "conversations_normal" : `conversations_project_${projectId}`;
+    const cached = cache.getFresh(cacheKey, "conversations");
+    if (cached) {
+      setConversations(Array.isArray(cached) ? cached : []);
+      // Refresh in background (only if not already loading)
+      if (!isLoadingConversationsRef.current) {
+        _refreshConversations(mode, projectId, cacheKey);
+      }
+      return;
+    }
+
+    await _refreshConversations(mode, projectId, cacheKey);
+  };
+
+  // Background refresh helper for models
+  const _refreshModels = async () => {
     if (isLoadingModelsRef.current) return;
     isLoadingModelsRef.current = true;
     try {
       const data = await apiFetch("/api/llm/models");
       if (Array.isArray(data)) {
         setModels(data);
+        cache.set("models_list", data, 60 * 60 * 1000, "models");
         if (data.length > 0 && !selectedModelId) {
-          // Default to llama-3.3-70b-versatile if available, otherwise first model
           const preferredModel = data.find(
             (m) => m.model_id === "llama-3.3-70b-versatile",
           );
@@ -183,13 +234,30 @@ export const useDashboard = () => {
           );
         }
       }
-    } catch (err) {
-      console.error("Failed to load models:", err);
-      // Fallback
-      setModels([]);
-    } finally {
+    } catch (_) {}
+    finally {
       isLoadingModelsRef.current = false;
     }
+  };
+
+  // Load available models — checks cache first (models change rarely)
+  const loadModels = async () => {
+    const cached = cache.getFresh("models_list", "models");
+    if (cached) {
+      setModels(Array.isArray(cached) ? cached : []);
+      if (Array.isArray(cached) && cached.length > 0 && !selectedModelId) {
+        const preferredModel = cached.find(
+          (m) => m.model_id === "llama-3.3-70b-versatile",
+        );
+        setSelectedModelId(
+          preferredModel ? preferredModel.model_id : cached[0].model_id,
+        );
+      }
+      // Refresh in background
+      _refreshModels();
+      return;
+    }
+    await _refreshModels();
   };
 
   // Load messages for selected conversation
