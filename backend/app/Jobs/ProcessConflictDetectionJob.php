@@ -19,7 +19,7 @@ class ProcessConflictDetectionJob implements ShouldQueue
     public int $projectId;
     public int $tries = 3;
     public array $backoff = [10, 30, 90];
-    public int $timeout = 180;
+    public int $timeout = 300;
 
     public function __construct(string $jobId, int $projectId)
     {
@@ -35,10 +35,13 @@ class ProcessConflictDetectionJob implements ShouldQueue
         ]);
 
         try {
-            // Poll the LLM service for job status (max 3 attempts, 5s apart)
+            // Poll the LLM service for job status with exponential backoff
+            // Max 12 attempts: 10s, 10s, 15s, 15s, 20s, 20s, 25s, 25s, 30s, 30s, 30s, 30s (~260s total)
             $result = null;
-            for ($attempt = 1; $attempt <= 6; $attempt++) {
-                Log::info("ProcessConflictDetectionJob: Poll attempt {$attempt}", [
+            $pollIntervals = [10, 10, 15, 15, 20, 20, 25, 25, 30, 30, 30, 30];
+            foreach ($pollIntervals as $attempt => $sleepSeconds) {
+                $attemptNum = $attempt + 1;
+                Log::info("ProcessConflictDetectionJob: Poll attempt {$attemptNum}/12", [
                     'job_id' => $this->jobId,
                 ]);
 
@@ -51,6 +54,7 @@ class ProcessConflictDetectionJob implements ShouldQueue
                     Log::info('ProcessConflictDetectionJob: Job completed', [
                         'job_id' => $this->jobId,
                         'conflict_count' => count($result),
+                        'attempts' => $attemptNum,
                     ]);
                     break;
                 }
@@ -64,7 +68,7 @@ class ProcessConflictDetectionJob implements ShouldQueue
                 }
 
                 // Wait before next poll
-                sleep(5);
+                sleep($sleepSeconds);
             }
 
             if ($result === null) {

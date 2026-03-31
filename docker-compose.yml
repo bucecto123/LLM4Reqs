@@ -4,8 +4,13 @@ services:
       context: ./llm
     env_file:
       - ./llm/.env
+    environment:
+      # Override KB_BASE_DIR to use the persistent named volume, not /tmp
+      KB_BASE_DIR: /data/faiss_store
     ports:
       - "8000:8000"
+    volumes:
+      - llm_data:/data/faiss_store
     # Production mode: no source bind mount, no --reload
     command: uvicorn main:app --host 0.0.0.0 --port 8000
     healthcheck:
@@ -43,6 +48,7 @@ services:
       - "8001:80"
     volumes:
       - sqlite_data:/var/www/html/database
+      - backend_storage:/var/www/html/storage
     depends_on:
       llm:
         condition: service_healthy
@@ -58,6 +64,8 @@ services:
              chmod 666 /var/www/html/database/database.sqlite &&
              php artisan migrate --force &&
              chmod 666 /var/www/html/database/database.sqlite &&
+             mkdir -p /var/www/html/storage/app/conflicts &&
+             chmod -R 755 /var/www/html/storage &&
              php-fpm -D &&
              nginx -g 'daemon off;'"
 
@@ -109,6 +117,7 @@ services:
       BROADCAST_CONNECTION: reverb
     volumes:
       - sqlite_data:/var/www/html/database
+      - backend_storage:/var/www/html/storage
     depends_on:
       - backend
     command: php artisan queue:work --tries=3 --sleep=1 --max-time=3600
@@ -132,4 +141,6 @@ services:
 
 volumes:
   sqlite_data:
+  llm_data:
+  backend_storage:
 

@@ -25,3 +25,7 @@ llm/data/*.json
 
 # node modules
 node_modules/
+
+# Windows artifact files (created by redirecting to nul/numeric paths)
+frontend/nul
+frontend/563
