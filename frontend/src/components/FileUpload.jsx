@@ -1,7 +1,12 @@
-import React, { useState, useRef } from 'react';
-import { Paperclip, X, Upload, File, FileText, FileImage } from 'lucide-react';
+import React, { useState, useRef } from "react";
+import { Paperclip, X, Upload, File, FileText, FileImage } from "lucide-react";
 
-const FileUpload = ({ onFilesSelected, onClose, maxFiles = 5, maxSizePerFile = 10 }) => {
+const FileUpload = ({
+  onFilesSelected,
+  onClose,
+  maxFiles = 5,
+  maxSizePerFile = 10,
+}) => {
   const [files, setFiles] = useState([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [error, setError] = useState(null);
@@ -9,19 +14,40 @@ const FileUpload = ({ onFilesSelected, onClose, maxFiles = 5, maxSizePerFile = 1
 
   // Supported file types
   const supportedTypes = {
-    'application/pdf': { icon: FileText, color: 'text-red-500', label: 'PDF' },
-    'application/msword': { icon: FileText, color: 'text-blue-500', label: 'DOC' },
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': { icon: FileText, color: 'text-blue-500', label: 'DOCX' },
-    'text/plain': { icon: File, color: 'text-gray-500', label: 'TXT' },
-    'application/vnd.ms-excel': { icon: FileText, color: 'text-green-500', label: 'XLS' },
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': { icon: FileText, color: 'text-green-500', label: 'XLSX' },
-    'application/vnd.ms-powerpoint': { icon: FileText, color: 'text-orange-500', label: 'PPT' },
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation': { icon: FileText, color: 'text-orange-500', label: 'PPTX' },
-    'image/jpeg': { icon: FileImage, color: 'text-purple-500', label: 'JPEG' },
-    'image/png': { icon: FileImage, color: 'text-purple-500', label: 'PNG' },
-    'image/gif': { icon: FileImage, color: 'text-purple-500', label: 'GIF' },
-    'text/markdown': { icon: FileText, color: 'text-indigo-500', label: 'MD' },
-    'text/csv': { icon: FileText, color: 'text-green-500', label: 'CSV' }
+    "application/pdf": { icon: FileText, color: "text-red-500", label: "PDF" },
+    "application/msword": {
+      icon: FileText,
+      color: "text-blue-500",
+      label: "DOC",
+    },
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {
+      icon: FileText,
+      color: "text-blue-500",
+      label: "DOCX",
+    },
+    "text/plain": { icon: File, color: "text-gray-500", label: "TXT" },
+    "application/vnd.ms-excel": {
+      icon: FileText,
+      color: "text-green-500",
+      label: "XLS",
+    },
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+      icon: FileText,
+      color: "text-green-500",
+      label: "XLSX",
+    },
+    "application/vnd.ms-powerpoint": {
+      icon: FileText,
+      color: "text-orange-500",
+      label: "PPT",
+    },
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+      { icon: FileText, color: "text-orange-500", label: "PPTX" },
+    "image/jpeg": { icon: FileImage, color: "text-purple-500", label: "JPEG" },
+    "image/png": { icon: FileImage, color: "text-purple-500", label: "PNG" },
+    "image/gif": { icon: FileImage, color: "text-purple-500", label: "GIF" },
+    "text/markdown": { icon: FileText, color: "text-indigo-500", label: "MD" },
+    "text/csv": { icon: FileText, color: "text-green-500", label: "CSV" },
   };
 
   const validateFile = (file) => {
@@ -40,10 +66,10 @@ const FileUpload = ({ onFilesSelected, onClose, maxFiles = 5, maxSizePerFile = 1
 
   const handleFiles = (newFiles) => {
     setError(null);
-    
+
     // Convert FileList to Array and validate
     const fileArray = Array.from(newFiles);
-    
+
     // Check total number of files
     if (files.length + fileArray.length > maxFiles) {
       setError(`You can only upload up to ${maxFiles} files at once.`);
@@ -58,24 +84,25 @@ const FileUpload = ({ onFilesSelected, onClose, maxFiles = 5, maxSizePerFile = 1
         setError(validationError);
         return;
       }
-      
+
       // Check for duplicates
-      const isDuplicate = files.some(existingFile => 
-        existingFile.name === file.name && existingFile.size === file.size
+      const isDuplicate = files.some(
+        (existingFile) =>
+          existingFile.name === file.name && existingFile.size === file.size,
       );
-      
+
       if (!isDuplicate) {
         validFiles.push({
           file,
           id: Math.random().toString(36).substr(2, 9),
           name: file.name,
           size: file.size,
-          type: file.type
+          type: file.type,
         });
       }
     }
 
-    setFiles(prev => [...prev, ...validFiles]);
+    setFiles((prev) => [...prev, ...validFiles]);
   };
 
   const handleDragOver = (e) => {
@@ -91,7 +118,7 @@ const FileUpload = ({ onFilesSelected, onClose, maxFiles = 5, maxSizePerFile = 1
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragOver(false);
-    
+
     const droppedFiles = e.dataTransfer.files;
     if (droppedFiles.length > 0) {
       handleFiles(droppedFiles);
@@ -105,19 +132,19 @@ const FileUpload = ({ onFilesSelected, onClose, maxFiles = 5, maxSizePerFile = 1
   };
 
   const removeFile = (fileId) => {
-    setFiles(prev => prev.filter(f => f.id !== fileId));
+    setFiles((prev) => prev.filter((f) => f.id !== fileId));
     setError(null);
   };
 
   const handleUpload = () => {
     if (files.length === 0) {
-      setError('Please select at least one file to upload.');
+      setError("Please select at least one file to upload.");
       return;
     }
 
     // Pass the files to the parent component
-    onFilesSelected(files.map(f => f.file));
-    
+    onFilesSelected(files.map((f) => f.file));
+
     // Reset the component
     setFiles([]);
     setError(null);
@@ -125,25 +152,28 @@ const FileUpload = ({ onFilesSelected, onClose, maxFiles = 5, maxSizePerFile = 1
   };
 
   const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return "0 Bytes";
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   const getFileIcon = (fileType) => {
-    const fileInfo = supportedTypes[fileType] || { icon: File, color: 'text-gray-500' };
+    const fileInfo = supportedTypes[fileType] || {
+      icon: File,
+      color: "text-gray-500",
+    };
     const IconComponent = fileInfo.icon;
     return <IconComponent className={`w-4 h-4 ${fileInfo.color}`} />;
   };
 
   const getFileLabel = (fileType) => {
-    return supportedTypes[fileType]?.label || 'FILE';
+    return supportedTypes[fileType]?.label || "FILE";
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[200] p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -152,7 +182,9 @@ const FileUpload = ({ onFilesSelected, onClose, maxFiles = 5, maxSizePerFile = 1
               <Paperclip className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Upload Files</h3>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Upload Files
+              </h3>
               <p className="text-sm text-gray-500">
                 Upload up to {maxFiles} files (max {maxSizePerFile}MB each)
               </p>
@@ -174,21 +206,24 @@ const FileUpload = ({ onFilesSelected, onClose, maxFiles = 5, maxSizePerFile = 1
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
             className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-              isDragOver 
-                ? 'border-blue-500 bg-blue-50' 
-                : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+              isDragOver
+                ? "border-blue-500 bg-blue-50"
+                : "border-gray-300 hover:border-gray-400 hover:bg-gray-50"
             }`}
           >
-            <Upload className={`w-12 h-12 mx-auto mb-4 ${
-              isDragOver ? 'text-blue-500' : 'text-gray-400'
-            }`} />
+            <Upload
+              className={`w-12 h-12 mx-auto mb-4 ${
+                isDragOver ? "text-blue-500" : "text-gray-400"
+              }`}
+            />
             <p className="text-lg font-medium text-gray-700 mb-2">
               Drop files here or click to browse
             </p>
             <p className="text-sm text-gray-500 mb-4">
-              Supports PDF, DOC, DOCX, TXT, XLS, XLSX, PPT, PPTX, images, and more
+              Supports PDF, DOC, DOCX, TXT, XLS, XLSX, PPT, PPTX, images, and
+              more
             </p>
-            
+
             <input
               ref={fileInputRef}
               type="file"
@@ -251,7 +286,10 @@ const FileUpload = ({ onFilesSelected, onClose, maxFiles = 5, maxSizePerFile = 1
         <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
           <div className="text-sm text-gray-500">
             {files.length > 0 && (
-              <span>{files.length} file{files.length !== 1 ? 's' : ''} ready to upload</span>
+              <span>
+                {files.length} file{files.length !== 1 ? "s" : ""} ready to
+                upload
+              </span>
             )}
           </div>
           <div className="flex items-center space-x-3">

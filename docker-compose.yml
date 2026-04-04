@@ -4,6 +4,7 @@ services:
       context: ./llm
     env_file:
       - ./llm/.env
+    user: root
     environment:
       # Override KB_BASE_DIR to use the persistent named volume, not /tmp
       KB_BASE_DIR: /data/faiss_store
@@ -65,7 +66,12 @@ services:
              php artisan migrate --force &&
              chmod 666 /var/www/html/database/database.sqlite &&
              mkdir -p /var/www/html/storage/app/conflicts &&
-             chmod -R 755 /var/www/html/storage &&
+             mkdir -p /var/www/html/storage/logs &&
+             mkdir -p /var/www/html/storage/framework/cache &&
+             mkdir -p /var/www/html/storage/framework/sessions &&
+             mkdir -p /var/www/html/storage/framework/views &&
+             chown -R www-data:www-data /var/www/html/storage &&
+             chmod -R 775 /var/www/html/storage &&
              php-fpm -D &&
              nginx -g 'daemon off;'"
 
@@ -126,9 +132,11 @@ services:
     build:
       context: ./frontend
       args:
-        # Build-time vars baked into the bundle via nginx/Vite multi-stage build.
-        # Must match backend's REVERB_APP_KEY (set via docker-compose environment overrides).
-        VITE_API_BASE: http://backend:80
+        # Leave VITE_API_BASE empty so the bundle uses relative /api/* paths.
+        # nginx (in the same container) proxies /api/ → http://backend:80.
+        # Setting it to "http://backend:80" would make the *browser* try to
+        # reach that internal Docker hostname, which it can't.
+        VITE_API_BASE: ""
         VITE_REVERB_HOST: localhost
         VITE_REVERB_PORT: "8081"
         VITE_REVERB_SCHEME: http
@@ -143,4 +151,3 @@ volumes:
   sqlite_data:
   llm_data:
   backend_storage:
-

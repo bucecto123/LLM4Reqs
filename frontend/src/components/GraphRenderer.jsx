@@ -101,6 +101,11 @@ const GraphRenderer = ({
   const [loading, setLoading] = useState(false);
   const [mermaidSvg, setMermaidSvg] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.25, 3));
+  const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.25, 0.25));
+  const handleResetZoom = () => setZoomLevel(1);
 
   // React Flow state
   const [flowNodes, setFlowNodes, onNodesChange] = useNodesState([]);
@@ -126,6 +131,16 @@ const GraphRenderer = ({
 
           setMermaidSvg(svg);
           mermaidRef.current.innerHTML = svg;
+
+          // Apply current zoom level immediately after render
+          const renderedSvg = mermaidRef.current.querySelector('svg');
+          if (renderedSvg) {
+            renderedSvg.style.zoom = String(zoomLevel);
+            renderedSvg.style.maxWidth = 'none';
+            renderedSvg.style.display = 'block';
+            renderedSvg.style.margin = 'auto';
+          }
+
           setLoading(false);
         } catch (err) {
           console.error('Mermaid render error:', err);
@@ -137,6 +152,30 @@ const GraphRenderer = ({
       renderMermaid();
     }
   }, [type, mermaidCode]);
+
+  // Apply zoom to inline diagram whenever zoomLevel changes
+  useEffect(() => {
+    const svg = mermaidRef.current?.querySelector('svg');
+    if (svg) {
+      svg.style.zoom = String(zoomLevel);
+      svg.style.maxWidth = 'none';
+      svg.style.display = 'block';
+      svg.style.margin = 'auto';
+    }
+  }, [zoomLevel]);
+
+  // Apply zoom to modal SVG (modal uses dangerouslySetInnerHTML so SVG is child of modalRef)
+  const modalRef = useRef(null);
+  useEffect(() => {
+    if (!isModalOpen || !modalRef.current) return;
+    const svg = modalRef.current.querySelector('svg');
+    if (svg) {
+      svg.style.zoom = String(zoomLevel);
+      svg.style.maxWidth = 'none';
+      svg.style.display = 'block';
+      svg.style.margin = 'auto';
+    }
+  }, [zoomLevel, isModalOpen]);
 
   // Setup React Flow
   useEffect(() => {
@@ -442,40 +481,125 @@ const GraphRenderer = ({
   // Render Mermaid diagram
   if (type === 'mermaid') {
     return (
-      <div className={`relative border border-gray-300 rounded-lg overflow-hidden ${className}`} style={{ height }}>
-        {/* Loading overlay — kept in-tree so mermaidRef div is always mounted */}
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-20">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
-              <p className="text-gray-600">Rendering graph...</p>
+      <>
+        {/* Fullscreen Modal */}
+        {isModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex flex-col bg-black/80 backdrop-blur-sm"
+            onClick={(e) => { if (e.target === e.currentTarget) setIsModalOpen(false); }}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 bg-white/10 border-b border-white/20">
+              <span className="text-white font-semibold text-sm tracking-wide">Diagram — Fullscreen</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleZoomOut}
+                  disabled={zoomLevel <= 0.25}
+                  className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition disabled:opacity-40"
+                  title="Zoom Out"
+                >
+                  <ZoomOut size={18} />
+                </button>
+                <button
+                  onClick={handleResetZoom}
+                  className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg transition text-xs font-mono min-w-[3.5rem] text-center"
+                  title="Reset zoom"
+                >
+                  {Math.round(zoomLevel * 100)}%
+                </button>
+                <button
+                  onClick={handleZoomIn}
+                  disabled={zoomLevel >= 4}
+                  className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition disabled:opacity-40"
+                  title="Zoom In"
+                >
+                  <ZoomIn size={18} />
+                </button>
+                <div className="w-px h-6 bg-white/20 mx-1" />
+                <button
+                  onClick={exportAsSVG}
+                  className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition"
+                  title="Export as SVG"
+                >
+                  <Download size={18} />
+                </button>
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="p-2 bg-white/10 hover:bg-red-500/60 text-white rounded-lg transition ml-1"
+                  title="Close fullscreen"
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
+            {/* Modal diagram */}
+            <div
+              ref={modalRef}
+              className="flex-1 overflow-auto p-8 flex items-center justify-center"
+              dangerouslySetInnerHTML={{ __html: mermaidSvg }}
+            />
           </div>
         )}
-        {interactive && (
-          <div className="absolute top-4 right-4 z-10 flex gap-2">
-            <button
-              onClick={exportAsSVG}
-              className="p-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition"
-              title="Export as SVG"
-            >
-              <Download size={18} />
-            </button>
-            <button
-              onClick={exportAsPNG}
-              className="p-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition"
-              title="Export as PNG"
-            >
-              <Maximize2 size={18} />
-            </button>
-          </div>
-        )}
-        <div
-          ref={mermaidRef}
-          className="w-full h-full overflow-auto p-8 bg-white flex items-center justify-center"
-          style={{ minHeight: height }}
-        />
-      </div>
+
+        {/* Normal card view */}
+        <div className={`relative border border-gray-300 rounded-lg ${className}`} style={{ height }}>
+          {/* Loading overlay */}
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-20">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
+                <p className="text-gray-600">Rendering graph...</p>
+              </div>
+            </div>
+          )}
+          {interactive && (
+            <div className="absolute top-4 right-4 z-10 flex gap-2">
+              <button
+                onClick={handleZoomOut}
+                className="p-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition"
+                title="Zoom Out"
+                disabled={zoomLevel <= 0.25}
+              >
+                <ZoomOut size={18} />
+              </button>
+              <button
+                onClick={handleResetZoom}
+                className="px-2 py-1 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition text-xs font-mono text-gray-600 min-w-[3rem] text-center"
+                title="Reset zoom"
+              >
+                {Math.round(zoomLevel * 100)}%
+              </button>
+              <button
+                onClick={handleZoomIn}
+                className="p-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition"
+                title="Zoom In"
+                disabled={zoomLevel >= 3}
+              >
+                <ZoomIn size={18} />
+              </button>
+              <button
+                onClick={exportAsSVG}
+                className="p-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition"
+                title="Export as SVG"
+              >
+                <Download size={18} />
+              </button>
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="p-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition"
+                title="Fullscreen"
+              >
+                <Maximize2 size={18} />
+              </button>
+            </div>
+          )}
+          <div
+            ref={mermaidRef}
+            className="w-full h-full overflow-auto p-8 bg-white flex items-center justify-center"
+            style={{ minHeight: height }}
+          />
+        </div>
+      </>
     );
   }
 

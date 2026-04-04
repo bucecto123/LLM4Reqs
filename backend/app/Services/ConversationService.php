@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Events\MessageChunk;
 use App\Models\Conversation;
+use App\Models\Document;
 use App\Models\KnowledgeBase;
 use App\Models\Message;
 use App\Utils\TextCommons;
@@ -20,6 +21,31 @@ class ConversationService
     {
         $this->llmService = $llmService;
         $this->textCommons = $textCommons;
+    }
+
+    /**
+     * Resolve documents to inject into prompt context.
+     * Prefer conversation-bound docs; fall back to project docs when needed.
+     */
+    private function getDocumentsForContext(Conversation $conversation)
+    {
+        $conversationDocs = $conversation->documents;
+        if ($conversationDocs && $conversationDocs->count() > 0) {
+            return $conversationDocs;
+        }
+
+        if (!$conversation->project_id) {
+            return $conversationDocs;
+        }
+
+        return Document::query()
+            ->where('project_id', $conversation->project_id)
+            ->whereNotIn('status', ['failed'])
+            ->whereNotNull('content')
+            ->where('content', '!=', '')
+            ->orderByDesc('updated_at')
+            ->limit(10)
+            ->get();
     }
 
     public function createConversation($data)
@@ -206,13 +232,16 @@ class ConversationService
             }
         }
         
-        // Fallback to uploaded documents if KB context is empty
-        if (empty($kbContext) && $conversation->documents->count() > 0) {
+        $documentsForContext = $this->getDocumentsForContext($conversation);
+
+        // Include uploaded document text context whenever available.
+        // KB snippets are useful, but users also expect direct file content to be readable.
+        if ($documentsForContext->count() > 0) {
             $documentContext = "\n\n=== UPLOADED DOCUMENTS CONTEXT ===\n";
             $totalTokens = 0;
             $maxDocumentTokens = 6000;
             
-            foreach ($conversation->documents as $document) {
+            foreach ($documentsForContext as $document) {
                 $fileHeader = "\n--- File: {$document->original_filename} ---\n";
                 $content = $document->content ?? '';
                 
@@ -238,12 +267,13 @@ class ConversationService
         }
 
         // Enhanced context with document information
-        $enhancedContext = 'You are helping with requirements engineering and software development. When asked to create any diagram, graph, flowchart, sequence diagram, class diagram, use case diagram, or any other visual representation, always output it as a mermaid code block using ```mermaid syntax. Do not use any other format for diagrams.';
+        $enhancedContext = 'You are helping with requirements engineering and software development. When asked to create any diagram, graph, flowchart, sequence diagram, class diagram, use case diagram, or any other visual representation, always output it as a mermaid code block using ```mermaid syntax. Do not use any other format for diagrams. IMPORTANT Mermaid syntax rules: (1) For flowcharts use "graph LR" or "graph TD". (2) Edge labels MUST use pipe characters: A -->|label text| B. NEVER use bracket style like A -->[label]> B which is invalid. (3) Node labels with special characters must be quoted: A["Node Label"]. (4) Always validate that arrows use correct syntax: --> for plain arrows, -->|text| for labeled arrows.';
         
-        // Prioritize KB context if available
+        // Include both KB and raw document contexts when present.
         if (!empty($kbContext)) {
             $enhancedContext .= ' The following are relevant requirements from the project knowledge base. Use these to provide accurate, context-aware answers.' . $kbContext;
-        } elseif (!empty($documentContext)) {
+        }
+        if (!empty($documentContext)) {
             $enhancedContext .= ' The user has uploaded documents in this conversation. Use the document contents provided in the context to answer questions and provide relevant assistance.' . $documentContext;
         }
 
@@ -429,13 +459,15 @@ class ConversationService
             }
         }
 
-        // Fallback to documents if no KB context
-        if (empty($kbContext) && $conversation->documents->count() > 0) {
+        $documentsForContext = $this->getDocumentsForContext($conversation);
+
+        // Include uploaded document text context whenever available.
+        if ($documentsForContext->count() > 0) {
             $documentContext = "\n\n=== UPLOADED DOCUMENTS CONTEXT ===\n";
             $totalTokens = 0;
             $maxDocumentTokens = 6000;
             
-            foreach ($conversation->documents as $document) {
+            foreach ($documentsForContext as $document) {
                 $fileHeader = "\n--- File: {$document->original_filename} ---\n";
                 $content = $document->content ?? '';
                 $content = $this->textCommons->cleanUtf8Content($content);
@@ -459,11 +491,12 @@ class ConversationService
             $documentContext .= "\n=== END DOCUMENTS CONTEXT ===\n\n";
         }
 
-        $enhancedContext = 'You are helping with requirements engineering and software development. When asked to create any diagram, graph, flowchart, sequence diagram, class diagram, use case diagram, or any other visual representation, always output it as a mermaid code block using ```mermaid syntax. Do not use any other format for diagrams.';
+        $enhancedContext = 'You are helping with requirements engineering and software development. When asked to create any diagram, graph, flowchart, sequence diagram, class diagram, use case diagram, or any other visual representation, always output it as a mermaid code block using ```mermaid syntax. Do not use any other format for diagrams. IMPORTANT Mermaid syntax rules: (1) For flowcharts use "graph LR" or "graph TD". (2) Edge labels MUST use pipe characters: A -->|label text| B. NEVER use bracket style like A -->[label]> B which is invalid. (3) Node labels with special characters must be quoted: A["Node Label"]. (4) Always validate that arrows use correct syntax: --> for plain arrows, -->|text| for labeled arrows.';
 
         if (!empty($kbContext)) {
             $enhancedContext .= ' The following are relevant requirements from the project knowledge base.' . $kbContext;
-        } elseif (!empty($documentContext)) {
+        }
+        if (!empty($documentContext)) {
             $enhancedContext .= ' The user has uploaded documents in this conversation.' . $documentContext;
         }
 

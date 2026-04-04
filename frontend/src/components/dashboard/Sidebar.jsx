@@ -14,7 +14,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useLogout } from "../../hooks/useAuth.jsx";
-import { AnimateIn } from '../AnimateIn.jsx';
+import { AnimateIn } from "../AnimateIn.jsx";
 
 const NavItem = ({ icon, label, active, isOpen, onClick }) => {
   const activeStyle = active
@@ -33,14 +33,21 @@ const NavItem = ({ icon, label, active, isOpen, onClick }) => {
       }`}
       style={activeStyle}
     >
+      {active && (
+        <div className="absolute inset-0 bg-white/10 -skew-x-12 nav-item-shimmer pointer-events-none" />
+      )}
       <div
-        className={active ? "" : "group-hover:scale-110 transition-transform"}
+        className={`relative z-10 ${active ? "" : "group-hover:scale-110 transition-transform"}`}
       >
         {icon}
       </div>
-      {isOpen && <span className="font-semibold">{label}</span>}
-      {active && (
-        <div className="absolute inset-0 bg-white/10 -skew-x-12 animate-shimmer" />
+      {isOpen && (
+        <span
+          className="font-semibold relative z-10"
+          style={{ color: active ? "#7DD3FC" : undefined }}
+        >
+          {label}
+        </span>
       )}
     </button>
   );
@@ -66,7 +73,7 @@ const ConversationItem = ({
       isSelected
         ? "bg-blue-50 border-l-4 border-blue-500 shadow-sm scale-[1.02]"
         : "hover:bg-gray-50 hover:shadow-sm hover:scale-[1.01]"
-    }`}
+    } ${showDropdown ? "pb-10" : ""}`}
   >
     {/* Clickable conversation info area */}
     <div
@@ -75,7 +82,7 @@ const ConversationItem = ({
           onSelect(conversation);
         }
       }}
-      className="flex-1 min-w-0 p-3"
+      className="flex-1 min-w-0 p-3 pr-2"
     >
       {isEditing ? (
         <div className="flex items-center space-x-2">
@@ -88,13 +95,19 @@ const ConversationItem = ({
             autoFocus
           />
           <button
-            onClick={(e) => { e.stopPropagation(); onSaveEdit(conversation.id); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSaveEdit(conversation.id);
+            }}
             className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors flex-shrink-0"
           >
             <Check size={16} />
           </button>
           <button
-            onClick={(e) => { e.stopPropagation(); onCancelEdit(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCancelEdit();
+            }}
             className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
           >
             <X size={16} />
@@ -114,7 +127,7 @@ const ConversationItem = ({
 
     {/* Three-dot menu button — always in flow, shown on hover */}
     {!isEditing && (
-      <div className="relative flex-shrink-0 pr-2">
+      <div className="relative flex-shrink-0 pr-3 py-3 self-start">
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -203,12 +216,15 @@ const Sidebar = ({
     return () => window.removeEventListener("click", handleClickOutside);
   }, [onToggleDropdown]);
 
-  const handleSelectConversation = useCallback((conversation) => {
-    onSelectConversation(conversation);
-    if (isMobile) {
-      onToggleSidebar();
-    }
-  }, [onSelectConversation, isMobile, onToggleSidebar]);
+  const handleSelectConversation = useCallback(
+    (conversation) => {
+      onSelectConversation(conversation);
+      if (isMobile) {
+        onToggleSidebar();
+      }
+    },
+    [onSelectConversation, isMobile, onToggleSidebar],
+  );
 
   return (
     <>
@@ -220,13 +236,13 @@ const Sidebar = ({
           75% { transform: translateX(-3px) translateY(-2px) rotate(8deg); }
         }
         
-        @keyframes shimmer {
+        @keyframes navItemShimmer {
           0% { transform: translateX(-100%) skewX(-12deg); }
           100% { transform: translateX(200%) skewX(-12deg); }
         }
         
-        .animate-shimmer {
-          animation: shimmer 3s infinite;
+        .nav-item-shimmer {
+          animation: navItemShimmer 2.5s infinite;
         }
         
         .fish-swim {
@@ -486,7 +502,11 @@ const Sidebar = ({
                     </div>
                   ) : (
                     conversations.map((conversation, index) => (
-                      <AnimateIn key={conversation.id} direction="left" delayMs={40 + index * 20}>
+                      <AnimateIn
+                        key={conversation.id}
+                        direction="left"
+                        delayMs={40 + index * 20}
+                      >
                         <ConversationItem
                           conversation={conversation}
                           isSelected={
@@ -494,19 +514,19 @@ const Sidebar = ({
                           }
                           isEditing={editingConversationId === conversation.id}
                           editingTitle={editingTitle}
-                        showDropdown={showDropdownId === conversation.id}
-                        onSelect={handleSelectConversation}
-                        onStartEdit={onStartEditingConversation}
-                        onCancelEdit={onCancelEditing}
-                        onSaveEdit={onSaveConversationTitle}
-                        onDelete={onDeleteConversation}
-                        onTitleChange={onEditTitleChange}
-                        onToggleDropdown={onToggleDropdown}
-                        onKeyPress={onEditKeyPress}
-                      />
-                    </AnimateIn>
-                  ))
-                )}
+                          showDropdown={showDropdownId === conversation.id}
+                          onSelect={handleSelectConversation}
+                          onStartEdit={onStartEditingConversation}
+                          onCancelEdit={onCancelEditing}
+                          onSaveEdit={onSaveConversationTitle}
+                          onDelete={onDeleteConversation}
+                          onTitleChange={onEditTitleChange}
+                          onToggleDropdown={onToggleDropdown}
+                          onKeyPress={onEditKeyPress}
+                        />
+                      </AnimateIn>
+                    ))
+                  )}
                 </div>
               </div>
             )}

@@ -154,19 +154,36 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
     manualNotes: "",
   });
 
+  const detectAndLoadConflicts = async () => {
+    if (!projectId) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      await apiFetch(`/api/projects/${projectId}/conflicts/detect`, {
+        method: "POST",
+      });
+
+      await loadConflicts();
+    } catch (err) {
+      console.error("Error running conflict detection:", err);
+      setError(err.message || "Failed to run conflict detection");
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!projectId) return;
 
-    // Try cache first for instant render, then refresh in background
-    const cached = cache.getFresh(`conflicts_${projectId}`, 'conflicts');
+    // Show cached data quickly, then always run detection to keep results fresh.
+    const cached = cache.getFresh(`conflicts_${projectId}`, "conflicts");
     if (cached) {
       setConflicts(cached);
       setLoading(false);
-      // Refresh in background
-      loadConflicts();
-    } else {
-      loadConflicts();
     }
+
+    detectAndLoadConflicts();
     fetchProjectName();
   }, [projectId]);
 
@@ -237,10 +254,15 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
         });
 
         // Cache the fresh data
-        cache.set(`conflicts_${projectId}`, formattedConflicts, 5 * 60 * 1000, 'conflicts');
+        cache.set(
+          `conflicts_${projectId}`,
+          formattedConflicts,
+          5 * 60 * 1000,
+          "conflicts",
+        );
         setConflicts(formattedConflicts);
       } else {
-        cache.set(`conflicts_${projectId}`, [], 5 * 60 * 1000, 'conflicts');
+        cache.set(`conflicts_${projectId}`, [], 5 * 60 * 1000, "conflicts");
         setConflicts([]);
       }
     } catch (err) {
@@ -315,7 +337,7 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
       );
 
       if (response.success) {
-        cache.invalidate(`conflicts_${projectId}`, 'conflicts');
+        cache.invalidate(`conflicts_${projectId}`, "conflicts");
         await loadConflicts();
       } else {
         throw new Error(
@@ -350,7 +372,7 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
         body: { resolution_notes: manualNotes.trim() },
       });
 
-      cache.invalidate(`conflicts_${projectId}`, 'conflicts');
+      cache.invalidate(`conflicts_${projectId}`, "conflicts");
       await loadConflicts();
     } catch (err) {
       console.error("Failed to resolve conflict:", err);
@@ -398,7 +420,7 @@ export const ConflictsDisplay = ({ projectId, onClose }) => {
         </h2>
         <div className="flex items-center space-x-2">
           <button
-            onClick={loadConflicts}
+            onClick={detectAndLoadConflicts}
             className="px-4 py-2 rounded-lg bg-white hover:bg-orange-50 transition-colors font-medium text-orange-600 hover:text-orange-700 border border-orange-200 shadow-sm hover:shadow-md"
           >
             Refresh

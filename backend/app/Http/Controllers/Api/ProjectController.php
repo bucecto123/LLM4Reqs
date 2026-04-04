@@ -291,10 +291,10 @@ class ProjectController extends Controller
             ->whereHas('requirement2')
             ->with([
                 'requirement1' => function($query) {
-                    $query->select('id', 'title', 'requirement_text', 'requirement_type');
+                    $query->select('id', 'requirement_number', 'title', 'requirement_text', 'requirement_type');
                 },
                 'requirement2' => function($query) {
-                    $query->select('id', 'title', 'requirement_text', 'requirement_type');
+                    $query->select('id', 'requirement_number', 'title', 'requirement_text', 'requirement_type');
                 }
             ])
             ->when(request('severity'), function($query, $severity) {
@@ -303,6 +303,7 @@ class ProjectController extends Controller
             ->when(request('resolution_status'), function($query, $status) {
                 return $query->where('resolution_status', $status);
             })
+            ->orderBy('conflict_number', 'asc')
             ->orderBy('created_at', 'desc')
             ->paginate(request('per_page', 15));
         

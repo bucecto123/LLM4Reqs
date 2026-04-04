@@ -4,7 +4,12 @@
 
 import perfMonitor from './performanceMonitor.js';
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8001";
+// Use empty string when VITE_API_BASE is not set so relative paths go through
+// the Vite dev proxy (or nginx proxy in Docker). When it IS set (e.g. during
+// a non-proxied build), prefix requests with the full base URL.
+const API_BASE = import.meta.env.VITE_API_BASE
+  ? import.meta.env.VITE_API_BASE.replace(/\/$/, '')
+  : '';
 
 // Storage keys
 const ACCESS_TOKEN_KEY = "access_token";
@@ -41,11 +46,16 @@ class AuthManager {
 
     const timeUntilExpiry = parseInt(expiryTime) - Date.now();
 
+    // Only proactively refresh when token is close to expiry but still valid.
+    // Do NOT call logout() here — an expired token will naturally get a 401
+    // which triggers the refresh-retry flow inside apiFetch. Calling logout()
+    // proactively would wipe credentials before the request even runs.
     if (timeUntilExpiry <= REFRESH_THRESHOLD && timeUntilExpiry > 0) {
-      await this.refreshToken();
-    } else if (timeUntilExpiry <= 0) {
-      // Token has expired
-      this.logout();
+      try {
+        await this.refreshToken();
+      } catch (e) {
+        // Ignore — the request will retry or surface a proper 401 error
+      }
     }
   }
 
@@ -78,11 +88,19 @@ class AuthManager {
       fetchOptions.body = JSON.stringify(fetchOptions.body);
     }
 
-    // Wrap fetch with timing and deduplication
-    const dedupeKey = `${options.method || 'GET'} ${path}`;
-    return perfMonitor.dedupe(dedupeKey, async () => {
+    // Build the full URL — use API_BASE prefix so the request works regardless
+    // of which port the browser is accessing the app from. When API_BASE is ''
+    // (local dev with Vite proxy) the path stays relative, which the proxy picks up.
+    const url = `${API_BASE}${path}`;
+
+    // Only dedupe safe read-only (GET) requests. Mutations (POST/PUT/DELETE)
+    // must never be deduplicated — each call should hit the server independently.
+    const method = (options.method || 'GET').toUpperCase();
+    const dedupeKey = method === 'GET' ? `GET ${path}` : null;
+
+    const doFetch = async () => {
       try {
-        const response = await fetch(`${API_BASE}${path}`, {
+        const response = await fetch(url, {
           ...fetchOptions,
           headers,
         });
@@ -95,11 +113,10 @@ class AuthManager {
             const newAccessToken = this.getAccessToken();
             if (newAccessToken) {
               headers["Authorization"] = `Bearer ${newAccessToken}`;
-              const retryResponse = await fetch(`${API_BASE}${path}`, {
+              const retryResponse = await fetch(url, {
                 ...fetchOptions,
                 headers,
               });
-              perfMonitor.timed(`${options.method || 'GET'} ${path} [retry]`, async () => retryResponse);
               return this.handleResponse(retryResponse);
             }
           } catch (refreshError) {
@@ -109,13 +126,14 @@ class AuthManager {
           }
         }
 
-        perfMonitor.timed(`${options.method || 'GET'} ${path}`, async () => response);
         return this.handleResponse(response);
       } catch (error) {
         console.error("API fetch error:", error);
         throw error;
       }
-    });
+    };
+
+    return dedupeKey ? perfMonitor.dedupe(dedupeKey, doFetch) : doFetch();
   }
 
   /**

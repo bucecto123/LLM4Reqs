@@ -177,30 +177,18 @@ class ConflictDetectionService
 
         foreach ($conflicts as $conflict) {
             try {
-                // Parse requirement IDs (remove "REQ_" or "REQ-" prefix if present)
-                $req1Id = $conflict['req_id_1'];
-                $req2Id = $conflict['req_id_2'];
+                $req1Raw = $conflict['req_id_1'] ?? null;
+                $req2Raw = $conflict['req_id_2'] ?? null;
 
-                // Strip prefixes: "REQ_", "REQ-", or just numeric
-                if (is_string($req1Id)) {
-                    $req1Id = preg_replace('/^REQ[-_]/i', '', $req1Id);
-                    $req1Id = is_numeric($req1Id) ? (int)$req1Id : $req1Id;
-                }
-                if (is_string($req2Id)) {
-                    $req2Id = preg_replace('/^REQ[-_]/i', '', $req2Id);
-                    $req2Id = is_numeric($req2Id) ? (int)$req2Id : $req2Id;
-                }
-
-                // Find requirements by their IDs
-                $req1 = Requirement::find($req1Id);
-                $req2 = Requirement::find($req2Id);
+                // Resolve requirement references robustly: DB id first, then requirement_number.
+                $req1 = $this->resolveRequirementReference($projectId, $req1Raw);
+                $req2 = $this->resolveRequirementReference($projectId, $req2Raw);
 
                 if (!$req1 || !$req2) {
                     Log::warning("Skipping conflict - requirement not found", [
-                        'req_id_1_original' => $conflict['req_id_1'],
-                        'req_id_1_parsed' => $req1Id,
-                        'req_id_2_original' => $conflict['req_id_2'],
-                        'req_id_2_parsed' => $req2Id,
+                        'project_id' => $projectId,
+                        'req_id_1_original' => $req1Raw,
+                        'req_id_2_original' => $req2Raw,
                         'req1_found' => (bool)$req1,
                         'req2_found' => (bool)$req2,
                     ]);
@@ -257,6 +245,40 @@ class ConflictDetectionService
         ]);
 
         return $saved;
+    }
+
+    /**
+     * Resolve a requirement reference returned by the LLM.
+     * Accepts DB id values and project-scoped requirement_number values.
+     */
+    private function resolveRequirementReference(int $projectId, mixed $rawReference): ?Requirement
+    {
+        if ($rawReference === null || $rawReference === '') {
+            return null;
+        }
+
+        $candidate = $rawReference;
+        if (is_string($candidate)) {
+            $candidate = preg_replace('/^REQ[-_]/i', '', trim($candidate));
+        }
+
+        if (!is_numeric($candidate)) {
+            return null;
+        }
+
+        $value = (int) $candidate;
+
+        $requirement = Requirement::where('project_id', $projectId)
+            ->where('id', $value)
+            ->first();
+
+        if ($requirement) {
+            return $requirement;
+        }
+
+        return Requirement::where('project_id', $projectId)
+            ->where('requirement_number', $value)
+            ->first();
     }
 
     /**

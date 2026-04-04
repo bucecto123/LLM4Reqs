@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useRef, lazy, Suspense, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  lazy,
+  Suspense,
+} from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -27,6 +34,7 @@ import {
   Eye,
 } from "lucide-react";
 import { apiFetch } from "../utils/auth.js";
+import { cache } from "../utils/cache.js";
 import { useAuth } from "../hooks/useAuth.jsx";
 import Sidebar from "../components/dashboard/Sidebar.jsx";
 import MessageBubble from "../components/dashboard/MessageBubble.jsx";
@@ -40,7 +48,7 @@ import InviteForm from "../components/InviteForm.jsx";
 import { canEdit } from "../services/sharingService";
 import echo from "../utils/echo.js";
 import ModelSelector from "../components/dashboard/ModelSelector.jsx";
-import ProjectDashboardCard from "../components/ProjectDashboardCard.jsx";
+
 import ActivityFeed from "../components/ActivityFeed.jsx";
 
 import {
@@ -109,9 +117,11 @@ const PersonaDropdownItem = ({
 
     {/* Text */}
     <div className="flex-1 min-w-0">
-      <p className={`text-sm font-semibold leading-tight truncate ${
-        selected && !showActions ? "text-violet-900" : "text-slate-800"
-      }`}>
+      <p
+        className={`text-sm font-semibold leading-tight truncate ${
+          selected && !showActions ? "text-violet-900" : "text-slate-800"
+        }`}
+      >
         {label}
       </p>
       {description && (
@@ -125,7 +135,10 @@ const PersonaDropdownItem = ({
         <>
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
             className="p-1.5 rounded-md text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
             title="Edit persona"
           >
@@ -133,7 +146,10 @@ const PersonaDropdownItem = ({
           </button>
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
             className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
             title="Delete persona"
           >
@@ -141,9 +157,7 @@ const PersonaDropdownItem = ({
           </button>
         </>
       ) : (
-        selected && (
-          <div className="w-1.5 h-1.5 rounded-full bg-violet-600" />
-        )
+        selected && <div className="w-1.5 h-1.5 rounded-full bg-violet-600" />
       )}
     </div>
   </div>
@@ -195,8 +209,8 @@ export default function ProjectDetailPage() {
             convList.map((conv) =>
               apiFetch(`/api/conversations/${conv.id}/messages`)
                 .then((res) => res.messages ?? [])
-                .catch(() => [])
-            )
+                .catch(() => []),
+            ),
           );
           setAllProjectMessages(results.flat());
         })
@@ -266,18 +280,12 @@ export default function ProjectDetailPage() {
   // Model state
   const [models, setModels] = useState([]);
   const [selectedModelId, setSelectedModelId] = useState(null);
-  const [dashboard, setDashboard] = useState(null);
-  const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
 
   // Activity Feed state
   const [activities, setActivities] = useState([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
 
   const isLoadingModelsRef = useRef(false);
-
-  // PERFORMANCE: Track which conversations have had their messages loaded this session
-  // Skips redundant fetch for conversations already in memory
-  const loadedMessagesRef = useRef(new Set());
 
   // PERFORMANCE: Track whether graph tab has been initialized to prevent re-fetching
   // graph messages on every tab switch
@@ -425,8 +433,6 @@ export default function ProjectDetailPage() {
 
     // Reset graph initialization flag when project changes so stale data isn't shown
     isGraphTabInitializedRef.current = false;
-    // Reset message deduplication cache on project switch
-    loadedMessagesRef.current = new Set();
 
     const initializeProject = async () => {
       setIsLoading(true);
@@ -459,7 +465,9 @@ export default function ProjectDetailPage() {
         // 2. Conversations
         (async () => {
           try {
-            const data = await apiFetch(`/api/projects/${projectId}/conversations`);
+            const data = await apiFetch(
+              `/api/projects/${projectId}/conversations`,
+            );
             setConversations(data || []);
           } catch (err) {
             console.error("Failed to load project conversations:", err);
@@ -476,8 +484,12 @@ export default function ProjectDetailPage() {
                 setPersonas(response.all);
               } else if (response.data) {
                 const allPersonas = [
-                  ...(Array.isArray(response.data.predefined) ? response.data.predefined : []),
-                  ...(Array.isArray(response.data.custom) ? response.data.custom : []),
+                  ...(Array.isArray(response.data.predefined)
+                    ? response.data.predefined
+                    : []),
+                  ...(Array.isArray(response.data.custom)
+                    ? response.data.custom
+                    : []),
                 ];
                 setPersonas(allPersonas);
               } else {
@@ -503,8 +515,12 @@ export default function ProjectDetailPage() {
             if (Array.isArray(data)) {
               setModels(data);
               if (data.length > 0 && !selectedModelId) {
-                const preferredModel = data.find((m) => m.model_id === "llama-3.3-70b-versatile");
-                setSelectedModelId(preferredModel ? preferredModel.model_id : data[0].model_id);
+                const preferredModel = data.find(
+                  (m) => m.model_id === "llama-3.3-70b-versatile",
+                );
+                setSelectedModelId(
+                  preferredModel ? preferredModel.model_id : data[0].model_id,
+                );
               }
             }
           } catch (err) {
@@ -536,20 +552,6 @@ export default function ProjectDetailPage() {
     }
   }, [activeTab, projectId]);
 
-  // Load project dashboard metrics
-  const refreshDashboard = useCallback(() => {
-    if (!projectId) return;
-    setIsLoadingDashboard(true);
-    apiFetch(`/api/projects/${projectId}/dashboard`)
-      .then(setDashboard)
-      .catch(() => setDashboard(null))
-      .finally(() => setIsLoadingDashboard(false));
-  }, [projectId]);
-
-  useEffect(() => {
-    refreshDashboard();
-  }, [refreshDashboard]);
-
   // Auto-scroll effect
   useEffect(() => {
     if (messagesEndRef.current && !isUserScrolling) {
@@ -580,6 +582,7 @@ export default function ProjectDetailPage() {
       if (data.metadata?.status === "started") {
         console.log("🎬 Streaming started");
         streamState.tempMessageId = data.message_id;
+        streamState.buffer = "";
         setStreamingMessageId(data.message_id);
         setIsSendingMessage(false);
 
@@ -597,36 +600,63 @@ export default function ProjectDetailPage() {
         });
       } else if (data.is_complete) {
         console.log("✅ Streaming complete");
+        const targetId = streamState.tempMessageId || data.message_id;
 
         if (streamState.animationFrameId) {
           cancelAnimationFrame(streamState.animationFrameId);
         }
 
-        // Flush remaining buffer
-        if (streamState.buffer) {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === data.message_id
-                ? { ...m, content: streamState.buffer, isStreaming: false }
-                : m,
-            ),
-          );
-          streamState.buffer = "";
+        // Prefer persisted message payload from backend completion event.
+        if (data.metadata?.message) {
+          setMessages((prev) => {
+            let updated = false;
+            const next = prev.map((m) => {
+              if (m.id === targetId || m.id === data.message_id) {
+                updated = true;
+                return { ...data.metadata.message, isStreaming: false };
+              }
+              return m;
+            });
+            if (!updated) {
+              next.push({ ...data.metadata.message, isStreaming: false });
+            }
+            return next;
+          });
         } else {
-          // Use the final content from metadata or data
           const finalContent =
-            data.metadata?.message?.content || data.content || data.chunk || "";
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === data.message_id
-                ? { ...m, content: finalContent, isStreaming: false }
-                : m,
-            ),
-          );
+            streamState.buffer || data.content || data.chunk || "";
+          setMessages((prev) => {
+            let updated = false;
+            const next = prev.map((m) => {
+              if (m.id === targetId || m.id === data.message_id) {
+                updated = true;
+                return {
+                  ...m,
+                  id: data.message_id || m.id,
+                  content: finalContent,
+                  isStreaming: false,
+                };
+              }
+              return m;
+            });
+            if (!updated && finalContent) {
+              next.push({
+                id: data.message_id,
+                role: "assistant",
+                content: finalContent,
+                created_at: new Date().toISOString(),
+                isStreaming: false,
+              });
+            }
+            return next;
+          });
         }
 
+        streamState.buffer = "";
+        streamState.tempMessageId = null;
+
         setStreamingMessageId(null);
-        setLatestAIMessageId(data.message_id);
+        setLatestAIMessageId(data.metadata?.message?.id || data.message_id);
 
         // No need to reload documents on every message completion
         // Documents are already loaded and only change when explicitly uploaded
@@ -646,11 +676,12 @@ export default function ProjectDetailPage() {
           // Update immediately for smooth typewriter effect (no throttling)
           const currentBuffer = streamState.buffer;
           streamState.lastUpdateTime = timestamp;
+          const targetId = streamState.tempMessageId || data.message_id;
 
           if (currentBuffer) {
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === data.message_id ? { ...m, content: currentBuffer } : m,
+                m.id === targetId ? { ...m, content: currentBuffer } : m,
               ),
             );
           }
@@ -703,7 +734,9 @@ export default function ProjectDetailPage() {
     if (!projectId) return;
     setIsLoadingActivities(true);
     try {
-      const data = await apiFetch(`/api/projects/${projectId}/activity?per_page=20`);
+      const data = await apiFetch(
+        `/api/projects/${projectId}/activity?per_page=20`,
+      );
       setActivities(data.data || []);
     } catch {
       setActivities([]);
@@ -715,11 +748,6 @@ export default function ProjectDetailPage() {
   // PERFORMANCE: Deduplication — skip fetch if messages already loaded this session.
   // 50 messages × N re-selects adds up quickly; the ref persists across re-renders.
   const loadMessages = async (conversationId) => {
-    if (loadedMessagesRef.current.has(conversationId)) {
-      return; // Already loaded — state already has the messages
-    }
-    loadedMessagesRef.current.add(conversationId);
-
     try {
       setIsLoadingMessages(true);
       const data = await apiFetch(
@@ -734,8 +762,6 @@ export default function ProjectDetailPage() {
     } catch (err) {
       console.error("Failed to load messages:", err);
       setError("Failed to load messages");
-      // Remove from cache so retry is possible on next select
-      loadedMessagesRef.current.delete(conversationId);
     } finally {
       setIsLoadingMessages(false);
     }
@@ -986,13 +1012,20 @@ export default function ProjectDetailPage() {
         }
       }
     },
-    [isSendingMessage, isLoadingMessages, message, attachedFiles.length, handleSendMessage],
+    [
+      isSendingMessage,
+      isLoadingMessages,
+      message,
+      attachedFiles.length,
+      handleSendMessage,
+    ],
   );
 
   const handleScroll = useCallback((e) => {
     const container = e.target;
     const isAtBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight < 50;
+      container.scrollHeight - container.scrollTop - container.clientHeight <
+      50;
     setIsUserScrolling(!isAtBottom);
   }, []);
 
@@ -1089,9 +1122,12 @@ export default function ProjectDetailPage() {
 
     try {
       setError(null);
-      const response = await apiFetch(`/api/projects/${projectId}/conflicts/detect`, {
-        method: "POST",
-      });
+      const response = await apiFetch(
+        `/api/projects/${projectId}/conflicts/detect`,
+        {
+          method: "POST",
+        },
+      );
       console.log("Conflict detection result:", response);
 
       if (response.total_conflicts > 0) {
@@ -1158,7 +1194,9 @@ export default function ProjectDetailPage() {
     const endpoint = kbReady
       ? `/api/projects/${projectId}/kb/reindex`
       : `/api/projects/${projectId}/kb/build`;
-    const progressMsg = kbReady ? "Adding to Knowledge Base..." : "Building Knowledge Base...";
+    const progressMsg = kbReady
+      ? "Adding to Knowledge Base..."
+      : "Building Knowledge Base...";
 
     try {
       onProgress?.(progressMsg);
@@ -1223,6 +1261,12 @@ export default function ProjectDetailPage() {
         const currentDocs = Array.isArray(prev) ? prev : [];
         return currentDocs.filter((doc) => doc.id !== documentToDelete.id);
       });
+
+      // Ensure requirement/conflict lists refresh immediately after deletion.
+      cache.invalidateNamespace("requirements");
+      cache.invalidateNamespace("conflicts");
+      setKBRefreshKey((prev) => prev + 1);
+
       setError(null);
       closeDeleteModal();
     } catch (err) {
@@ -1230,10 +1274,6 @@ export default function ProjectDetailPage() {
       setError("Failed to delete document. Please try again.");
       setIsDeletingDocument(false);
     }
-  };
-
-  const openInDashboard = () => {
-    navigate(`/dashboard?project=${projectId}`);
   };
 
   // Show skeleton immediately for fast LCP - DON'T wait for data
@@ -1332,10 +1372,7 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
 
-              <div
-                className="flex items-center gap-3"
-                ref={personaDropdownRef}
-              >
+              <div className="flex items-center gap-3" ref={personaDropdownRef}>
                 {/* Persona trigger pill */}
                 <div className="relative">
                   <button
@@ -1347,9 +1384,16 @@ export default function ProjectDetailPage() {
                         : "bg-white border-gray-200 text-slate-600 hover:border-violet-300 hover:text-violet-700"
                     }`}
                   >
-                    <Sparkles size={14} className={selectedPersonaId ? "text-violet-600" : "text-slate-400"} />
+                    <Sparkles
+                      size={14}
+                      className={
+                        selectedPersonaId ? "text-violet-600" : "text-slate-400"
+                      }
+                    />
                     <span className="hidden sm:inline">
-                      {selectedPersonaId ? activePersona?.name || "Persona" : "Normal Mode"}
+                      {selectedPersonaId
+                        ? activePersona?.name || "Persona"
+                        : "Normal Mode"}
                     </span>
                     <ChevronDown
                       size={13}
@@ -1371,8 +1415,13 @@ export default function ProjectDetailPage() {
 
                       {isLoadingPersonas ? (
                         <div className="p-6 text-center">
-                          <Loader2 size={18} className="animate-spin text-violet-400 mx-auto" />
-                          <p className="text-xs text-slate-400 mt-2">Loading…</p>
+                          <Loader2
+                            size={18}
+                            className="animate-spin text-violet-400 mx-auto"
+                          />
+                          <p className="text-xs text-slate-400 mt-2">
+                            Loading…
+                          </p>
                         </div>
                       ) : (
                         <>
@@ -1394,7 +1443,9 @@ export default function ProjectDetailPage() {
                           {/* Custom personas list */}
                           {personaList.length > 0 && (
                             <div className="border-t border-gray-100 pt-1 pb-1">
-                              <p className="text-xs text-slate-400 px-4 py-1.5">Custom personas</p>
+                              <p className="text-xs text-slate-400 px-4 py-1.5">
+                                Custom personas
+                              </p>
                               {personaList.map((persona) => (
                                 <PersonaDropdownItem
                                   key={persona.id}
@@ -1406,9 +1457,15 @@ export default function ProjectDetailPage() {
                                     setSelectedPersonaId(persona.id);
                                     setIsPersonaDropdownOpen(false);
                                   }}
-                                  showActions={showPersonaActions && canUserEdit}
-                                  onEdit={() => openPersonaManagerForEdit(persona)}
-                                  onDelete={() => handleDeletePersona(persona.id)}
+                                  showActions={
+                                    showPersonaActions && canUserEdit
+                                  }
+                                  onEdit={() =>
+                                    openPersonaManagerForEdit(persona)
+                                  }
+                                  onDelete={() =>
+                                    handleDeletePersona(persona.id)
+                                  }
                                 />
                               ))}
                             </div>
@@ -1426,7 +1483,9 @@ export default function ProjectDetailPage() {
                               <>
                                 <button
                                   type="button"
-                                  onClick={() => setShowPersonaActions((prev) => !prev)}
+                                  onClick={() =>
+                                    setShowPersonaActions((prev) => !prev)
+                                  }
                                   className="text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors"
                                 >
                                   {showPersonaActions ? "Done" : "Manage"}
@@ -1436,7 +1495,9 @@ export default function ProjectDetailPage() {
                                   onClick={openPersonaManagerForCreate}
                                   className="inline-flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors"
                                 >
-                                  <span className="text-base leading-none">+</span>
+                                  <span className="text-base leading-none">
+                                    +
+                                  </span>
                                   Add persona
                                 </button>
                               </>
@@ -1460,7 +1521,11 @@ export default function ProjectDetailPage() {
             <button
               onClick={() => setShowEditModal(true)}
               disabled={!canUserEdit}
-              title={!canUserEdit ? "You don't have permission to edit this project" : "Edit project"}
+              title={
+                !canUserEdit
+                  ? "You don't have permission to edit this project"
+                  : "Edit project"
+              }
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 ${
                 !canUserEdit
                   ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-60"
@@ -1475,7 +1540,11 @@ export default function ProjectDetailPage() {
             <button
               onClick={() => setIsKBUploadOpen(true)}
               disabled={!canUserEdit}
-              title={!canUserEdit ? "You don't have permission to build KB" : "Build Knowledge Base"}
+              title={
+                !canUserEdit
+                  ? "You don't have permission to build KB"
+                  : "Build Knowledge Base"
+              }
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-150 ${
                 !canUserEdit
                   ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-60"
@@ -1506,6 +1575,18 @@ export default function ProjectDetailPage() {
           </div>
         </header>
 
+        {/* Last activity */}
+        {project?.updated_at && (
+          <div className="border-b border-gray-200 bg-white px-6 py-2 text-right">
+            <span
+              className="text-xs text-gray-500"
+              title={new Date(project.updated_at).toLocaleString()}
+            >
+              Last active: {new Date(project.updated_at).toLocaleDateString()}
+            </span>
+          </div>
+        )}
+
         {/* Read-Only Banner for Viewers */}
         {!canUserEdit && (
           <div className="bg-amber-50 border-b border-amber-200 px-6 py-3">
@@ -1523,9 +1604,6 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         )}
-
-        {/* Dashboard */}
-        <ProjectDashboardCard dashboard={dashboard} isLoading={isLoadingDashboard} />
 
         {/* Tabs */}
         <div className="border-b border-gray-200 bg-white px-6">
@@ -1621,48 +1699,6 @@ export default function ProjectDetailPage() {
                   !isSendingMessage &&
                   !isLoadingMessages) ? (
                   <div className="flex flex-col h-full">
-
-                    {/* ── Header block ── */}
-                    <div className="pt-8 pb-6 px-2 border-b border-gray-100">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          {/* eyebrow */}
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                            <span className="text-xs font-medium text-indigo-600 uppercase tracking-widest">
-                              Project Chat
-                            </span>
-                          </div>
-                          <h1 className="text-3xl font-extrabold text-slate-900 leading-tight truncate">
-                            {project?.name || "Workspace"}
-                          </h1>
-                          {project?.description && (
-                            <p className="mt-1.5 text-sm text-slate-500 leading-relaxed line-clamp-2">
-                              {project.description}
-                            </p>
-                          )}
-                        </div>
-                        {/* mini stats */}
-                        <div className="flex flex-col gap-1.5 text-right shrink-0">
-                          <span className="text-xs text-slate-400">
-                            <span className="font-semibold text-slate-700">
-                              {Array.isArray(documents) ? documents.length : 0}
-                            </span>{" "}
-                            docs
-                          </span>
-                          <span className="text-xs text-slate-400">
-                            <span className="font-semibold text-slate-700">
-                              {conversations.length}
-                            </span>{" "}
-                            chats
-                          </span>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold capitalize">
-                            {currentUserRole || "member"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
                     {/* ── Action grid ── */}
                     <div className="flex-1 py-6 px-2">
                       <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">
@@ -1711,7 +1747,8 @@ export default function ProjectDetailPage() {
                             key={action.label}
                             onClick={() => {
                               setMessage(action.msg);
-                              if (!selectedConversation) createNewConversation();
+                              if (!selectedConversation)
+                                createNewConversation();
                             }}
                             className={`group flex items-start gap-3 p-4 rounded-xl ${action.bg} ring-1 ${action.ring} ring-transparent hover:ring-1 text-left transition-all duration-150 active:scale-[0.98]`}
                           >
@@ -1732,17 +1769,35 @@ export default function ProjectDetailPage() {
 
                       {/* ── Quick-launch row ── */}
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs text-slate-400 mr-1">Quick launch →</span>
+                        <span className="text-xs text-slate-400 mr-1">
+                          Quick launch →
+                        </span>
                         {[
-                          { label: "Upload doc", icon: <Upload size={13} />, action: () => setIsFileUploadOpen(true) },
-                          { label: "View docs",  icon: <BookOpen size={13} />, action: () => setActiveTab("documents") },
-                          { label: "Story graph", icon: <Network size={13} />, action: () => setActiveTab("graph") },
-                          { label: "Find conflicts", icon: <AlertTriangle size={13} />, action: runConflictDetection },
+                          {
+                            label: "Upload doc",
+                            icon: <Upload size={13} />,
+                            action: () => setIsFileUploadOpen(true),
+                          },
+                          {
+                            label: "View docs",
+                            icon: <BookOpen size={13} />,
+                            action: () => setActiveTab("documents"),
+                          },
+                          {
+                            label: "Story graph",
+                            icon: <Network size={13} />,
+                            action: () => setActiveTab("graph"),
+                          },
+                          {
+                            label: "Find conflicts",
+                            icon: <AlertTriangle size={13} />,
+                            action: runConflictDetection,
+                          },
                         ].map((btn) => (
                           <button
                             key={btn.label}
                             onClick={btn.action}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-200 text-slate-600 hover:border-indigo-400 hover:text-indigo-700 hover:bg-indigo-50 transition-all duration-150 ${btn.color || ''}`}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-200 text-slate-600 hover:border-indigo-400 hover:text-indigo-700 hover:bg-indigo-50 transition-all duration-150 ${btn.color || ""}`}
                           >
                             {btn.icon}
                             {btn.label}
@@ -2075,8 +2130,13 @@ export default function ProjectDetailPage() {
 
           {activeTab === "activity" && (
             <div className="p-4">
-              <h2 className="text-lg font-semibold mb-4 text-slate-800">Activity Feed</h2>
-              <ActivityFeed activities={activities} isLoading={isLoadingActivities} />
+              <h2 className="text-lg font-semibold mb-4 text-slate-800">
+                Activity Feed
+              </h2>
+              <ActivityFeed
+                activities={activities}
+                isLoading={isLoadingActivities}
+              />
             </div>
           )}
 
@@ -2173,7 +2233,7 @@ export default function ProjectDetailPage() {
           onUpload={handleKBUpload}
           projectId={projectId}
           projectName={project.name}
-          onBuildComplete={refreshDashboard}
+          onBuildComplete={() => {}}
         />
       )}
 

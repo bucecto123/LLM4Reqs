@@ -33,5 +33,20 @@ export default defineConfig({
   // Enable compression
   server: {
     compress: true,
+    port: 5173,
+    proxy: {
+      // Proxy all /api/* requests to the backend container
+      '/api': {
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+        secure: false,
+      },
+      // Proxy WebSocket (Reverb/Pusher) connections
+      '/app': {
+        target: 'ws://localhost:8081',
+        ws: true,
+        changeOrigin: true,
+      },
+    },
   },
 });

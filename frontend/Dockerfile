@@ -15,7 +15,7 @@ RUN npm ci
 COPY . .
 
 # Inject build-time env vars into .env so Vite bakes them into the bundle
-RUN echo "VITE_API_BASE=${VITE_API_BASE:-http://localhost:8001}" > .env && \
+RUN echo "VITE_API_BASE=${VITE_API_BASE}" > .env && \
     echo "VITE_REVERB_HOST=${VITE_REVERB_HOST:-localhost}" >> .env && \
     echo "VITE_REVERB_PORT=${VITE_REVERB_PORT:-8081}" >> .env && \
     echo "VITE_REVERB_SCHEME=${VITE_REVERB_SCHEME:-http}" >> .env && \
