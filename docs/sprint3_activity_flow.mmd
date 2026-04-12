@@ -1,0 +1,24 @@
+sequenceDiagram
+    actor User
+    participant FE as Frontend
+    participant BE as Backend API
+    participant Q as Queue Worker
+    participant LLM as LLM Service
+    participant DB as SQLite DB
+    participant WS as Reverb WebSocket
+
+    User->>FE: Upload document
+    FE->>BE: POST /api/documents
+    BE->>DB: Save Document (status: uploaded)
+    BE->>Q: Dispatch ProcessDocumentJob
+    BE-->>FE: 201 Created (immediate)
+
+    Q->>LLM: POST /api/extract {text, document_type}
+    LLM-->>Q: {requirements[]}
+    Q->>DB: Save Requirements
+    Q->>DB: Save ActivityLog entry
+    Q->>DB: Create Notification record
+    Q->>WS: Broadcast notification event
+    WS-->>FE: Push to subscribed channel
+    FE->>FE: NotificationBell badge +1
+    FE->>FE: ActivityFeed updates

@@ -1,0 +1,35 @@
+graph TB
+    subgraph Browser["Browser (localhost:5173)"]
+        FE["React SPA"]
+        Perf["PerfOverlay\nCtrl+Shift+P"]
+        NB["NotificationBell"]
+        AF["ActivityFeed"]
+    end
+    subgraph Docker["Docker Network"]
+        BE["Laravel Backend\n:8001"]
+        LLM["FastAPI LLM Service\n:8000"]
+        RV["Reverb WebSocket\n:8081"]
+        QW["Queue Worker"]
+        DB[("SQLite\nDatabase")]
+    end
+    subgraph External["External APIs"]
+        Groq["Groq API\nllama-3.3-70b"]
+        Gem["Gemini API\n(fallback)"]
+        Web["Web Search\nTavily / DuckDuckGo"]
+    end
+
+    FE -->|"REST /api/*\nBearer JWT"| BE
+    FE <-->|"WebSocket"| RV
+    BE -->|"http://llm:8000\nX-API-Key"| LLM
+    BE --> DB
+    BE -->|"dispatch job"| QW
+    QW --> LLM
+    QW --> DB
+    QW -->|"broadcast"| RV
+    LLM --> Groq
+    LLM --> Gem
+    LLM -->|"web_search tool"| Web
+
+    style Browser fill:#e8f4f8,stroke:#2196F3
+    style Docker fill:#f0f8e8,stroke:#4CAF50
+    style External fill:#fff8e1,stroke:#FF9800

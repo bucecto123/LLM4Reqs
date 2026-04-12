@@ -1,0 +1,12 @@
+graph LR
+    A["HTTP Request"] --> B["RequestTiming\nMiddleware\n(backend)"]
+    B --> C["Route Handler"]
+    C --> D["LLMService::\ntimedRequest()"]
+    D -->|"duration_ms\nlogged"| E["Laravel Log"]
+    E --> F["performanceMonitor.js\n(frontend)"]
+    F --> G["Console\n🚀 < 500ms\n⚡ < 1000ms\n🐌 > 1000ms"]
+    G --> H["PerfOverlay Panel\nCtrl+Shift+P"]
+
+    style H fill:#1a1a2e,color:#e0e0e0
+    style G fill:#0d7377,color:#white
+    style D fill:#2d6a4f,color:#white
