@@ -14,6 +14,7 @@ from docx.oxml import OxmlElement
 import copy
 
 DOCS_DIR = os.path.dirname(os.path.abspath(__file__))
+EVIDENCE_DIR = os.path.join(DOCS_DIR, "evidence")
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -57,8 +58,9 @@ def add_bullet(doc, text, level=0):
     p.paragraph_format.left_indent = Cm(0.5 + level * 0.5)
     return p
 
-def add_image(doc, filename, width_inches=5.5, caption=None):
-    path = os.path.join(DOCS_DIR, filename)
+def add_image(doc, filename, width_inches=5.5, caption=None, evidence=False):
+    base_dir = EVIDENCE_DIR if evidence else DOCS_DIR
+    path = os.path.join(base_dir, filename)
     if os.path.exists(path):
         doc.add_picture(path, width=Inches(width_inches))
         last_para = doc.paragraphs[-1]
@@ -382,13 +384,48 @@ def build_sprint3():
     for item in week9:
         add_bullet(doc, item)
 
-    add_para(doc, "Figure 2 illustrates the data flow for the new activity logging and notification pipeline.")
-    add_image(doc, "sprint3_activity_flow.png", width_inches=6.0,
-              caption="Figure 2 — Activity Logging & Notification Data Flow (Sprint Three)")
+    # --- App screenshots ---
+    add_heading(doc, "Application Screenshots — Sprint Three", level=2)
 
-    add_para(doc, "Figure 3 illustrates the end-to-end performance monitoring chain from backend request to frontend overlay.")
+    add_para(doc, "Figure 2 — Login / Sign-Up page: JWT-based authentication with register and login tabs.")
+    add_image(doc, "01_login_page.png", width_inches=5.8, evidence=True,
+              caption="Figure 2 — Login / Sign-Up Page (http://localhost:5173)")
+
+    add_para(doc, "Figure 3 — Main dashboard after login: conversation sidebar, model selector, and chat area.")
+    add_image(doc, "02_dashboard.png", width_inches=5.8, evidence=True,
+              caption="Figure 3 — Dashboard (Chat Interface)")
+
+    add_para(doc, "Figure 4 — Create New Project dialog: name and description fields.")
+    add_image(doc, "03_create_project_dialog.png", width_inches=5.8, evidence=True,
+              caption="Figure 4 — Create New Project Dialog")
+
+    add_para(doc, "Figure 5 — Project detail page showing Build KB, Requirements, Conflicts, and Chat tabs.")
+    add_image(doc, "04_project_detail.png", width_inches=5.8, evidence=True,
+              caption="Figure 5 — Project Detail Page")
+
+    add_para(doc, "Figure 6 — Project chat with live AI response to a requirements query.")
+    add_image(doc, "05_chat_with_response.png", width_inches=5.8, evidence=True,
+              caption="Figure 6 — Chat Interface with AI Response")
+
+    add_para(doc, "Figure 7 — Activity feed showing project audit trail (notification system).")
+    add_image(doc, "06_notification_bell.png", width_inches=5.8, evidence=True,
+              caption="Figure 7 — Activity Feed / Notification Panel")
+
+    add_para(doc, "Figure 8 — Performance overlay (Ctrl+Shift+P) showing recent API calls with duration grades.")
+    add_image(doc, "09_perf_overlay.png", width_inches=5.8, evidence=True,
+              caption="Figure 8 — Performance Overlay Panel (Sprint Three Feature)")
+
+    add_para(doc, "Figure 9 — Knowledge Base upload modal: drag-and-drop document ingestion.")
+    add_image(doc, "10_document_upload.png", width_inches=5.8, evidence=True,
+              caption="Figure 9 — Build Knowledge Base / Document Upload Modal")
+
+    add_para(doc, "Figure 10 illustrates the data flow for the new activity logging and notification pipeline.")
+    add_image(doc, "sprint3_activity_flow.png", width_inches=6.0,
+              caption="Figure 10 — Activity Logging & Notification Data Flow (Sprint Three)")
+
+    add_para(doc, "Figure 11 illustrates the end-to-end performance monitoring chain from backend request to frontend overlay.")
     add_image(doc, "sprint3_perf_flow.png", width_inches=5.5,
-              caption="Figure 3 — Performance Monitoring Flow (Sprint Three)")
+              caption="Figure 11 — Performance Monitoring Flow (Sprint Three)")
 
     # Quality table
     add_heading(doc, "Quality Management — Goals & Outcomes", level=2)
@@ -741,6 +778,33 @@ def build_sprint4():
 
     # ── 4. SPRINT PROGRESS ─────────────────────────────────────────────────
     add_heading(doc, "4. SPRINT PROGRESS", level=1)
+
+    # --- App screenshots for Sprint 4 ---
+    add_heading(doc, "Application Evidence — Running System", level=2)
+    add_para(doc, (
+        "The following screenshots were captured from the live Docker deployment "
+        "(docker compose up) to demonstrate the fully operational system at Sprint Four."
+    ))
+
+    add_para(doc, "Figure 6 — Projects list showing created projects.")
+    add_image(doc, "07_projects_list.png", width_inches=5.8, evidence=True,
+              caption="Figure 6 — Projects List Page")
+
+    add_para(doc, "Figure 7 — Sidebar navigation with conversations and project tree.")
+    add_image(doc, "08_sidebar.png", width_inches=5.8, evidence=True,
+              caption="Figure 7 — Sidebar Navigation")
+
+    add_para(doc, "Figure 8 — Project chat showing AI-generated requirements response.")
+    add_image(doc, "05_chat_with_response.png", width_inches=5.8, evidence=True,
+              caption="Figure 8 — Project Chat with AI Response")
+
+    add_para(doc, "Figure 9 — Performance overlay (Ctrl+Shift+P) showing API call monitoring.")
+    add_image(doc, "09_perf_overlay.png", width_inches=5.8, evidence=True,
+              caption="Figure 9 — Performance Overlay (Sprint Three Feature, Verified in Sprint Four)")
+
+    add_para(doc, "Figure 10 — Document upload modal for Knowledge Base ingestion.")
+    add_image(doc, "10_document_upload.png", width_inches=5.8, evidence=True,
+              caption="Figure 10 — Knowledge Base Document Upload")
 
     add_heading(doc, "Week 10 (22–28 March): Bug Fixes & Architecture Review", level=2)
     w10 = [
