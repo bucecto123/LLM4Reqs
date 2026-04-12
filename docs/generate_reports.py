@@ -17,8 +17,35 @@ DOCS_DIR = os.path.dirname(os.path.abspath(__file__))
 EVIDENCE_DIR = os.path.join(DOCS_DIR, "evidence")
 
 # ---------------------------------------------------------------------------
+# Font constants
+# ---------------------------------------------------------------------------
+FONT_BODY   = "Times New Roman"
+FONT_CODE   = "Consolas"
+SZ_NORMAL   = 11   # body text
+SZ_SUBHEAD  = 12   # heading level 2
+SZ_HEAD     = 14   # heading level 1
+SZ_CODE     = 10   # inline code / file paths
+SZ_CAPTION  = 9    # figure captions
+SZ_TABLE    = 10   # table cell text
+SZ_TITLE    = 22   # cover title
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _apply_body_font(run, size=SZ_NORMAL, bold=False, italic=False, color=None):
+    """Apply Times New Roman with given size to a run."""
+    run.font.name = FONT_BODY
+    run.font.size = Pt(size)
+    run.bold = bold
+    run.italic = italic
+    if color:
+        run.font.color.rgb = RGBColor(*bytes.fromhex(color))
+
+def _apply_code_font(run):
+    """Apply Consolas size 10 to a run (for code / file paths)."""
+    run.font.name = FONT_CODE
+    run.font.size = Pt(SZ_CODE)
 
 def set_cell_bg(cell, hex_color: str):
     tc = cell._tc
@@ -29,33 +56,50 @@ def set_cell_bg(cell, hex_color: str):
     shd.set(qn("w:fill"), hex_color)
     tcPr.append(shd)
 
-def bold_run(para, text, size=11, color=None):
+def bold_run(para, text, size=SZ_NORMAL, color=None):
     run = para.add_run(text)
-    run.bold = True
-    run.font.size = Pt(size)
-    if color:
-        run.font.color.rgb = RGBColor(*bytes.fromhex(color))
+    _apply_body_font(run, size=size, bold=True, color=color)
+    return run
+
+def code_run(para, text):
+    """Inline code / file path run in Consolas 10."""
+    run = para.add_run(text)
+    _apply_code_font(run)
     return run
 
 def add_heading(doc, text, level=1, color="1F3864"):
-    h = doc.add_heading(text, level=level)
-    for run in h.runs:
-        run.font.color.rgb = RGBColor(*bytes.fromhex(color))
+    h = doc.add_heading("", level=level)
+    size = SZ_HEAD if level == 1 else SZ_SUBHEAD
+    run = h.add_run(text)
+    _apply_body_font(run, size=size, bold=True, color=color)
+    # Clear any default theme font that Word might inject
+    h.paragraph_format.space_before = Pt(10 if level == 1 else 6)
+    h.paragraph_format.space_after = Pt(4)
     return h
 
-def add_para(doc, text="", bold=False, size=11, space_after=6):
+def add_para(doc, text="", bold=False, size=SZ_NORMAL, space_after=6):
     p = doc.add_paragraph()
     if text:
         run = p.add_run(text)
-        run.bold = bold
-        run.font.size = Pt(size)
+        _apply_body_font(run, size=size, bold=bold)
     p.paragraph_format.space_after = Pt(space_after)
     return p
 
 def add_bullet(doc, text, level=0):
+    """Bullet item — supports backtick-delimited inline code within text."""
     p = doc.add_paragraph(style="List Bullet")
-    p.add_run(text).font.size = Pt(11)
     p.paragraph_format.left_indent = Cm(0.5 + level * 0.5)
+    p.paragraph_format.space_after = Pt(3)
+    # Split on backtick pairs so `code` spans render in Consolas
+    parts = text.split("`")
+    for i, part in enumerate(parts):
+        if not part:
+            continue
+        run = p.add_run(part)
+        if i % 2 == 1:          # inside backtick pair → code
+            _apply_code_font(run)
+        else:
+            _apply_body_font(run, size=SZ_NORMAL)
     return p
 
 def add_image(doc, filename, width_inches=5.5, caption=None, evidence=False):
@@ -66,13 +110,12 @@ def add_image(doc, filename, width_inches=5.5, caption=None, evidence=False):
         last_para = doc.paragraphs[-1]
         last_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
         if caption:
-            cp = doc.add_paragraph(caption)
+            cp = doc.add_paragraph()
             cp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            for run in cp.runs:
-                run.font.size = Pt(9)
-                run.font.italic = True
+            run = cp.add_run(caption)
+            _apply_body_font(run, size=SZ_CAPTION, italic=True)
     else:
-        add_para(doc, f"[Image not found: {filename}]", bold=False)
+        add_para(doc, f"[Image not found: {filename}]")
 
 def add_table_header_row(table, headers, bg="1F3864"):
     row = table.rows[0]
@@ -81,17 +124,17 @@ def add_table_header_row(table, headers, bg="1F3864"):
         cell.text = ""
         p = cell.paragraphs[0]
         run = p.add_run(header)
-        run.bold = True
-        run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
-        run.font.size = Pt(10)
+        _apply_body_font(run, size=SZ_TABLE, bold=True, color="FFFFFF")
         set_cell_bg(cell, bg)
 
 def add_table_row(table, values, row_idx=None, alt_bg=None):
     row = table.add_row()
     for i, val in enumerate(values):
         cell = row.cells[i]
-        cell.text = str(val)
-        cell.paragraphs[0].runs[0].font.size = Pt(10)
+        cell.text = ""
+        p = cell.paragraphs[0]
+        run = p.add_run(str(val))
+        _apply_body_font(run, size=SZ_TABLE)
         if alt_bg and row_idx is not None and row_idx % 2 == 0:
             set_cell_bg(cell, alt_bg)
     return row
@@ -105,13 +148,11 @@ def page_break(doc):
 # ---------------------------------------------------------------------------
 
 def add_cover_block(doc, sprint_num, portfolio_task, submission_date, scrum_master):
-    # Title box
+    # Title
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = p.add_run(f"Sprint {sprint_num} Report")
-    run.bold = True
-    run.font.size = Pt(22)
-    run.font.color.rgb = RGBColor(0x1F, 0x38, 0x64)
+    _apply_body_font(run, size=SZ_TITLE, bold=True, color="1F3864")
 
     for label, value in [
         ("PORTFOLIO TASK", portfolio_task),
@@ -122,9 +163,9 @@ def add_cover_block(doc, sprint_num, portfolio_task, submission_date, scrum_mast
     ]:
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        bold_run(p, f"{label}  ", size=12)
+        bold_run(p, f"{label}  ", size=SZ_SUBHEAD)
         r = p.add_run(value)
-        r.font.size = Pt(12)
+        _apply_body_font(r, size=SZ_SUBHEAD)
 
     doc.add_paragraph()  # spacer
 
@@ -162,12 +203,16 @@ def add_contribution_summary(doc):
 
     for i, (name, sid) in enumerate(MEMBERS):
         row = table.add_row()
-        row.cells[0].text = f"{name}\n({sid})"
-        row.cells[0].paragraphs[0].runs[0].font.size = Pt(9)
+        cell0 = row.cells[0]
+        cell0.text = ""
+        run0 = cell0.paragraphs[0].add_run(f"{name}\n({sid})")
+        _apply_body_font(run0, size=9)
         for j in range(1, len(CONTRIB_COLS)):
-            row.cells[j].text = "Yes"
-            row.cells[j].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-            row.cells[j].paragraphs[0].runs[0].font.size = Pt(10)
+            c = row.cells[j]
+            c.text = ""
+            r = c.paragraphs[0].add_run("Yes")
+            _apply_body_font(r, size=SZ_TABLE)
+            c.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
         if i % 2 == 0:
             for cell in row.cells:
                 set_cell_bg(cell, "EBF3FB")
@@ -212,15 +257,15 @@ def build_sprint3():
             [
                 "Led the majority of coding work across all three service layers (LLM, backend, frontend) "
                 "throughout Sprint Three.",
-                "Completed migration from the deprecated google-generativeai library to the new google-genai SDK, "
+                "Completed migration from the deprecated `google-generativeai` library to the new `google-genai` SDK, "
                 "eliminating deprecation warnings and restoring Gemini model compatibility (1464d7e).",
-                "Added the web_search tool (llm/tools/web_search.py, 171 lines) integrating Tavily (primary) "
+                "Added the web search tool (`llm/tools/web_search.py`, 171 lines) integrating Tavily (primary) "
                 "and DuckDuckGo (fallback), callable by the agent executor during chat (119ca2d).",
-                "Implemented ActivityLog and Notification models, migrations, controllers, and wired all "
+                "Implemented `ActivityLog` and `Notification` models, migrations, controllers, and wired all "
                 "background jobs to emit activity events and push real-time notifications (119ca2d).",
-                "Refactored LLMService.php with the timedRequest() helper, eliminating duplicated try/catch "
+                "Refactored `LLMService.php` with the `timedRequest()` helper, eliminating duplicated try/catch "
                 "blocks and adding structured latency logging across all LLM calls.",
-                "Resolved backend N+1 query bottlenecks with eager loading; added RequestTiming middleware "
+                "Resolved backend N+1 query bottlenecks with eager loading; added `RequestTiming` middleware "
                 "and 60-second KB query caching for measurable performance gains (39a2ef7, ee2b91a).",
                 "Rebuilt and maintained Docker configuration throughout the sprint, resolving container "
                 "startup issues and environment variable conflicts.",
@@ -256,7 +301,7 @@ def build_sprint3():
             [
                 "Designed and executed integration test cases for the SDK migration, performance "
                 "benchmarks, and backend API endpoints.",
-                "Used Apache Bench (ab) to measure API response times and verify the 20% improvement "
+                "Used Apache Bench (`ab`) to measure API response times and verify the 20% improvement "
                 "target was met against Sprint Two baselines.",
                 "Maintained the test results table and tracked pass/fail status across all test areas.",
                 "Contributed to quality management planning and acceptance criteria definition.",
@@ -320,7 +365,7 @@ def build_sprint3():
     ]
     for area, items in backlog:
         p = doc.add_paragraph()
-        bold_run(p, f"{area}:", size=11)
+        bold_run(p, f"{area}:", size=SZ_NORMAL)
         for item in items:
             add_bullet(doc, item, level=1)
 
@@ -592,33 +637,33 @@ def build_sprint4():
             "1.1  Dinh Danh Nam — Lead Developer: Full-Stack Coding, Optimization & Docker",
             [
                 "Led the majority of coding work in Sprint Four across all modules.",
-                "Conducted a full architecture review, producing architecture.md documenting all five "
+                "Conducted a full architecture review, producing `architecture.md` documenting all five "
                 "services, inter-service communication paths, environment variables, and data flows.",
-                "Identified and fixed six consistency errors: REVERB_APP_KEY mismatch between "
-                "frontend/.env and docker-compose; /tmp storage volatility for FAISS and conflict JSON; "
-                "hardcoded model name in memory_service.py; missing GEMINI_API_KEY in .env.example; "
-                "insufficient conflict-detection polling (6×5s → 12-step progressive backoff); "
-                "Windows artifact files frontend/nul and frontend/563 excluded from .gitignore.",
-                "Added persistent Docker named volumes (llm_data, backend_storage) to preserve FAISS "
+                "Identified and fixed six consistency errors: `REVERB_APP_KEY` mismatch between "
+                "`frontend/.env` and `docker-compose.yml`; `/tmp` storage volatility for FAISS and conflict JSON; "
+                "hardcoded model name in `memory_service.py`; missing `GEMINI_API_KEY` in `.env.example`; "
+                "insufficient conflict-detection polling (6x5s to 12-step progressive backoff); "
+                "Windows artifact files `frontend/nul` and `frontend/563` excluded from `.gitignore`.",
+                "Added persistent Docker named volumes (`llm_data`, `backend_storage`) to preserve FAISS "
                 "index and conflict JSON across container restarts.",
                 "Fixed conflict detection: duplicate records, polling timeout extended to 300s.",
-                "Fixed CORS middleware, bootstrap/app.php middleware registration, and chat sync "
+                "Fixed CORS middleware, `bootstrap/app.php` middleware registration, and chat sync "
                 "ordering under queue load.",
                 "Maintained and rebuilt the full Docker stack throughout the sprint; resolved "
                 "Reverb startup timing and SQLite volume permission issues.",
-                "Updated TESTING_GUIDE.md and .env.example; managed sprint report generation.",
+                "Updated `TESTING_GUIDE.md` and `.env.example`; managed sprint report generation.",
                 "Key commits: 2220383, 982389a.",
             ],
         ),
         (
             "1.2  Nguyen Quy Hung — Frontend: Visual Bug Fixes",
             [
-                "Identified and fixed multiple visual bugs in ProjectDetailPage.jsx: "
+                "Identified and fixed multiple visual bugs in `ProjectDetailPage.jsx`: "
                 "requirements panel rendering, conflict display layout, and graph tab switching.",
-                "Improved GraphRenderer.jsx with better error states and loading indicators "
+                "Improved `GraphRenderer.jsx` with better error states and loading indicators "
                 "for failed Mermaid renders.",
-                "Improved FileUpload.jsx with drag-and-drop visual feedback and upload progress indicators.",
-                "Expanded Sidebar.jsx with a collapsible project navigation tree.",
+                "Improved `FileUpload.jsx` with drag-and-drop visual feedback and upload progress indicators.",
+                "Expanded `Sidebar.jsx` with a collapsible project navigation tree.",
                 "Key commits: 982389a.",
             ],
         ),
@@ -628,7 +673,7 @@ def build_sprint4():
                 "Wrote and executed frontend manual test cases verifying all Sprint Three and "
                 "Sprint Four features in the live Docker environment.",
                 "Documented test procedures and results for the Sprint Four test results table.",
-                "Contributed to final documentation review, checking README.md for accuracy "
+                "Contributed to final documentation review, checking `README.md` for accuracy "
                 "and completeness from a user perspective.",
                 "Verified all UI fixes across Chrome and Firefox per the Definition of Done.",
             ],
@@ -640,7 +685,7 @@ def build_sprint4():
                 "CORS configuration, and middleware registration.",
                 "Ran full Docker stack integration tests to verify all five services communicate "
                 "correctly after Sprint Four fixes.",
-                "Contributed to the architecture.md review, validating the data-flow diagrams "
+                "Contributed to the `architecture.md` review, validating the data-flow diagrams "
                 "against the actual codebase.",
                 "Maintained the test results table and verified all acceptance criteria were met.",
             ],
@@ -650,8 +695,8 @@ def build_sprint4():
             [
                 "Served as Scrum Master for Sprint Four: facilitated standups, coordinated "
                 "the final client demonstration, and managed sprint closure.",
-                "Wrote and executed LLM service test cases: /api/chat, /api/extract, /kb/build, "
-                "and the web_search tool, verifying correct responses and error handling.",
+                "Wrote and executed LLM service test cases: `/api/chat`, `/api/extract`, `/kb/build`, "
+                "and the `web_search` tool, verifying correct responses and error handling.",
                 "Prepared sprint retrospective, lessons learned, and overall project retrospective "
                 "sections for the Sprint Four report.",
                 "Coordinated client feedback collection and confirmed final increment acceptance.",
@@ -704,7 +749,7 @@ def build_sprint4():
     ]
     for area, items in backlog4:
         p = doc.add_paragraph()
-        bold_run(p, f"{area}:", size=11)
+        bold_run(p, f"{area}:", size=SZ_NORMAL)
         for item in items:
             add_bullet(doc, item, level=1)
 
