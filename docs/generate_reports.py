@@ -239,7 +239,7 @@ def build_sprint3():
         sprint_num=3,
         portfolio_task="7",
         submission_date="March 21st, 2026",
-        scrum_master="Hoang Dinh Vinh Hoang",
+        scrum_master="Dinh Danh Nam",
     )
 
     add_contribution_summary(doc)
@@ -308,14 +308,13 @@ def build_sprint3():
             ],
         ),
         (
-            "1.5  Hoang Dinh Vinh Hoang — Testing, Documentation & Scrum Master",
+            "1.5  Hoang Dinh Vinh Hoang — Testing & Documentation",
             [
-                "Served as Scrum Master for Sprint Three: facilitated standups, tracked backlog "
-                "progress, and coordinated the client demonstration session.",
                 "Wrote and executed integration test cases for the notification system, activity feed, "
                 "and web search tool.",
                 "Prepared sprint documentation including the sprint plan, retrospective, and lessons learned.",
                 "Coordinated client feedback collection during the Sprint Three demonstration on 21 March 2026.",
+                "Supported the Scrum Master in tracking backlog progress and facilitating standups.",
             ],
         ),
     ]
@@ -323,14 +322,14 @@ def build_sprint3():
     for title, bullets in contrib_data:
         add_heading(doc, title, level=2)
         for b in bullets:
-            add_bullet(doc, b)
+            add_para(doc, b)
         doc.add_paragraph()
 
     # ── 2. SPRINT PLAN ─────────────────────────────────────────────────────
     add_heading(doc, "2. SPRINT PLAN", level=1)
     add_para(doc, (
         "Sprint Three ran from 1 March to 21 March 2026, covering Weeks 7–9 of the project timeline. "
-        "Hoang Dinh Vinh Hoang served as Scrum Master, rotating from Nguyen Quy Hung (Sprint Two)."
+        "Dinh Danh Nam served as Scrum Master, taking over from Nguyen Quy Hung (Sprint Two)."
     ))
 
     add_heading(doc, "Sprint Goal", level=2)
@@ -341,33 +340,36 @@ def build_sprint3():
 
     add_heading(doc, "Sprint Backlog", level=2)
     backlog = [
-        ("LLM Module", [
-            "Migrate from google-generativeai to google-genai SDK",
-            "Add web_search tool (Tavily + DuckDuckGo fallback)",
-            "Refactor LLMService with timedRequest() helper",
-            "Fix model_manager.py broken httpx client",
-        ]),
-        ("Backend", [
-            "Resolve N+1 query bottlenecks in project/conversation endpoints",
-            "Add RequestTiming middleware",
-            "Implement ActivityLog model, migration, and controller",
-            "Implement Notification model, migration, and controller",
-            "Wire jobs to log activity and dispatch notifications",
-        ]),
-        ("Frontend", [
-            "Fix Mermaid graph rendering parse errors",
-            "Fix model selector z-index layering",
-            "Build PerfOverlay (Ctrl+Shift+P) and performanceMonitor.js",
-            "Build NotificationBell with WebSocket subscription",
-            "Build ActivityFeed, Toast, AnimateIn, ShimmerSkeleton components",
-            "Build ImportModal and cache.js utility",
-        ]),
+        ("LLM Module", (
+            "Migrate from `google-generativeai` to the new `google-genai` SDK; add a `web_search` tool "
+            "integrating Tavily with a DuckDuckGo fallback; refactor `LLMService` with a `timedRequest()` "
+            "helper; fix the broken `httpx` client in `model_manager.py`."
+        )),
+        ("Backend", (
+            "Resolve N+1 query bottlenecks in project and conversation endpoints; add `RequestTiming` "
+            "middleware for structured latency logging; implement `ActivityLog` and `Notification` models, "
+            "migrations, and controllers; wire all background jobs to emit activity events and push "
+            "real-time notifications."
+        )),
+        ("Frontend", (
+            "Fix Mermaid graph parse errors and model selector z-index layering; build the `PerfOverlay` "
+            "panel (Ctrl+Shift+P) and `performanceMonitor.js` with emoji-graded latency display; build "
+            "`NotificationBell` with WebSocket subscription, `ActivityFeed`, `Toast`, `AnimateIn`, "
+            "`ShimmerSkeleton` components, `ImportModal`, and `cache.js` utility."
+        )),
     ]
-    for area, items in backlog:
+    for area, prose in backlog:
         p = doc.add_paragraph()
-        bold_run(p, f"{area}:", size=SZ_NORMAL)
-        for item in items:
-            add_bullet(doc, item, level=1)
+        bold_run(p, f"{area}: ", size=SZ_NORMAL)
+        parts = prose.split("`")
+        for i, part in enumerate(parts):
+            if not part:
+                continue
+            run = p.add_run(part)
+            if i % 2 == 1:
+                _apply_code_font(run)
+            else:
+                _apply_body_font(run, size=SZ_NORMAL)
 
     add_heading(doc, "Sprint Architecture", level=2)
     add_para(doc, "Figure 1 shows the full system architecture as delivered at the end of Sprint Three.")
@@ -399,37 +401,36 @@ def build_sprint3():
     add_heading(doc, "4. SPRINT PROGRESS", level=1)
 
     add_heading(doc, "Week 7 (1–7 March): Bottlenecks & Project Features", level=2)
-    week7 = [
-        "Nam: Completed google-genai SDK migration; improved model manager reliability.",
-        "Hung: Fixed Mermaid parse errors; resolved model selector z-index.",
-        "Huyen: Implemented user avatar system and dropup menu conversions.",
-        "Thinh: Resolved backend N+1 query bottlenecks; added eager loading.",
-        "Hoang: Enhanced project controller, dashboard data endpoint, and detail page.",
-    ]
-    for item in week7:
-        add_bullet(doc, item)
+    add_para(doc, (
+        "Week 7 focused on foundational stability work. Nam completed the google-genai SDK migration "
+        "and improved model manager reliability. Hung fixed Mermaid parse errors and resolved the model "
+        "selector z-index layering issue. Huyen implemented the user avatar system and converted dropdown "
+        "menus to dropup menus for better usability. Thinh resolved backend N+1 query bottlenecks by "
+        "introducing eager loading across the project and conversation endpoints. Hoang enhanced the "
+        "project controller, the dashboard data endpoint, and the project detail page."
+    ))
 
     add_heading(doc, "Week 8 (8–14 March): Performance Optimizations", level=2)
-    week8 = [
-        "Nam: Refactored LLMService with timedRequest() timing helper.",
-        "Hung: Added performanceMonitor.js with emoji grading and cache.js utility.",
-        "Huyen: Built ShimmerSkeleton and AnimateIn components; applied to project dashboard.",
-        "Thinh: Added RequestTiming middleware; enabled KB query caching (60s TTL).",
-        "Hoang: Integrated performance metrics into dashboard endpoint; code review.",
-    ]
-    for item in week8:
-        add_bullet(doc, item)
+    add_para(doc, (
+        "Week 8 was dedicated to measurable performance improvements. Nam refactored LLMService with a "
+        "centralised timedRequest() timing helper, eliminating duplicated try/catch blocks. Hung added "
+        "performanceMonitor.js with emoji-graded latency display and a cache.js utility module. Huyen "
+        "built the ShimmerSkeleton and AnimateIn components and applied them to the project dashboard "
+        "for improved perceived load time. Thinh added the RequestTiming middleware for structured "
+        "per-request latency logging and enabled KB query caching with a 60-second TTL. Hoang integrated "
+        "performance metrics into the dashboard endpoint and led the week's code review."
+    ))
 
     add_heading(doc, "Week 9 (15–21 March): New Features — Notifications, Activity, Import, Web Search", level=2)
-    week9 = [
-        "Nam: Implemented web_search tool (Tavily + DuckDuckGo); integrated with agent executor.",
-        "Hung: Built PerfOverlay panel (Ctrl+Shift+P) and ImportModal component.",
-        "Huyen: Implemented NotificationBell, ActivityFeed, Toast; wired WebSocket subscriptions.",
-        "Thinh: Added comprehensive performance optimizations and bug fixes across backend.",
-        "Hoang: Designed ActivityLog + Notification models/migrations; wired jobs to emit events.",
-    ]
-    for item in week9:
-        add_bullet(doc, item)
+    add_para(doc, (
+        "Week 9 delivered the sprint's headline features. Nam implemented the web_search tool integrating "
+        "Tavily (primary) and DuckDuckGo (fallback) and wired it into the agent executor. Hung built the "
+        "PerfOverlay panel (Ctrl+Shift+P) and the ImportModal component. Huyen implemented the "
+        "NotificationBell, ActivityFeed, and Toast components and wired all WebSocket subscriptions. "
+        "Thinh applied comprehensive backend performance optimizations and addressed remaining bug fixes. "
+        "Hoang designed the ActivityLog and Notification models and migrations and updated all background "
+        "jobs to emit activity events and dispatch real-time notifications."
+    ))
 
     # --- App screenshots ---
     add_heading(doc, "Application Screenshots — Sprint Three", level=2)
@@ -502,14 +503,13 @@ def build_sprint3():
     ))
 
     add_heading(doc, "Client Feedback", level=2)
-    feedback = [
-        "The performance overlay was well received — the client appreciated the developer-friendly Ctrl+Shift+P shortcut.",
-        "The notification bell was highlighted as a significant UX improvement for collaborative projects.",
-        "The web search integration was requested to be surfaced more prominently in the chat interface.",
-        "Minor request: activity feed should show timestamps in local time zone rather than UTC.",
-    ]
-    for f in feedback:
-        add_bullet(doc, f)
+    add_para(doc, (
+        "The performance overlay was well received — the client appreciated the developer-friendly "
+        "Ctrl+Shift+P shortcut. The notification bell was highlighted as a significant UX improvement "
+        "for collaborative projects. The client requested that the web search integration be surfaced "
+        "more prominently in the chat interface. A minor request was also raised to display activity "
+        "feed timestamps in the user's local time zone rather than UTC."
+    ))
 
     add_heading(doc, "Progress vs Plan", level=2)
     add_para(doc, (
@@ -540,16 +540,14 @@ def build_sprint3():
     add_heading(doc, "6. RETROSPECT", level=1)
 
     add_heading(doc, "Key Strengths", level=2)
-    strengths = [
-        "Rapid SDK Migration with zero service disruption — the team swapped the entire Google AI SDK "
-        "in a single week without breaking any existing functionality.",
-        "Self-directed feature expansion — the web_search tool was identified and implemented by Nam "
-        "without a formal backlog item, demonstrating initiative beyond requirements.",
-        "End-to-end real-time pipeline — the NotificationBell + ActivityFeed combination, backed by "
-        "WebSocket broadcasting, was designed, implemented, and tested within one week by Hung and Hoang.",
-    ]
-    for s in strengths:
-        add_bullet(doc, s)
+    add_para(doc, (
+        "The team demonstrated rapid SDK migration capability — the entire Google AI SDK was swapped "
+        "in a single week with zero service disruption and no regression in existing functionality. "
+        "Nam showed initiative beyond the formal backlog by independently identifying and implementing "
+        "the web_search tool as a high-value enhancement. The end-to-end real-time pipeline — "
+        "NotificationBell combined with ActivityFeed, backed by WebSocket broadcasting — was designed, "
+        "implemented, and tested within a single week, reflecting strong cross-layer collaboration."
+    ))
 
     add_heading(doc, "Process Challenges", level=2)
     add_para(doc, (
@@ -577,24 +575,28 @@ def build_sprint3():
 
     # ── 7. LESSONS LEARNED ─────────────────────────────────────────────────
     add_heading(doc, "7. LESSONS LEARNED", level=1)
-    lessons = [
-        "Environment variable precedence in Docker Compose: docker-compose environment: blocks "
-        "override env_file values — always verify the runtime value of critical shared keys "
-        "(e.g. REVERB_APP_KEY) rather than assuming .env is authoritative.",
-        "Centralise timing logic: introducing timedRequest() in LLMService eliminated 6 duplicated "
-        "try/catch blocks. Shared infrastructure helpers should be extracted early, not after the "
-        "fourth duplication.",
-        "Real-time UX requires end-to-end testing: the NotificationBell appeared to work in isolation "
-        "but the broadcast channel mismatch (local-app-key vs llm4reqs-reverb-key) was only discovered "
-        "when testing the full Docker stack. Integration tests must cover the broadcast pipeline.",
-        "Proactive feature additions add value but need scope control: the web_search tool was a "
-        "valuable addition but required careful timeout management to avoid blocking the chat "
-        "endpoint. Future enhancements should have explicit acceptance criteria even when self-assigned.",
-        "Skeleton loaders and shimmer effects significantly reduce perceived load time — they should "
-        "be added as a standard component for any data-loading UI rather than an afterthought.",
-    ]
-    for l in lessons:
-        add_bullet(doc, l)
+    add_para(doc, (
+        "Docker Compose environment variable precedence was a key discovery: the "
+        "environment: block in docker-compose.yml overrides env_file values, which meant the runtime "
+        "value of critical shared keys like REVERB_APP_KEY must always be verified against the compose "
+        "file rather than assumed from .env. Centralising timing logic in a single timedRequest() "
+        "helper eliminated six duplicated try/catch blocks — shared infrastructure helpers should be "
+        "extracted early, not after repeated duplication."
+    ))
+    add_para(doc, (
+        "Real-time features require end-to-end integration testing. The NotificationBell appeared "
+        "functional in isolation but the broadcast channel key mismatch was only discovered when testing "
+        "the full Docker stack. Future real-time work must include integration tests that cover the "
+        "complete broadcast pipeline. Self-assigned feature additions — such as the web_search tool — "
+        "add genuine value but require explicit acceptance criteria and timeout budgets to prevent "
+        "them from blocking core endpoints."
+    ))
+    add_para(doc, (
+        "Skeleton loaders and shimmer effects significantly reduce perceived load time. Having "
+        "established the AnimateIn and ShimmerSkeleton components this sprint, they should be "
+        "treated as standard toolkit items for any future data-loading UI rather than added "
+        "retroactively."
+    ))
 
     out_path = os.path.join(DOCS_DIR, "Sprint3_Report_COS40006.docx")
     doc.save(out_path)
@@ -619,7 +621,7 @@ def build_sprint4():
         sprint_num=4,
         portfolio_task="8",
         submission_date="April 12th, 2026",
-        scrum_master="Nguyen Quy Hung",
+        scrum_master="Dinh Danh Nam",
     )
 
     add_contribution_summary(doc)
@@ -691,15 +693,15 @@ def build_sprint4():
             ],
         ),
         (
-            "1.5  Hoang Dinh Vinh Hoang — Testing, Documentation & Scrum Master",
+            "1.5  Hoang Dinh Vinh Hoang — Testing & Documentation",
             [
-                "Served as Scrum Master for Sprint Four: facilitated standups, coordinated "
-                "the final client demonstration, and managed sprint closure.",
-                "Wrote and executed LLM service test cases: `/api/chat`, `/api/extract`, `/kb/build`, "
+                "Wrote and executed LLM service test cases covering `/api/chat`, `/api/extract`, `/kb/build`, "
                 "and the `web_search` tool, verifying correct responses and error handling.",
                 "Prepared sprint retrospective, lessons learned, and overall project retrospective "
                 "sections for the Sprint Four report.",
-                "Coordinated client feedback collection and confirmed final increment acceptance.",
+                "Coordinated client feedback collection during the final demonstration and confirmed "
+                "increment acceptance.",
+                "Supported sprint closure activities and preparation for client handover.",
             ],
         ),
     ]
@@ -707,14 +709,14 @@ def build_sprint4():
     for title, bullets in contrib_data4:
         add_heading(doc, title, level=2)
         for b in bullets:
-            add_bullet(doc, b)
+            add_para(doc, b)
         doc.add_paragraph()
 
     # ── 2. SPRINT PLAN ─────────────────────────────────────────────────────
     add_heading(doc, "2. SPRINT PLAN", level=1)
     add_para(doc, (
         "Sprint Four ran from 22 March to 12 April 2026, covering Weeks 10–12. "
-        "Nguyen Quy Hung served as Scrum Master."
+        "Dinh Danh Nam served as Scrum Master, continuing from Sprint Three."
     ))
 
     add_heading(doc, "Sprint Goal", level=2)
@@ -726,32 +728,38 @@ def build_sprint4():
 
     add_heading(doc, "Sprint Backlog", level=2)
     backlog4 = [
-        ("Bug Fixes", [
-            "Resolve Docker volume persistence issue (FAISS and conflict JSON lost on restart)",
-            "Fix REVERB_APP_KEY mismatch between frontend/.env and docker-compose",
-            "Fix conflict detection: duplicate records, polling timeout",
-            "Fix visual bugs in ProjectDetailPage, GraphRenderer, FileUpload",
-            "Fix CORS middleware origin whitelist",
-            "Fix chat sync ordering under load",
-        ]),
-        ("Testing", [
-            "Write PHPUnit unit tests for ConversationService and LLMService",
-            "Write Vitest unit tests for NotificationBell, ActivityFeed, PerfOverlay",
-            "Write pytest unit tests for LLM service endpoints",
-        ]),
-        ("Documentation", [
-            "Produce architecture.md with service map and all data-flow diagrams",
-            "Produce TESTING_GUIDE.md with Docker rebuild guide and test procedures",
-            "Restructure README.md as a user-facing onboarding guide",
-            "Update .env.example with all required and optional variables",
-            "Write Sprint Three and Sprint Four reports (Portfolio Tasks 7 & 8)",
-        ]),
+        ("Bug Fixes", (
+            "Resolve Docker volume persistence so that FAISS index and conflict JSON survive container "
+            "restarts; fix the `REVERB_APP_KEY` mismatch between `frontend/.env` and `docker-compose.yml`; "
+            "fix conflict detection duplicate records and extend polling timeout to 300 s; resolve visual "
+            "bugs in `ProjectDetailPage`, `GraphRenderer`, and `FileUpload`; correct the CORS middleware "
+            "origin whitelist and fix chat sync ordering under queue load."
+        )),
+        ("Testing", (
+            "Write PHPUnit unit tests for `ConversationService` and `LLMService`; write Vitest unit "
+            "tests for `NotificationBell`, `ActivityFeed`, and `PerfOverlay`; write pytest unit tests "
+            "covering `/api/chat`, `/api/extract`, and `/kb/build` endpoints."
+        )),
+        ("Documentation", (
+            "Produce `architecture.md` with a full service map and all data-flow diagrams; produce "
+            "`TESTING_GUIDE.md` with the Docker rebuild guide and manual test procedures; restructure "
+            "`README.md` as a user-facing onboarding guide; update `.env.example` with all required and "
+            "optional variables across all three services; write Sprint Three and Sprint Four reports "
+            "(Portfolio Tasks 7 and 8)."
+        )),
     ]
-    for area, items in backlog4:
+    for area, prose in backlog4:
         p = doc.add_paragraph()
-        bold_run(p, f"{area}:", size=SZ_NORMAL)
-        for item in items:
-            add_bullet(doc, item, level=1)
+        bold_run(p, f"{area}: ", size=SZ_NORMAL)
+        parts = prose.split("`")
+        for i, part in enumerate(parts):
+            if not part:
+                continue
+            run = p.add_run(part)
+            if i % 2 == 1:
+                _apply_code_font(run)
+            else:
+                _apply_body_font(run, size=SZ_NORMAL)
 
     add_heading(doc, "Sprint Timeline", level=2)
     add_para(doc, "Figure 4 shows the Sprint Four activity timeline across the three-week period.")
@@ -769,45 +777,31 @@ def build_sprint4():
     add_heading(doc, "3.1  User Manual (README.md)", level=2)
     add_para(doc, (
         "The README.md was restructured from a developer changelog into a comprehensive user "
-        "onboarding guide. It covers:"
+        "onboarding guide. It covers prerequisites (Docker Desktop, Git, and API keys), a Quick Start "
+        "workflow from git clone through docker compose build to docker compose up, and a full "
+        "feature walkthrough covering Chat, Document Upload, Knowledge Base, Conflict Detection, and "
+        "Story Graph. A troubleshooting section addresses the five most common startup issues, and an "
+        "environment variable reference table documents all configurable settings."
     ))
-    readme_items = [
-        "Prerequisites (Docker Desktop, Git, API keys)",
-        "Quick Start: git clone → docker compose build → docker compose up",
-        "Feature walkthrough: Chat, Document Upload, Knowledge Base, Conflict Detection, Story Graph",
-        "Troubleshooting section for the five most common startup issues",
-        "Environment variable reference table",
-    ]
-    for item in readme_items:
-        add_bullet(doc, item)
 
     add_heading(doc, "3.2  System Installation Manual (TESTING_GUIDE.md)", level=2)
     add_para(doc, (
-        "The TESTING_GUIDE.md serves as the system administrator / developer installation manual. "
-        "It provides:"
+        "The TESTING_GUIDE.md serves as the system administrator and developer installation manual. "
+        "It provides the Docker compose build procedure with expected output and timing, health check "
+        "verification for all five services, and step-by-step test procedures for six feature groups: "
+        "Performance Monitoring, Notifications, Activity Feed, Import, Web Search, and Knowledge Base. "
+        "Each procedure specifies the expected outcome so that pass/fail determination is unambiguous."
     ))
-    testing_items = [
-        "Docker compose build procedure with expected output and timing",
-        "Health check verification for all five services",
-        "Step-by-step test procedures for six feature groups: Performance Monitoring, "
-        "Notifications, Activity Feed, Import, Web Search, and Knowledge Base",
-        "Manual test procedures with expected outcomes for each feature",
-    ]
-    for item in testing_items:
-        add_bullet(doc, item)
 
     add_heading(doc, "3.3  Architecture Documentation (architecture.md)", level=2)
     add_para(doc, (
-        "The architecture.md documents the complete technical structure of LLM4Reqs:"
+        "The architecture.md documents the complete technical structure of LLM4Reqs, including a "
+        "service map covering all five Docker containers with ports, protocols, and startup "
+        "dependencies. It inventories all environment variables (18 LLM vars, 23 backend vars, "
+        "5 frontend vars) and provides data-flow diagrams for all four core pipelines: Chat, "
+        "Document Processing, KB Build, and Conflict Detection. A consistency fix log records the "
+        "six issues identified and resolved during Sprint Four."
     ))
-    arch_items = [
-        "Service map: five Docker containers, ports, protocols, and startup dependencies",
-        "Environment variable inventory: 18 LLM vars, 23 backend vars, 5 frontend vars",
-        "Data-flow diagrams for all four core pipelines: Chat, Document Processing, KB Build, Conflict Detection",
-        "Consistency fix log: six issues identified and resolved in Sprint Four",
-    ]
-    for item in arch_items:
-        add_bullet(doc, item)
 
     add_para(doc, "Figure 5 illustrates the final documentation structure.")
     add_image(doc, "sprint4_docs_structure.png", width_inches=5.5,
@@ -857,37 +851,35 @@ def build_sprint4():
               caption="Figure 10 — Knowledge Base Document Upload")
 
     add_heading(doc, "Week 10 (22–28 March): Bug Fixes & Architecture Review", level=2)
-    w10 = [
-        "Nam: Produced architecture.md; identified six consistency errors from the architecture review.",
-        "Hung: Fixed visual bugs in ProjectDetailPage.jsx and GraphRenderer.jsx.",
-        "Huyen: Fixed edge cases in AnimateIn.jsx and chat input empty-submit bug.",
-        "Thinh: Fixed duplicate conflict record insertion in ConflictDetectionService; CORS fix.",
-        "Hoang: Fixed chat stream ordering under queue load; improved Reverb startup reliability.",
-    ]
-    for item in w10:
-        add_bullet(doc, item)
+    add_para(doc, (
+        "Week 10 opened with a structured architecture review. Nam produced architecture.md and "
+        "identified six consistency errors spanning all service layers. Hung fixed visual bugs in "
+        "ProjectDetailPage.jsx and GraphRenderer.jsx. Huyen addressed edge cases in AnimateIn.jsx "
+        "and the chat input empty-submit bug. Thinh fixed the duplicate conflict record insertion "
+        "in ConflictDetectionService and resolved the CORS origin whitelist. Hoang fixed chat stream "
+        "ordering under queue load and improved Reverb WebSocket startup reliability."
+    ))
 
     add_heading(doc, "Week 11 (29 March–4 April): Infrastructure Fixes & Testing", level=2)
-    w11 = [
-        "Nam: Applied all six consistency fixes (docker-compose volumes, env var alignment, polling backoff).",
-        "Hung: Wrote Vitest tests for frontend components; restructured README.md.",
-        "Huyen: Completed frontend unit test suite; removed deprecated ProjectDashboardCard component.",
-        "Thinh: Wrote PHPUnit tests; fixed CORS and middleware registration.",
-        "Hoang: Wrote pytest unit tests for LLM service; improved vite.config.js proxy.",
-    ]
-    for item in w11:
-        add_bullet(doc, item)
+    add_para(doc, (
+        "Week 11 focused on applying all six architecture consistency fixes and establishing test "
+        "coverage. Nam applied the docker-compose volume additions, environment variable alignment, "
+        "and progressive polling backoff changes. Hung wrote Vitest unit tests for the frontend "
+        "components and began restructuring README.md. Huyen completed the frontend unit test suite "
+        "and removed the deprecated ProjectDashboardCard component. Thinh wrote PHPUnit tests and "
+        "finalised the CORS and middleware registration fixes. Hoang wrote pytest unit tests for "
+        "all LLM service endpoints and improved the vite.config.js proxy configuration."
+    ))
 
     add_heading(doc, "Week 12 (5–12 April): Documentation & Reports", level=2)
-    w12 = [
-        "Nam: Updated TESTING_GUIDE.md and .env.example; wrote Sprint 3 & 4 reports.",
-        "Hung: Completed README.md restructure; final review of all documentation.",
-        "Huyen: Final component polish and accessibility review.",
-        "Thinh: Integration test verification across the full Docker stack.",
-        "Hoang: Final LLM service test run; preparation for client handover.",
-    ]
-    for item in w12:
-        add_bullet(doc, item)
+    add_para(doc, (
+        "Week 12 completed all final documentation deliverables. Nam updated TESTING_GUIDE.md and "
+        ".env.example and wrote the Sprint Three and Sprint Four reports. Hung completed the README.md "
+        "restructure and conducted a final review of all documentation. Huyen performed final component "
+        "polish and an accessibility review of the UI. Thinh ran integration test verification across "
+        "the full Docker stack to confirm end-to-end correctness. Hoang completed the final LLM service "
+        "test run and coordinated preparation for client handover."
+    ))
 
     # ── 5. SPRINT REVIEW ───────────────────────────────────────────────────
     add_heading(doc, "5. SPRINT REVIEW", level=1)
@@ -902,17 +894,15 @@ def build_sprint4():
     ))
 
     add_heading(doc, "Client Feedback", level=2)
-    feedback4 = [
+    add_para(doc, (
         "The documentation quality was praised — the client confirmed the README was clear enough "
-        "for a non-developer to set up the system.",
-        "The conflict detection improvements (no duplicate records, longer polling timeout) "
-        "resolved an issue the client had observed in Sprint Three.",
-        "The architecture consistency fixes (persistent volumes) were appreciated as they "
-        "resolved data loss on container restart that had affected client testing.",
-        "Final request: persist the model selection preference across browser sessions (deferred post-submission).",
-    ]
-    for f in feedback4:
-        add_bullet(doc, f)
+        "for a non-developer to set up the system independently. The conflict detection improvements "
+        "(no duplicate records and the extended polling timeout) directly resolved an issue the client "
+        "had encountered during Sprint Three testing. The persistent Docker volumes were appreciated "
+        "as they eliminated the data loss on container restart that had affected earlier demonstrations. "
+        "A final request was raised to persist the model selection preference across browser sessions; "
+        "this was noted but deferred as a post-submission enhancement."
+    ))
 
     add_heading(doc, "Progress vs Plan", level=2)
     add_para(doc, (
@@ -943,19 +933,16 @@ def build_sprint4():
     add_heading(doc, "6. RETROSPECT", level=1)
 
     add_heading(doc, "Key Strengths", level=2)
-    strengths4 = [
-        "Architecture review as a structured process: producing architecture.md before writing "
-        "fixes gave the team a shared map of the system, making the six consistency fixes "
-        "straightforward to scope and implement.",
-        "Cross-layer test coverage in one sprint: PHPUnit, Vitest, and pytest suites were all "
-        "established in the same sprint, giving the team confidence across all three service layers "
-        "simultaneously.",
-        "Documentation-first handover: restructuring README.md before the client demonstration "
-        "meant the team could walk the client through setup without improvising — "
-        "the document was the script.",
-    ]
-    for s in strengths4:
-        add_bullet(doc, s)
+    add_para(doc, (
+        "Treating the architecture review as a structured process proved highly effective: producing "
+        "architecture.md before writing any fixes gave the team a shared system map, making the six "
+        "consistency fixes straightforward to scope and implement without overlap or duplication. "
+        "Cross-layer test coverage was established in a single sprint — PHPUnit, Vitest, and pytest "
+        "suites were all delivered simultaneously, providing confidence across all three service layers "
+        "at once. The documentation-first approach to client handover also proved valuable: "
+        "restructuring README.md before the final demonstration meant the team could walk the client "
+        "through setup using the document itself as the script rather than improvising."
+    ))
 
     add_heading(doc, "Process Challenges", level=2)
     add_para(doc, (
@@ -967,20 +954,17 @@ def build_sprint4():
     ))
 
     add_heading(doc, "Overall Project Retrospective", level=2)
-    overall = [
+    add_para(doc, (
         "The LLM4Reqs project successfully delivered a working AI-powered requirements management "
-        "system across four sprints, progressing from a basic prototype to a production-ready "
-        "Docker application with real-time notifications, knowledge base integration, conflict "
-        "detection, and story graph generation.",
-        "The microservices architecture (Laravel + FastAPI + Reverb) proved effective for "
-        "separating concerns but introduced environment consistency challenges that required "
-        "dedicated attention in Sprint Four.",
-        "The team's decision to invest in architecture documentation in the final sprint paid "
-        "dividends: six latent bugs were discovered through the documentation process rather "
-        "than through production failures.",
-    ]
-    for item in overall:
-        add_bullet(doc, item)
+        "system across four sprints, progressing from a basic prototype to a production-ready Docker "
+        "application with real-time notifications, knowledge base integration, conflict detection, "
+        "and story graph generation. The microservices architecture combining Laravel, FastAPI, and "
+        "Reverb proved effective for separating concerns, though it introduced environment consistency "
+        "challenges that required dedicated attention in the final sprint. Most notably, the team's "
+        "decision to invest in architecture documentation before writing fixes paid dividends: six "
+        "latent bugs were surfaced through the documentation process rather than through production "
+        "failures, demonstrating the value of systematic review as a quality gate."
+    ))
 
     add_heading(doc, "Team Code of Conduct", level=2)
     add_para(doc, (
@@ -1000,26 +984,30 @@ def build_sprint4():
 
     # ── 7. LESSONS LEARNED ─────────────────────────────────────────────────
     add_heading(doc, "7. LESSONS LEARNED", level=1)
-    lessons4 = [
-        "Architecture review before the final sprint: a structured review of all service "
-        "interactions surfaced six bugs that had been invisible during feature development. "
-        "This should be scheduled at the mid-point of future projects, not just at the end.",
-        "Docker volume strategy from day one: storing stateful data in /tmp or relative paths "
-        "caused data loss on container restart throughout the project. Named volumes should be "
-        "defined in docker-compose.yml at project inception.",
-        "Shared secrets need a single source of truth: the REVERB_APP_KEY appearing in three "
-        "places (backend/.env, docker-compose.yml, frontend/.env) with different values caused "
-        "a silent WebSocket failure. One canonical value in docker-compose should be the source "
-        "of truth, overriding all others.",
-        "Test infrastructure should be established in Sprint One: retrofitting PHPUnit, Vitest, "
-        "and pytest in the final sprint was successful but expensive. Starting with test scaffolding "
-        "in Sprint One would have caught integration bugs earlier and reduced Sprint Four workload.",
-        "Documentation is a feature: the README restructure directly improved the client "
-        "experience at the final demonstration. Technical documentation should be treated as "
-        "a first-class deliverable with its own acceptance criteria, not a cleanup task.",
-    ]
-    for l in lessons4:
-        add_bullet(doc, l)
+    add_para(doc, (
+        "A structured architecture review should be scheduled at the mid-point of future projects "
+        "rather than reserved for the final sprint. In this project it surfaced six bugs that had been "
+        "invisible during feature development; conducted earlier, it would have prevented rather than "
+        "corrected them. Equally important, Docker volume strategy must be defined from day one: "
+        "storing stateful data in /tmp or relative paths caused recurring data loss on container "
+        "restart throughout the project. Named volumes should be declared in docker-compose.yml at "
+        "project inception."
+    ))
+    add_para(doc, (
+        "Shared secrets require a single authoritative source. The REVERB_APP_KEY appearing in three "
+        "separate files with different values caused a silent WebSocket failure that was difficult to "
+        "diagnose. Going forward, one canonical value in docker-compose should override all others. "
+        "Test infrastructure should similarly be established in Sprint One — retrofitting PHPUnit, "
+        "Vitest, and pytest in the final sprint was achievable but expensive; starting with test "
+        "scaffolding earlier would have caught integration bugs sooner and significantly reduced "
+        "Sprint Four's workload."
+    ))
+    add_para(doc, (
+        "Finally, documentation is a feature in its own right. The README restructure directly "
+        "improved the client experience at the final demonstration and was cited as a highlight in "
+        "client feedback. Technical documentation should be treated as a first-class deliverable "
+        "with explicit acceptance criteria from the first sprint, not deferred as a cleanup task."
+    ))
 
     out_path = os.path.join(DOCS_DIR, "Sprint4_Report_COS40006.docx")
     doc.save(out_path)
