@@ -208,67 +208,69 @@ def build_sprint3():
 
     contrib_data = [
         (
-            "1.1  Dinh Danh Nam — LLM Module: SDK Migration, Web Search & Model Manager",
+            "1.1  Dinh Danh Nam — Lead Developer: Full-Stack Coding, Optimization & Docker",
             [
+                "Led the majority of coding work across all three service layers (LLM, backend, frontend) "
+                "throughout Sprint Three.",
                 "Completed migration from the deprecated google-generativeai library to the new google-genai SDK, "
-                "eliminating deprecation warnings and restoring Gemini model compatibility.",
-                "Added a web_search tool (llm/tools/web_search.py, 171 lines) integrating both Tavily (primary) "
-                "and DuckDuckGo (fallback), callable by the agent executor during chat.",
-                "Refactored LLMService.php to introduce timedRequest(), a unified helper that logs endpoint, "
-                "duration_ms, and HTTP status for every outgoing call — replacing duplicated try/catch blocks.",
-                "Improved model_manager.py to remove a broken httpx.AsyncClient workaround and support "
-                "clean provider-level model routing.",
-                "Key commits: 1464d7e (SDK migration), 119ca2d (web search tool), ee2b91a (LLM perf).",
+                "eliminating deprecation warnings and restoring Gemini model compatibility (1464d7e).",
+                "Added the web_search tool (llm/tools/web_search.py, 171 lines) integrating Tavily (primary) "
+                "and DuckDuckGo (fallback), callable by the agent executor during chat (119ca2d).",
+                "Implemented ActivityLog and Notification models, migrations, controllers, and wired all "
+                "background jobs to emit activity events and push real-time notifications (119ca2d).",
+                "Refactored LLMService.php with the timedRequest() helper, eliminating duplicated try/catch "
+                "blocks and adding structured latency logging across all LLM calls.",
+                "Resolved backend N+1 query bottlenecks with eager loading; added RequestTiming middleware "
+                "and 60-second KB query caching for measurable performance gains (39a2ef7, ee2b91a).",
+                "Rebuilt and maintained Docker configuration throughout the sprint, resolving container "
+                "startup issues and environment variable conflicts.",
+                "Key commits: 1464d7e, 119ca2d, ee2b91a, 39a2ef7, 97eee65.",
             ],
         ),
         (
-            "1.2  Nguyen Quy Hung — Frontend: UI Fixes, Performance Overlay & Import Modal",
+            "1.2  Nguyen Quy Hung — Frontend: UI Bug Fixes",
             [
-                "Fixed Mermaid graph parse errors preventing complex story maps from rendering (2986977).",
-                "Resolved model selector z-index issue so the dropdown renders above the sidebar (2986977).",
-                "Implemented the PerfOverlay component (248 lines): toggled via Ctrl+Shift+P, displays recent "
-                "API calls with duration, method, path, and success/failure colour-coding.",
-                "Built ImportModal.jsx for importing requirement sets from external sources.",
-                "Added cache.js utility (localStorage with TTL) and performanceMonitor.js "
-                "([PERF] emoji grading: 🚀/⚡/🐌) to the frontend utilities.",
-                "Key commits: 2986977, 119ca2d.",
+                "Fixed Mermaid graph parse errors that prevented complex story maps from rendering (2986977).",
+                "Resolved the model selector z-index layering issue so the dropdown renders correctly "
+                "above the sidebar on all screen sizes (2986977).",
+                "Implemented user avatar display in the sidebar and message bubbles; converted "
+                "dropdown menus to dropup menus for improved usability on larger screens (ee0b859).",
+                "Set default model selection so users are not required to manually choose a model "
+                "for each new conversation (ee0b859).",
+                "Key commits: 2986977, ee0b859.",
             ],
         ),
         (
-            "1.3  Vo Thi Kim Huyen — Frontend: Notifications, Activity Feed & UI Components",
+            "1.3  Vo Thi Kim Huyen — Testing & Documentation",
             [
-                "Implemented NotificationBell.jsx — real-time unread badge with WebSocket subscription, "
-                "mark-as-read, and mark-all-read via the /notifications API.",
-                "Built ActivityFeed.jsx to display a chronological audit trail of project actions.",
-                "Created Toast.jsx for transient success/error notifications and AnimateIn.jsx "
-                "for smooth entrance animations on key UI sections.",
-                "Added ShimmerSkeleton.jsx and ProjectDashboardCard.jsx to improve perceived load performance.",
-                "Implemented useNotifications.js hook (80 lines) to encapsulate notification state and polling.",
-                "Key commits: 119ca2d, ee0b859.",
+                "Wrote and executed manual test cases covering graph rendering, model selector, "
+                "user avatar display, and notification badge behaviour.",
+                "Documented test scenarios and expected outcomes for the Sprint Three test case "
+                "specification table.",
+                "Verified UI changes across Chrome and Firefox as required by the Definition of Done.",
+                "Contributed to sprint documentation including quality management goals and test results.",
             ],
         ),
         (
-            "1.4  Le Luu Phuoc Thinh — Backend: Performance Optimizations & Request Timing",
+            "1.4  Le Luu Phuoc Thinh — Testing & Documentation",
             [
-                "Resolved backend bottleneck issues causing slow responses under load (39a2ef7).",
-                "Added RequestTiming middleware that logs wall-clock time for every HTTP request "
-                "passing through the Laravel pipeline.",
-                "Optimised the project list and conversation queries with eager loading to eliminate N+1 queries.",
-                "Added cache.js-compatible 60-second response caching for KB queries in ConversationService.",
-                "Key commits: 39a2ef7, ee2b91a.",
+                "Designed and executed integration test cases for the SDK migration, performance "
+                "benchmarks, and backend API endpoints.",
+                "Used Apache Bench (ab) to measure API response times and verify the 20% improvement "
+                "target was met against Sprint Two baselines.",
+                "Maintained the test results table and tracked pass/fail status across all test areas.",
+                "Contributed to quality management planning and acceptance criteria definition.",
             ],
         ),
         (
-            "1.5  Hoang Dinh Vinh Hoang — Backend: Activity Logs, Notifications & Project Features",
+            "1.5  Hoang Dinh Vinh Hoang — Testing, Documentation & Scrum Master",
             [
-                "Designed and implemented ActivityLog model + migration (2026_03_22_000000), "
-                "ActivityLogController, and a log() helper used by all background jobs.",
-                "Implemented Notification model + migration (2026_03_22_000001) with "
-                "conflictDetected() and requirementsExtracted() factory methods.",
-                "Added NotificationsController with list, mark-read, mark-all-read, and unread-count endpoints.",
-                "Enhanced ProjectController with dashboard data endpoint and collaborator statistics.",
-                "Wired ProcessConflictDetectionJob to log activity and fire notifications on completion.",
-                "Key commits: 119ca2d, 97eee65.",
+                "Served as Scrum Master for Sprint Three: facilitated standups, tracked backlog "
+                "progress, and coordinated the client demonstration session.",
+                "Wrote and executed integration test cases for the notification system, activity feed, "
+                "and web search tool.",
+                "Prepared sprint documentation including the sprint plan, retrospective, and lessons learned.",
+                "Coordinated client feedback collection during the Sprint Three demonstration on 21 March 2026.",
             ],
         ),
     ]
@@ -587,8 +589,9 @@ def build_sprint4():
 
     contrib_data4 = [
         (
-            "1.1  Dinh Danh Nam — Architecture Consistency Review & Bug Fixes",
+            "1.1  Dinh Danh Nam — Lead Developer: Full-Stack Coding, Optimization & Docker",
             [
+                "Led the majority of coding work in Sprint Four across all modules.",
                 "Conducted a full architecture review, producing architecture.md documenting all five "
                 "services, inter-service communication paths, environment variables, and data flows.",
                 "Identified and fixed six consistency errors: REVERB_APP_KEY mismatch between "
@@ -596,60 +599,62 @@ def build_sprint4():
                 "hardcoded model name in memory_service.py; missing GEMINI_API_KEY in .env.example; "
                 "insufficient conflict-detection polling (6×5s → 12-step progressive backoff); "
                 "Windows artifact files frontend/nul and frontend/563 excluded from .gitignore.",
-                "Added persistent Docker volumes (llm_data, backend_storage) to preserve FAISS index "
-                "and conflict JSON across container restarts.",
-                "Key commits: 2220383.",
+                "Added persistent Docker named volumes (llm_data, backend_storage) to preserve FAISS "
+                "index and conflict JSON across container restarts.",
+                "Fixed conflict detection: duplicate records, polling timeout extended to 300s.",
+                "Fixed CORS middleware, bootstrap/app.php middleware registration, and chat sync "
+                "ordering under queue load.",
+                "Maintained and rebuilt the full Docker stack throughout the sprint; resolved "
+                "Reverb startup timing and SQLite volume permission issues.",
+                "Updated TESTING_GUIDE.md and .env.example; managed sprint report generation.",
+                "Key commits: 2220383, 982389a.",
             ],
         ),
         (
-            "1.2  Nguyen Quy Hung — Visual Bug Fixes & README Restructure",
+            "1.2  Nguyen Quy Hung — Frontend: Visual Bug Fixes",
             [
                 "Identified and fixed multiple visual bugs in ProjectDetailPage.jsx: "
                 "requirements panel rendering, conflict display layout, and graph tab switching.",
-                "Improved GraphRenderer.jsx with better error states and loading indicators.",
-                "Improved FileUpload.jsx with drag-and-drop feedback and progress indicators.",
-                "Significantly expanded Sidebar.jsx with a collapsible project tree structure.",
-                "Restructured README.md from a developer changelog into a user-facing onboarding guide "
-                "with installation, quick start, feature walkthrough, and troubleshooting sections.",
-                "Key commits: 982389a, 1109a09.",
+                "Improved GraphRenderer.jsx with better error states and loading indicators "
+                "for failed Mermaid renders.",
+                "Improved FileUpload.jsx with drag-and-drop visual feedback and upload progress indicators.",
+                "Expanded Sidebar.jsx with a collapsible project navigation tree.",
+                "Key commits: 982389a.",
             ],
         ),
         (
-            "1.3  Vo Thi Kim Huyen — Frontend Unit Tests & Component Fixes",
+            "1.3  Vo Thi Kim Huyen — Testing & Documentation",
             [
-                "Wrote Vitest unit tests for key frontend components: NotificationBell, ActivityFeed, "
-                "Toast, PerfOverlay, and the performanceMonitor utility.",
-                "Fixed minor animation jitter in AnimateIn.jsx and ShimmerSkeleton.jsx.",
-                "Resolved an edge case where the chat input incorrectly submitted empty messages.",
-                "Removed deprecated ProjectDashboardCard.jsx (replaced by Sidebar project tree) "
-                "to reduce bundle size.",
-                "Key commits: 982389a, 1109a09.",
+                "Wrote and executed frontend manual test cases verifying all Sprint Three and "
+                "Sprint Four features in the live Docker environment.",
+                "Documented test procedures and results for the Sprint Four test results table.",
+                "Contributed to final documentation review, checking README.md for accuracy "
+                "and completeness from a user perspective.",
+                "Verified all UI fixes across Chrome and Firefox per the Definition of Done.",
             ],
         ),
         (
-            "1.4  Le Luu Phuoc Thinh — Backend Unit Tests & Conflict Detection Fix",
+            "1.4  Le Luu Phuoc Thinh — Testing & Documentation",
             [
-                "Wrote PHPUnit unit tests for ConversationService, LLMService timedRequest(), "
-                "and ProcessConflictDetectionJob polling logic.",
-                "Fixed a bug in ConflictDetectionService.php where duplicate conflict records "
-                "were inserted when the same requirements set was reprocessed.",
-                "Fixed CORS middleware to allow the frontend origin in production mode.",
-                "Added bootstrap/app.php registration for the new RequestTiming middleware.",
-                "Key commits: 982389a, 1109a09.",
+                "Wrote and executed backend integration test cases for the conflict detection fix, "
+                "CORS configuration, and middleware registration.",
+                "Ran full Docker stack integration tests to verify all five services communicate "
+                "correctly after Sprint Four fixes.",
+                "Contributed to the architecture.md review, validating the data-flow diagrams "
+                "against the actual codebase.",
+                "Maintained the test results table and verified all acceptance criteria were met.",
             ],
         ),
         (
-            "1.5  Hoang Dinh Vinh Hoang — LLM Tests, Chat Sync Fix & Docker Stability",
+            "1.5  Hoang Dinh Vinh Hoang — Testing, Documentation & Scrum Master",
             [
-                "Wrote pytest unit tests for the LLM service: /api/chat, /api/extract, "
-                "/kb/build, and the web_search tool.",
-                "Fixed a chat synchronisation bug where streaming responses occasionally delivered "
-                "chunks out of order when the queue was under load.",
-                "Resolved a Docker runtime stability issue: the reverb service occasionally "
-                "failed to connect to the SQLite volume on first boot; fixed with a startup delay "
-                "and a retry loop in the startup command.",
-                "Improved vite.config.js proxy configuration for more reliable hot-module replacement.",
-                "Key commits: 982389a, 1109a09.",
+                "Served as Scrum Master for Sprint Four: facilitated standups, coordinated "
+                "the final client demonstration, and managed sprint closure.",
+                "Wrote and executed LLM service test cases: /api/chat, /api/extract, /kb/build, "
+                "and the web_search tool, verifying correct responses and error handling.",
+                "Prepared sprint retrospective, lessons learned, and overall project retrospective "
+                "sections for the Sprint Four report.",
+                "Coordinated client feedback collection and confirmed final increment acceptance.",
             ],
         ),
     ]
